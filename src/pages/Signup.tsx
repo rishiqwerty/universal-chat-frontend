@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { signupAccount } from "../api/api";
 
 function LogoMark() {
   return (
@@ -11,16 +12,32 @@ function LogoMark() {
   );
 }
 
-export default function Login() {
+export default function Signup() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [persist, setPersist] = useState(true);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
-    navigate("/library");
+    setError("");
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await signupAccount({ email, password });
+      navigate("/login");
+    } catch {
+      setError("Could not create account. Try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -39,9 +56,15 @@ export default function Login() {
         </p>
 
         <form
-          onSubmit={handleLogin}
+          onSubmit={handleSignup}
           className="mt-10 rounded-card bg-surface p-8 shadow-none ring-1 ring-border/40"
         >
+          {error ? (
+            <p className="mb-4 rounded-input bg-elevated px-3 py-2 text-sm text-textSecondary ring-1 ring-border/50">
+              {error}
+            </p>
+          ) : null}
+
           <label className="block">
             <span className="text-xs font-medium text-textSecondary">Email</span>
             <div className="relative mt-2">
@@ -60,14 +83,9 @@ export default function Login() {
           </label>
 
           <div className="mt-5">
-            <div className="flex items-center justify-between">
-              <label htmlFor="password" className="text-xs font-medium text-textSecondary">
-                Password
-              </label>
-              <button type="button" className="text-xs font-medium text-primary hover:text-primaryHover">
-                Forgot password?
-              </button>
-            </div>
+            <label htmlFor="signup-password" className="text-xs font-medium text-textSecondary">
+              Password
+            </label>
             <div className="relative mt-2">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted">
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -76,9 +94,9 @@ export default function Login() {
                 </svg>
               </span>
               <input
-                id="password"
+                id="signup-password"
                 type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -98,21 +116,46 @@ export default function Login() {
             </div>
           </div>
 
-          <label className="mt-6 flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={persist}
-              onChange={(e) => setPersist(e.target.checked)}
-              className="h-4 w-4 rounded border-border bg-elevated accent-primary focus:ring-primary/40"
-            />
-            <span className="text-sm text-textSecondary">Maintain persistent session (24h)</span>
-          </label>
+          <div className="mt-5">
+            <label htmlFor="signup-password-confirm" className="text-xs font-medium text-textSecondary">
+              Confirm password
+            </label>
+            <div className="relative mt-2">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="5" y="11" width="14" height="10" rx="2" />
+                  <path d="M8 11V7a4 4 0 018 0v4" />
+                </svg>
+              </span>
+              <input
+                id="signup-password-confirm"
+                type={showConfirmPassword ? "text" : "password"}
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                className="h-11 w-full rounded-input border border-border/50 bg-elevated py-2 pl-10 pr-11 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((s) => !s)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-textMuted transition-colors hover:text-textSecondary"
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+          </div>
 
           <button
             type="submit"
-            className="mt-8 w-full rounded-input bg-primary py-3 text-sm font-bold text-background shadow-[0_0_24px_rgba(217,255,0,0.35)] transition-colors hover:bg-primaryHover"
+            disabled={loading}
+            className="mt-8 w-full rounded-input bg-primary py-3 text-sm font-bold text-background shadow-[0_0_24px_rgba(217,255,0,0.35)] transition-colors hover:bg-primaryHover disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Secure Login
+            {loading ? "Creating account…" : "Create account"}
           </button>
 
           <p className="mt-8 text-center text-[10px] font-semibold uppercase tracking-widest text-textMuted">
@@ -142,9 +185,9 @@ export default function Login() {
         </form>
 
         <p className="mt-8 text-center text-sm text-textSecondary">
-          New operative?{" "}
-          <Link to="/signup" className="font-medium text-primary hover:text-primaryHover">
-            Initialize account
+          Already registered?{" "}
+          <Link to="/login" className="font-medium text-primary hover:text-primaryHover">
+            Sign in
           </Link>
         </p>
 
