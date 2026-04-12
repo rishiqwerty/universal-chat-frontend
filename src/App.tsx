@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { AnimatePresence } from "framer-motion";
 import Chat from "./pages/Chat";
 import Library from "./pages/Library";
 import Login from "./pages/Login";
@@ -17,16 +18,20 @@ function GuestRoute({ children }: { children: JSX.Element }) {
 
 export default function App() {
   const isAuth = localStorage.getItem("isAuthenticated") === "true";
+  const location = useLocation();
 
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to={isAuth ? "/chat" : "/login"} replace />} />
-      <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
-      <Route path="/signup" element={<Signup />} />
-      <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-      <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-      <Route path="*" element={<Navigate to={isAuth ? "/chat" : "/login"} replace />} />
-    </Routes>
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route path="/" element={<Navigate to={isAuth ? "/chat" : "/login"} replace />} />
+        <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+        <Route path="*" element={<Navigate to={isAuth ? "/chat" : "/login"} replace />} />
+      </Routes>
+    </AnimatePresence>
   );
 }
+

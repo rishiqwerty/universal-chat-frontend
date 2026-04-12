@@ -8,6 +8,7 @@ import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import WelcomeScreen from "../components/WelcomeScreen";
 import ConfirmModal from "../components/ConfirmModal";
+import PageTransition from "../components/PageTransition";
 
 const initialMessages: ChatMessage[] = [];
 
@@ -26,11 +27,11 @@ export default function Chat() {
   );
   const [activeChatTitle, setActiveChatTitle] = useState<string | null>(null);
   const [recentChats, setRecentChats] = useState<Conversation[]>([]);
-  
+
   const [availableModels, setAvailableModels] = useState<ProviderModels[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
-  
+
   const streamControllerRef = useRef<AbortController | null>(null);
   const messageInputRef = useRef<MessageInputHandle>(null);
 
@@ -109,14 +110,14 @@ export default function Chat() {
 
       // Priority 1: Latest assistant message in history
       const latestAssistantMsg = [...msgs].reverse().find(m => m.role === "assistant" && m.provider && m.model);
-      
+
       if (latestAssistantMsg) {
         setSelectedProvider(latestAssistantMsg.provider);
         setSelectedModel(latestAssistantMsg.model);
         // Sync to local storage for quick access next time
-        localStorage.setItem(`chat_model_config_${id}`, JSON.stringify({ 
-          provider: latestAssistantMsg.provider, 
-          model: latestAssistantMsg.model 
+        localStorage.setItem(`chat_model_config_${id}`, JSON.stringify({
+          provider: latestAssistantMsg.provider,
+          model: latestAssistantMsg.model
         }));
       } else {
         // Priority 2: Per-chat model config
@@ -193,7 +194,7 @@ export default function Chat() {
   const handleModelChange = useCallback((provider: string, model: string) => {
     setSelectedProvider(provider);
     setSelectedModel(model);
-    
+
     const config = JSON.stringify({ provider, model });
     if (activeChatId) {
       localStorage.setItem(`chat_model_config_${activeChatId}`, config);
@@ -324,7 +325,7 @@ export default function Chat() {
         // This avoids reloading the whole conversation details/title
         if (currentChatId) {
           syncMessages(currentChatId);
-          
+
           // Refresh sidebar to catch auto-generated title from backend and update top bar
           getRecentConversations(true)
             .then((chats) => {
@@ -401,136 +402,138 @@ export default function Chat() {
   const isEmpty = messages.length === 0;
 
   return (
-    <div className="flex h-screen min-h-0 overflow-hidden bg-background">
-      <Sidebar activeNav="chat" onNewChat={handleNewChat} onSelectChat={loadConversation} onDeleteChat={handleDeleteConversation} recentChats={recentChats} activeChatId={activeChatId} />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <Topbar activeChatTitle={activeChatTitle} onUpdateTitle={handleUpdateTitle} onDeleteChat={activeChatId ? () => handleDeleteConversation() : undefined} />
+    <PageTransition>
+      <div className="flex h-screen min-h-0 overflow-hidden bg-background">
+        <Sidebar activeNav="chat" onNewChat={handleNewChat} onSelectChat={loadConversation} onDeleteChat={handleDeleteConversation} recentChats={recentChats} activeChatId={activeChatId} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <Topbar activeChatTitle={activeChatTitle} onUpdateTitle={handleUpdateTitle} onDeleteChat={activeChatId ? () => handleDeleteConversation() : undefined} />
 
-        <AnimatePresence mode="wait">
-          {isEmpty ? (
-            /* Welcome layout — everything centered as one block */
-            <motion.div
-              key="welcome-screen"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex min-h-0 flex-1 flex-col items-center justify-center bg-background px-6"
-            >
-              <WelcomeScreen />
+          <AnimatePresence mode="wait">
+            {isEmpty ? (
+              /* Welcome layout — everything centered as one block */
               <motion.div
-                layoutId="chat-input-container"
-                transition={{ type: "spring", stiffness: 260, damping: 30 }}
-                className="mt-8 w-full max-w-2xl"
+                key="welcome-screen"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="flex min-h-0 flex-1 flex-col items-center justify-center bg-background px-6"
               >
-                <div className="mx-auto flex w-full flex-col gap-4">
-                  {streamError && (
-                    <div className="flex items-center gap-3 animate-fade-in">
-                      <p className="flex-1 rounded-input bg-primary/10 px-4 py-2 text-sm text-primary ring-1 ring-primary/50">
-                        {streamError}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleRetry}
-                        className="flex items-center gap-2 rounded-input bg-primary px-4 py-2 text-sm font-semibold text-background shadow-[0_0_12px_rgba(217,255,0,0.2)] transition-colors hover:bg-primaryHover"
-                      >
-                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M1 4v6h6M23 20v-6h-6" />
-                          <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
-                        </svg>
-                        Retry
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => messageInputRef.current?.openPicker()}
-                        className="flex items-center gap-2 rounded-input border border-border bg-sidebar px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-elevated"
-                      >
-                        Change Model
-                      </button>
-                    </div>
-                  )}
-                  <MessageInput
-                    ref={messageInputRef}
-                    value={draft}
-                    onChange={setDraft}
-                    onSend={send}
-                    disabled={!!streamError || isProcessing}
-                    isStreaming={pending}
-                    availableModels={availableModels}
-                    selectedProvider={selectedProvider}
-                    selectedModel={selectedModel}
-                    onModelChange={handleModelChange}
-                  />
-                </div>
+                <WelcomeScreen />
+                <motion.div
+                  layoutId="chat-input-container"
+                  transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                  className="mt-8 w-full max-w-2xl"
+                >
+                  <div className="mx-auto flex w-full flex-col gap-4">
+                    {streamError && (
+                      <div className="flex items-center gap-3 animate-fade-in">
+                        <p className="flex-1 rounded-input bg-primary/10 px-4 py-2 text-sm text-primary ring-1 ring-primary/50">
+                          {streamError}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleRetry}
+                          className="flex items-center gap-2 rounded-input bg-primary px-4 py-2 text-sm font-semibold text-background shadow-[0_0_12px_rgba(217,255,0,0.2)] transition-colors hover:bg-primaryHover"
+                        >
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M1 4v6h6M23 20v-6h-6" />
+                            <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
+                          </svg>
+                          Retry
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => messageInputRef.current?.openPicker()}
+                          className="flex items-center gap-2 rounded-input border border-border bg-sidebar px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-elevated"
+                        >
+                          Change Model
+                        </button>
+                      </div>
+                    )}
+                    <MessageInput
+                      ref={messageInputRef}
+                      value={draft}
+                      onChange={setDraft}
+                      onSend={send}
+                      disabled={!!streamError || isProcessing}
+                      isStreaming={pending}
+                      availableModels={availableModels}
+                      selectedProvider={selectedProvider}
+                      selectedModel={selectedModel}
+                      onModelChange={handleModelChange}
+                    />
+                  </div>
+                </motion.div>
               </motion.div>
-            </motion.div>
-          ) : (
-            /* Normal chat layout */
-            <motion.div
-              key="chat-screen"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-              className="flex min-h-0 flex-1 flex-col"
-            >
-              <ChatWindow messages={messages} onDeleteMessage={handleDeleteMessage} />
+            ) : (
+              /* Normal chat layout */
               <motion.div
-                layoutId="chat-input-container"
-                transition={{ type: "spring", stiffness: 260, damping: 30 }}
-                className="w-full"
+                key="chat-screen"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className="flex min-h-0 flex-1 flex-col"
               >
-                <div className="mx-auto w-full max-w-4xl px-6 pb-6 pt-2">
-                  {streamError && (
-                    <div className="mb-4 flex items-center gap-3 animate-fade-in">
-                      <p className="flex-1 rounded-input bg-primary/10 px-4 py-2 text-sm text-primary ring-1 ring-primary/50">
-                        {streamError}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleRetry}
-                        className="flex items-center gap-2 rounded-input bg-primary px-4 py-2 text-sm font-semibold text-background shadow-[0_0_12px_rgba(217,255,0,0.2)] transition-colors hover:bg-primaryHover"
-                      >
-                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M1 4v6h6M23 20v-6h-6" />
-                          <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
-                        </svg>
-                        Retry
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => messageInputRef.current?.openPicker()}
-                        className="flex items-center gap-2 rounded-input border border-border bg-sidebar px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-elevated"
-                      >
-                        Change Model
-                      </button>
-                    </div>
-                  )}
-                  <MessageInput
-                    ref={messageInputRef}
-                    value={draft}
-                    onChange={setDraft}
-                    onSend={send}
-                    disabled={!!streamError || isProcessing}
-                    isStreaming={pending}
-                    availableModels={availableModels}
-                    selectedProvider={selectedProvider}
-                    selectedModel={selectedModel}
-                    onModelChange={handleModelChange}
-                  />
-                </div>
+                <ChatWindow messages={messages} onDeleteMessage={handleDeleteMessage} />
+                <motion.div
+                  layoutId="chat-input-container"
+                  transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                  className="w-full"
+                >
+                  <div className="mx-auto w-full max-w-4xl px-6 pb-6 pt-2">
+                    {streamError && (
+                      <div className="mb-4 flex items-center gap-3 animate-fade-in">
+                        <p className="flex-1 rounded-input bg-primary/10 px-4 py-2 text-sm text-primary ring-1 ring-primary/50">
+                          {streamError}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleRetry}
+                          className="flex items-center gap-2 rounded-input bg-primary px-4 py-2 text-sm font-semibold text-background shadow-[0_0_12px_rgba(217,255,0,0.2)] transition-colors hover:bg-primaryHover"
+                        >
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M1 4v6h6M23 20v-6h-6" />
+                            <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
+                          </svg>
+                          Retry
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => messageInputRef.current?.openPicker()}
+                          className="flex items-center gap-2 rounded-input border border-border bg-sidebar px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-elevated"
+                        >
+                          Change Model
+                        </button>
+                      </div>
+                    )}
+                    <MessageInput
+                      ref={messageInputRef}
+                      value={draft}
+                      onChange={setDraft}
+                      onSend={send}
+                      disabled={!!streamError || isProcessing}
+                      isStreaming={pending}
+                      availableModels={availableModels}
+                      selectedProvider={selectedProvider}
+                      selectedModel={selectedModel}
+                      onModelChange={handleModelChange}
+                    />
+                  </div>
+                </motion.div>
               </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <ConfirmModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          onConfirm={handleConfirmDelete}
+          title="Delete Conversation"
+          message="Are you sure you want to delete this conversation? This action cannot be undone and will remove all messages associated with it."
+        />
       </div>
-
-      <ConfirmModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={handleConfirmDelete}
-        title="Delete Conversation"
-        message="Are you sure you want to delete this conversation? This action cannot be undone and will remove all messages associated with it."
-      />
-    </div>
+    </PageTransition>
   );
 }
