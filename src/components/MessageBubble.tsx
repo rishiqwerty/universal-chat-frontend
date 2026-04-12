@@ -6,9 +6,12 @@ type MessageBubbleProps = {
   role: "user" | "assistant";
   content: string;
   onDelete?: () => void;
+  provider?: string;
+  model?: string;
+  isComplete?: boolean;
 };
 
-export default function MessageBubble({ role, content, onDelete }: MessageBubbleProps) {
+export default function MessageBubble({ role, content, onDelete, provider, model, isComplete }: MessageBubbleProps) {
   const isUser = role === "user";
 
   if (isUser) {
@@ -48,9 +51,9 @@ export default function MessageBubble({ role, content, onDelete }: MessageBubble
   }
 
   return (
-    <div className="flex w-full justify-start group">
+    <div className="flex w-full flex-col justify-start group">
       <div className="flex items-start gap-2">
-        <div className="max-w-[min(100%,48rem)] rounded-card px-4 py-3 text-sm leading-relaxed bg-surface text-textSecondary prose-chat">
+        <div className="max-w-[min(100%,48rem)] rounded-card px-4 py-3 text-sm leading-relaxed bg-surface text-textSecondary prose-chat shadow-sm">
           <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           rehypePlugins={[rehypeHighlight]}
@@ -148,6 +151,22 @@ export default function MessageBubble({ role, content, onDelete }: MessageBubble
         </button>
       )}
       </div>
+      {model && (
+        <div className="mt-1.5 flex flex-col gap-0.5 px-3 truncate max-w-[min(100%,48rem)]">
+          <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#D9FF00]/60 leading-tight">{provider || "AI"}</span>
+          <span className="text-[10px] font-medium text-textMuted/60 leading-tight tracking-tight">{model}</span>
+        </div>
+      )}
+      {isComplete === false && content && (
+        <div className="mt-2 flex items-center gap-2 px-3">
+          <div className="flex items-center gap-1">
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/70 [animation-delay:0ms]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/70 [animation-delay:150ms]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/70 [animation-delay:300ms]" />
+          </div>
+          <span className="text-[10px] font-medium text-textMuted/50">Processing...</span>
+        </div>
+      )}
     </div>
   );
 }

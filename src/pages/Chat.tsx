@@ -1,12 +1,13 @@
-import { useCallback, useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { createConversation, updateConversationTitle, getRecentConversations, getConversationDetails, getConversationMessages, sendMessageStream, deleteConversation, deleteMessage, type Conversation } from "../api/api";
+import { createConversation, updateConversationTitle, getRecentConversations, getConversationDetails, getConversationMessages, sendMessageStream, deleteConversation, deleteMessage, getAvailableModels, type Conversation, type ProviderModels } from "../api/api";
 import ChatWindow, { type ChatMessage } from "../components/ChatWindow";
-import MessageInput from "../components/MessageInput";
+import MessageInput, { type MessageInputHandle } from "../components/MessageInput";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import WelcomeScreen from "../components/WelcomeScreen";
+import ConfirmModal from "../components/ConfirmModal";
 
 const initialMessages: ChatMessage[] = [];
 
@@ -25,7 +26,16 @@ export default function Chat() {
   );
   const [activeChatTitle, setActiveChatTitle] = useState<string | null>(null);
   const [recentChats, setRecentChats] = useState<Conversation[]>([]);
+  
+  const [availableModels, setAvailableModels] = useState<ProviderModels[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  
   const streamControllerRef = useRef<AbortController | null>(null);
+  const messageInputRef = useRef<MessageInputHandle>(null);
+
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [chatIdToDelete, setChatIdToDelete] = useState<string | null>(null);
 
   const cancelActiveStream = useCallback(() => {
     if (streamControllerRef.current) {
@@ -39,15 +49,35 @@ export default function Chat() {
   }, [cancelActiveStream]);
 
   const handleNewChat = useCallback(() => {
+    if (!activeChatId && messages.length === 0) {
+      // Already in a new empty chat, just focus and show glow
+      messageInputRef.current?.focus();
+      messageInputRef.current?.triggerGlow();
+      return;
+    }
+
     cancelActiveStream();
     setPending(false);
     setActiveChatId(null);
     localStorage.removeItem("activeChatId");
     setActiveChatTitle("Untitled Chat");
     setMessages([]);
-  }, [cancelActiveStream]);
+
+    // Restore global default for new chat
+    const savedDefault = localStorage.getItem("default_model_config");
+    if (savedDefault) {
+      const { provider, model } = JSON.parse(savedDefault);
+      setSelectedProvider(provider);
+      setSelectedModel(model);
+    }
+
+    // Auto focus new chat
+    setTimeout(() => messageInputRef.current?.focus(), 100);
+  }, [cancelActiveStream, activeChatId, messages.length]);
 
   const loadConversation = useCallback(async (id: string) => {
+    if (id === activeChatId) return;
+
     cancelActiveStream();
     setPending(false);
     setStreamError(null);
@@ -59,15 +89,56 @@ export default function Chat() {
       setActiveChatId(details.id);
       localStorage.setItem("activeChatId", details.id);
       setActiveChatTitle(details.title);
+
+      // Sync sidebar title if it changed on backend
+      setRecentChats((prev) =>
+        prev.map((c) => (c.id === details.id ? { ...c, title: details.title } : c))
+      );
+
       // Map server roles down to valid UI Chat window roles
       const formatted: ChatMessage[] = msgs.map((m) => ({
         id: m.id,
-        role: m.role === "system" ? "assistant" : m.role,
+        role: m.role === "system" ? "assistant" : (m.role as any),
         content: m.content,
+        provider: m.provider,
+        model: m.model,
+        isComplete: m.is_complete,
+      }));
+      setMessages(formatted);
+
+      // Restore per-chat model config or fall back to default
+      const savedChatConfig = localStorage.getItem(`chat_model_config_${id}`);
+      if (savedChatConfig) {
+        const { provider, model } = JSON.parse(savedChatConfig);
+        setSelectedProvider(provider);
+        setSelectedModel(model);
+      } else {
+        const savedDefault = localStorage.getItem("default_model_config");
+        if (savedDefault) {
+          const { provider, model } = JSON.parse(savedDefault);
+          setSelectedProvider(provider);
+          setSelectedModel(model);
+        }
+      }
+    } catch {
+      console.error("Failed to load chat history");
+    }
+  }, [cancelActiveStream, activeChatId]);
+
+  const syncMessages = useCallback(async (id: string) => {
+    try {
+      const msgs = await getConversationMessages(id);
+      const formatted: ChatMessage[] = msgs.map((m) => ({
+        id: m.id,
+        role: m.role === "system" ? "assistant" : (m.role as any),
+        content: m.content,
+        provider: m.provider,
+        model: m.model,
+        isComplete: m.is_complete,
       }));
       setMessages(formatted);
     } catch {
-      console.error("Failed to load chat history");
+      console.error("Failed to sync messages");
     }
   }, []);
 
@@ -98,18 +169,42 @@ export default function Chat() {
     }
   }, [activeChatId]);
 
-  const handleDeleteConversation = useCallback(async () => {
-    if (!activeChatId) return;
+  const handleModelChange = useCallback((provider: string, model: string) => {
+    setSelectedProvider(provider);
+    setSelectedModel(model);
+    
+    const config = JSON.stringify({ provider, model });
+    if (activeChatId) {
+      localStorage.setItem(`chat_model_config_${activeChatId}`, config);
+    } else {
+      localStorage.setItem("default_model_config", config);
+    }
+  }, [activeChatId]);
+
+  const handleDeleteConversation = useCallback(async (id?: string) => {
+    const targetId = id || activeChatId;
+    if (!targetId) return;
+    setChatIdToDelete(targetId);
+    setIsDeleteModalOpen(true);
+  }, [activeChatId]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!chatIdToDelete) return;
     try {
-      await deleteConversation(activeChatId);
+      await deleteConversation(chatIdToDelete);
       getRecentConversations(true)
         .then((chats) => setRecentChats(chats))
         .catch(() => { });
-      handleNewChat();
+
+      if (chatIdToDelete === activeChatId) {
+        handleNewChat();
+      }
     } catch (e) {
       console.error("Failed to delete conversation");
+    } finally {
+      setChatIdToDelete(null);
     }
-  }, [activeChatId, handleNewChat]);
+  }, [chatIdToDelete, activeChatId, handleNewChat]);
 
   const handleDeleteMessage = useCallback(async (msgId: string) => {
     if (!activeChatId) return;
@@ -142,6 +237,14 @@ export default function Chat() {
         localStorage.setItem("activeChatId", conv.id);
         setActiveChatTitle(conv.title);
 
+        // Link the current model to this new chat id
+        if (selectedProvider && selectedModel) {
+          localStorage.setItem(`chat_model_config_${conv.id}`, JSON.stringify({
+            provider: selectedProvider,
+            model: selectedModel
+          }));
+        }
+
         console.log
         getRecentConversations(true).then((chats) => setRecentChats(chats)).catch(() => { });
       } catch (e) {
@@ -151,6 +254,12 @@ export default function Chat() {
         setPending(false);
         return;
       }
+    }
+
+    if (!selectedProvider || !selectedModel) {
+      setStreamError("Please select a model first.");
+      setPending(false);
+      return;
     }
 
     const assistantMsgId = `a-${Date.now()}`;
@@ -163,10 +272,14 @@ export default function Chat() {
       await sendMessageStream(
         currentChatId,
         text,
+        selectedProvider,
+        selectedModel,
         (chunk) => {
           setMessages((m) =>
             m.map((msg) =>
-              msg.id === assistantMsgId ? { ...msg, content: msg.content + chunk } : msg
+              msg.id === assistantMsgId
+                ? { ...msg, content: msg.content + chunk, provider: selectedProvider, model: selectedModel }
+                : msg
             )
           );
         },
@@ -186,9 +299,19 @@ export default function Chat() {
       if (streamControllerRef.current === controller) {
         streamControllerRef.current = null;
         setPending(false);
+        // Silent sync after stream finishes to get real DB IDs (required for deletion)
+        // This avoids reloading the whole conversation details/title
+        if (currentChatId) {
+          syncMessages(currentChatId);
+          
+          // Refresh sidebar to catch auto-generated title from backend
+          getRecentConversations(true)
+            .then((chats) => setRecentChats(chats))
+            .catch(() => { });
+        }
       }
     }
-  }, [pending, activeChatId, activeChatTitle, cancelActiveStream]);
+  }, [pending, activeChatId, activeChatTitle, cancelActiveStream, selectedProvider, selectedModel]);
 
   const send = useCallback(() => {
     const text = draft.trim();
@@ -204,9 +327,44 @@ export default function Chat() {
     sendMessage(lastFailedText);
   }, [lastFailedText, sendMessage]);
 
+  const lastMessage = messages[messages.length - 1];
+  const isProcessing = useMemo(() => {
+    if (pending) return true;
+    if (!lastMessage) return false;
+    return lastMessage.role === "assistant" && lastMessage.isComplete === false;
+  }, [pending, lastMessage]);
+
+  useEffect(() => {
+    if (!activeChatId || !isProcessing || pending) return;
+
+    const interval = setInterval(() => {
+      syncMessages(activeChatId);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [activeChatId, isProcessing, pending, syncMessages]);
+
   useEffect(() => {
     getRecentConversations()
       .then((chats) => setRecentChats(chats))
+      .catch(() => { });
+
+    getAvailableModels()
+      .then((models) => {
+        setAvailableModels(models);
+        // Set initial selection if none exists
+        if (!selectedModel && models.length > 0) {
+          const savedDefault = localStorage.getItem("default_model_config");
+          if (savedDefault) {
+            const { provider, model } = JSON.parse(savedDefault);
+            setSelectedProvider(provider);
+            setSelectedModel(model);
+          } else {
+            setSelectedProvider(models[0].provider);
+            setSelectedModel(models[0].models[0]);
+          }
+        }
+      })
       .catch(() => { });
   }, []);
 
@@ -214,9 +372,9 @@ export default function Chat() {
 
   return (
     <div className="flex h-screen min-h-0 overflow-hidden bg-background">
-      <Sidebar activeNav="chat" onNewChat={handleNewChat} onSelectChat={loadConversation} recentChats={recentChats} activeChatId={activeChatId} />
+      <Sidebar activeNav="chat" onNewChat={handleNewChat} onSelectChat={loadConversation} onDeleteChat={handleDeleteConversation} recentChats={recentChats} activeChatId={activeChatId} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <Topbar activeChatTitle={activeChatTitle} onUpdateTitle={handleUpdateTitle} onDeleteChat={handleDeleteConversation} />
+        <Topbar activeChatTitle={activeChatTitle} onUpdateTitle={handleUpdateTitle} onDeleteChat={activeChatId ? () => handleDeleteConversation() : undefined} />
 
         <AnimatePresence mode="wait">
           {isEmpty ? (
@@ -252,9 +410,27 @@ export default function Chat() {
                         </svg>
                         Retry
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => messageInputRef.current?.openPicker()}
+                        className="flex items-center gap-2 rounded-input border border-border bg-sidebar px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-elevated"
+                      >
+                        Change Model
+                      </button>
                     </div>
                   )}
-                  <MessageInput value={draft} onChange={setDraft} onSend={send} disabled={pending || !!streamError} />
+                  <MessageInput
+                    ref={messageInputRef}
+                    value={draft}
+                    onChange={setDraft}
+                    onSend={send}
+                    disabled={!!streamError || isProcessing}
+                    isStreaming={pending}
+                    availableModels={availableModels}
+                    selectedProvider={selectedProvider}
+                    selectedModel={selectedModel}
+                    onModelChange={handleModelChange}
+                  />
                 </div>
               </motion.div>
             </motion.div>
@@ -290,15 +466,41 @@ export default function Chat() {
                         </svg>
                         Retry
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => messageInputRef.current?.openPicker()}
+                        className="flex items-center gap-2 rounded-input border border-border bg-sidebar px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-elevated"
+                      >
+                        Change Model
+                      </button>
                     </div>
                   )}
-                  <MessageInput value={draft} onChange={setDraft} onSend={send} disabled={pending || !!streamError} />
+                  <MessageInput
+                    ref={messageInputRef}
+                    value={draft}
+                    onChange={setDraft}
+                    onSend={send}
+                    disabled={!!streamError || isProcessing}
+                    isStreaming={pending}
+                    availableModels={availableModels}
+                    selectedProvider={selectedProvider}
+                    selectedModel={selectedModel}
+                    onModelChange={handleModelChange}
+                  />
                 </div>
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Conversation"
+        message="Are you sure you want to delete this conversation? This action cannot be undone and will remove all messages associated with it."
+      />
     </div>
   );
 }

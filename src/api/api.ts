@@ -57,6 +57,16 @@ export type Conversation = {
   updatedAt: string;
 };
 
+export type ProviderModels = {
+  provider: string;
+  models: string[];
+};
+
+export async function getAvailableModels(): Promise<ProviderModels[]> {
+  const { data } = await client.get("/chat/models");
+  return data;
+}
+
 export async function createConversation(title: string): Promise<Conversation> {
   const { data } = await client.post("/chat/conversations", { title });
   return data;
@@ -82,6 +92,7 @@ export type ApiMessage = {
   content: string;
   provider: string;
   model: string;
+  is_complete: boolean;
   created_at: string;
 };
 
@@ -98,6 +109,8 @@ export async function getConversationMessages(id: string): Promise<ApiMessage[]>
 export async function sendMessageStream(
   conversationId: string,
   message: string,
+  provider: string,
+  model: string,
   onChunk: (chunk: string) => void,
   signal?: AbortSignal
 ): Promise<void> {
@@ -109,9 +122,9 @@ export async function sendMessageStream(
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({
-      provider: "gemini",
-      model: "gemini-3-flash-preview",
-      message: message,
+      provider,
+      model,
+      message,
       stream: true,
     }),
     signal,
