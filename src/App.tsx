@@ -3,6 +3,7 @@ import Chat from "./pages/Chat";
 import Library from "./pages/Library";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import Settings from "./pages/Settings";
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const isAuth = localStorage.getItem("isAuthenticated") === "true";
@@ -16,6 +17,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

@@ -1,18 +1,57 @@
-export default function Topbar() {
+import { useState, useEffect } from "react";
+
+type TopbarProps = {
+  activeChatTitle?: string | null;
+  onUpdateTitle?: (newTitle: string) => void;
+};
+
+export default function Topbar({ activeChatTitle, onUpdateTitle }: TopbarProps) {
+  const [editingTitle, setEditingTitle] = useState("");
+
+  useEffect(() => {
+    if (activeChatTitle) setEditingTitle(activeChatTitle);
+  }, [activeChatTitle]);
+
+  function handleBlur() {
+    if (editingTitle.trim() !== "" && editingTitle !== activeChatTitle && onUpdateTitle) {
+      onUpdateTitle(editingTitle.trim());
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    }
+  }
+
   return (
     <header className="flex h-[60px] shrink-0 items-center gap-4 border-b border-border/30 bg-background px-6">
       <div className="relative min-w-0 flex-1 max-w-2xl">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted">
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <circle cx="11" cy="11" r="7" />
-            <path d="M20 20l-4-4" />
-          </svg>
-        </span>
-        <input
-          type="search"
-          placeholder="Search across chat library..."
-          className="h-10 w-full rounded-input border border-border/50 bg-surface py-2 pl-10 pr-3 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
-        />
+        {activeChatTitle != null ? (
+          <input
+            type="text"
+            value={editingTitle}
+            onChange={(e) => setEditingTitle(e.target.value)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            className="w-full bg-transparent text-lg font-semibold text-textPrimary placeholder:text-textMuted focus:outline-none"
+            placeholder="Conversation Title"
+          />
+        ) : (
+          <>
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M20 20l-4-4" />
+              </svg>
+            </span>
+            <input
+              type="search"
+              placeholder="Search across chat library..."
+              className="h-10 w-full rounded-input border border-border/50 bg-surface py-2 pl-10 pr-3 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+            />
+          </>
+        )}
       </div>
       <div className="ml-auto flex items-center gap-2">
         <button

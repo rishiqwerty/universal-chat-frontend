@@ -1,9 +1,11 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 type NavKey = "chat" | "models" | "settings";
 
 type SidebarProps = {
   activeNav: NavKey;
+  onNewChat?: () => void;
+  recentChats?: { id: string; title: string }[];
 };
 
 function LogoMark() {
@@ -46,7 +48,8 @@ function NavIcon({ name }: { name: NavKey }) {
   );
 }
 
-export default function Sidebar({ activeNav }: SidebarProps) {
+export default function Sidebar({ activeNav, onNewChat, recentChats }: SidebarProps) {
+  const navigate = useNavigate();
   const item = (key: NavKey, label: string, to: string) => {
     const on = activeNav === key;
     return (
@@ -78,17 +81,39 @@ export default function Sidebar({ activeNav }: SidebarProps) {
         </div>
       </div>
 
-      <Link
-        to="/chat"
+      <button
+        onClick={() => {
+          if (onNewChat) {
+            onNewChat();
+          } else {
+            navigate("/chat", { state: { newChat: true } });
+          }
+        }}
         className="mt-6 block w-full rounded-input bg-primary py-3 text-center text-sm font-semibold text-background shadow-[0_0_20px_rgba(217,255,0,0.25)] transition-colors hover:bg-primaryHover"
       >
         + New Chat
-      </Link>
+      </button>
+
+      {recentChats && recentChats.length > 0 && (
+        <div className="mt-4 flex flex-col gap-1">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-textMuted px-3">
+            Recent
+          </p>
+          {recentChats.map((chat) => (
+            <button
+              key={chat.id}
+              className="flex items-center justify-between rounded-input px-3 py-2 text-left text-sm text-textSecondary transition-colors hover:bg-surface/80 hover:text-textPrimary"
+            >
+              <span className="truncate">{chat.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <nav className="mt-8 flex flex-col gap-1">
         {item("chat", "Chat", "/chat")}
         {item("models", "Models", "/library")}
-        {item("settings", "Settings", "/library")}
+        {item("settings", "Settings", "/settings")}
       </nav>
 
       <p className="mb-3 mt-10 text-[10px] font-semibold uppercase tracking-wider text-textMuted">

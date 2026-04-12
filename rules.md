@@ -92,6 +92,7 @@ No context unless absolutely required
 9. API Rules
 Use mock data initially
 No real backend integration yet
+Once i start asking you to start integrating apis, then you can start integrating apis only the one which i ask you to integrate
 
 10. Chat UI Rules
 Messages

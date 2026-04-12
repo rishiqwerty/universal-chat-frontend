@@ -26,8 +26,9 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      await loginAccount({ email, password });
+      const token = await loginAccount({ email, password });
       localStorage.setItem("isAuthenticated", "true");
+      localStorage.setItem("access_token", token);
       navigate("/library");
     } catch {
       setError("Login failed. Check your credentials.");
