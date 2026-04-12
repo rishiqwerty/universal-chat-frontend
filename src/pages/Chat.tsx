@@ -76,7 +76,8 @@ export default function Chat() {
   }, [cancelActiveStream, activeChatId, messages.length]);
 
   const loadConversation = useCallback(async (id: string) => {
-    if (id === activeChatId) return;
+    // Only return early if we already have messages for this chat
+    if (id === activeChatId && messages.length > 0) return;
 
     cancelActiveStream();
     setPending(false);
@@ -106,24 +107,44 @@ export default function Chat() {
       }));
       setMessages(formatted);
 
-      // Restore per-chat model config or fall back to default
-      const savedChatConfig = localStorage.getItem(`chat_model_config_${id}`);
-      if (savedChatConfig) {
-        const { provider, model } = JSON.parse(savedChatConfig);
-        setSelectedProvider(provider);
-        setSelectedModel(model);
+      // Priority 1: Latest assistant message in history
+      const latestAssistantMsg = [...msgs].reverse().find(m => m.role === "assistant" && m.provider && m.model);
+      
+      if (latestAssistantMsg) {
+        setSelectedProvider(latestAssistantMsg.provider);
+        setSelectedModel(latestAssistantMsg.model);
+        // Sync to local storage for quick access next time
+        localStorage.setItem(`chat_model_config_${id}`, JSON.stringify({ 
+          provider: latestAssistantMsg.provider, 
+          model: latestAssistantMsg.model 
+        }));
       } else {
-        const savedDefault = localStorage.getItem("default_model_config");
-        if (savedDefault) {
-          const { provider, model } = JSON.parse(savedDefault);
+        // Priority 2: Per-chat model config
+        const savedChatConfig = localStorage.getItem(`chat_model_config_${id}`);
+        if (savedChatConfig) {
+          const { provider, model } = JSON.parse(savedChatConfig);
           setSelectedProvider(provider);
           setSelectedModel(model);
+        } else {
+          // Priority 3: Global default
+          const savedDefault = localStorage.getItem("default_model_config");
+          if (savedDefault) {
+            const { provider, model } = JSON.parse(savedDefault);
+            setSelectedProvider(provider);
+            setSelectedModel(model);
+          } else if (availableModels.length > 0) {
+            // Priority 4: Absolute latest from available models
+            const lastProv = availableModels[availableModels.length - 1];
+            const lastMod = lastProv.models[lastProv.models.length - 1];
+            setSelectedProvider(lastProv.provider);
+            setSelectedModel(lastMod);
+          }
         }
       }
     } catch {
       console.error("Failed to load chat history");
     }
-  }, [cancelActiveStream, activeChatId]);
+  }, [cancelActiveStream, activeChatId, messages.length]);
 
   const syncMessages = useCallback(async (id: string) => {
     try {
@@ -304,9 +325,15 @@ export default function Chat() {
         if (currentChatId) {
           syncMessages(currentChatId);
           
-          // Refresh sidebar to catch auto-generated title from backend
+          // Refresh sidebar to catch auto-generated title from backend and update top bar
           getRecentConversations(true)
-            .then((chats) => setRecentChats(chats))
+            .then((chats) => {
+              setRecentChats(chats);
+              const updated = chats.find(c => c.id === currentChatId);
+              if (updated) {
+                setActiveChatTitle(updated.title);
+              }
+            })
             .catch(() => { });
         }
       }
@@ -360,8 +387,11 @@ export default function Chat() {
             setSelectedProvider(provider);
             setSelectedModel(model);
           } else {
-            setSelectedProvider(models[0].provider);
-            setSelectedModel(models[0].models[0]);
+            // Default to absolute latest (last provider, last model)
+            const lastProv = models[models.length - 1];
+            const lastMod = lastProv.models[lastProv.models.length - 1];
+            setSelectedProvider(lastProv.provider);
+            setSelectedModel(lastMod);
           }
         }
       })

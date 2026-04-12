@@ -44,10 +44,12 @@ export default function Login() {
         aria-hidden
       />
       <div className="relative w-full max-w-[420px]">
-        <LogoMark />
-        <h1 className="mt-5 text-center text-2xl font-headline font-bold tracking-tight text-textPrimary">
-          Neural Architect
-        </h1>
+        <Link to="/" className="group block">
+          <LogoMark />
+          <h1 className="mt-5 text-center text-2xl font-headline font-bold tracking-tight text-textPrimary group-hover:text-primary transition-colors">
+            Neural Architect
+          </h1>
+        </Link>
         <p className="mt-1 text-center text-xs text-textSecondary">
           V1.0.4-Beta • Secure Protocol
         </p>

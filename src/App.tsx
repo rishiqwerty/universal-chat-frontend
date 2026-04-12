@@ -10,16 +10,23 @@ function ProtectedRoute({ children }: { children: JSX.Element }) {
   return isAuth ? children : <Navigate to="/login" replace />;
 }
 
+function GuestRoute({ children }: { children: JSX.Element }) {
+  const isAuth = localStorage.getItem("isAuthenticated") === "true";
+  return isAuth ? <Navigate to="/chat" replace /> : children;
+}
+
 export default function App() {
+  const isAuth = localStorage.getItem("isAuthenticated") === "true";
+
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<Login />} />
+      <Route path="/" element={<Navigate to={isAuth ? "/chat" : "/login"} replace />} />
+      <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to={isAuth ? "/chat" : "/login"} replace />} />
     </Routes>
   );
 }

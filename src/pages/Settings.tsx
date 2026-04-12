@@ -99,6 +99,19 @@ export default function Settings() {
                 />
               </label>
             </div>
+
+            <div className="mt-4 flex items-start gap-3 rounded-input bg-surface/40 p-3 ring-1 ring-border/30">
+              <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center text-textMuted">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+              </div>
+              <p className="text-[11px] leading-relaxed text-textSecondary">
+                Your API key is <span className="font-bold text-textPrimary">encrypted</span> and cannot be accessed by anyone. 
+                We only use your API key to send requests directly to the provider. 
+                We do not store or reuse it outside your requests.
+              </p>
+            </div>
             
             <button
               type="submit"
