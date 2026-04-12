@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { useMemo } from "react";
 
 const greetings = [
@@ -31,7 +32,13 @@ export default function WelcomeScreen() {
   );
 
   return (
-    <div className="flex flex-col items-center px-6 animate-fade-in">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="flex flex-col items-center px-6"
+    >
       <LogoMark />
       <h1
         className="mt-5 text-2xl font-bold tracking-tight text-textPrimary"
@@ -43,6 +50,6 @@ export default function WelcomeScreen() {
       <p className="mt-6 max-w-md text-center text-base leading-relaxed text-textSecondary">
         {greeting}
       </p>
-    </div>
+    </motion.div>
   );
 }

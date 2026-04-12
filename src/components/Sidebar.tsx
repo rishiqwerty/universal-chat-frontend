@@ -9,6 +9,7 @@ type SidebarProps = {
   onNewChat?: () => void;
   onSelectChat?: (id: string) => void;
   recentChats?: Conversation[];
+  activeChatId?: string | null;
 };
 
 function LogoMark() {
@@ -51,7 +52,7 @@ function NavIcon({ name }: { name: NavKey }) {
   );
 }
 
-export default function Sidebar({ activeNav, onNewChat, onSelectChat, recentChats: propsRecentChats }: SidebarProps) {
+export default function Sidebar({ activeNav, onNewChat, onSelectChat, recentChats: propsRecentChats, activeChatId }: SidebarProps) {
   const navigate = useNavigate();
   const [internalRecentChats, setInternalRecentChats] = useState<Conversation[]>([]);
 
@@ -122,7 +123,11 @@ export default function Sidebar({ activeNav, onNewChat, onSelectChat, recentChat
                   navigate("/chat", { state: { chatId: chat.id } });
                 }
               }}
-              className="flex items-center justify-between rounded-input px-3 py-2 text-left text-sm text-textSecondary transition-colors hover:bg-surface/80 hover:text-textPrimary"
+              className={`flex items-center justify-between rounded-input px-3 py-2 text-left text-sm transition-colors ${
+                chat.id === activeChatId
+                  ? "bg-surface text-primary"
+                  : "text-textSecondary hover:bg-surface/80 hover:text-textPrimary"
+              }`}
             >
               <span className="truncate">{chat.title}</span>
             </button>

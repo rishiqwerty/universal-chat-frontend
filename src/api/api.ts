@@ -90,7 +90,8 @@ export async function getConversationMessages(id: string): Promise<ApiMessage[]>
 export async function sendMessageStream(
   conversationId: string,
   message: string,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  signal?: AbortSignal
 ): Promise<void> {
   const token = localStorage.getItem("access_token");
   const response = await fetch(`${apiRoot}/chat/conversations/${conversationId}/messages`, {
@@ -105,6 +106,7 @@ export async function sendMessageStream(
       message: message,
       stream: true,
     }),
+    signal,
   });
 
   if (!response.ok) {
@@ -113,8 +115,20 @@ export async function sendMessageStream(
       localStorage.removeItem("access_token");
       clearChatCache();
       window.location.href = "/login";
+      throw new Error("Session expired. Please login again.");
     }
-    throw new Error("Failed to send message stream");
+    
+    let errorMsg = `Server error (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMsg = errorData.detail || errorData.message || errorMsg;
+      if (typeof errorMsg !== "string") {
+        errorMsg = JSON.stringify(errorMsg);
+      }
+    } catch {
+      // Not JSON or no detail field
+    }
+    throw new Error(errorMsg);
   }
 
   const reader = response.body?.getReader();
@@ -151,10 +165,16 @@ export async function sendMessageStream(
 
       try {
         const parsed = JSON.parse(payload);
+        if (parsed.error) {
+          throw new Error(parsed.error);
+        }
         if (parsed.content) {
           onChunk(parsed.content);
         }
-      } catch {
+      } catch (e: any) {
+        if (e instanceof Error && e.message !== "Unexpected string in JSON..." && e.message !== "Unexpected token") {
+          throw e; // re-throw intentional errors like parsed.error
+        }
         // ignore malformed JSON chunks
       }
     }
