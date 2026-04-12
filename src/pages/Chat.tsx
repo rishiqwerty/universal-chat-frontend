@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { createConversation, updateConversationTitle, getRecentConversations, getConversationDetails, getConversationMessages, sendMessageStream, type Conversation } from "../api/api";
+import { createConversation, updateConversationTitle, getRecentConversations, getConversationDetails, getConversationMessages, sendMessageStream, deleteConversation, deleteMessage, type Conversation } from "../api/api";
 import ChatWindow, { type ChatMessage } from "../components/ChatWindow";
 import MessageInput from "../components/MessageInput";
 import Sidebar from "../components/Sidebar";
@@ -98,6 +98,31 @@ export default function Chat() {
     }
   }, [activeChatId]);
 
+  const handleDeleteConversation = useCallback(async () => {
+    if (!activeChatId) return;
+    try {
+      await deleteConversation(activeChatId);
+      getRecentConversations(true)
+        .then((chats) => setRecentChats(chats))
+        .catch(() => { });
+      handleNewChat();
+    } catch (e) {
+      console.error("Failed to delete conversation");
+    }
+  }, [activeChatId, handleNewChat]);
+
+  const handleDeleteMessage = useCallback(async (msgId: string) => {
+    if (!activeChatId) return;
+    try {
+      // Optimistic update
+      setMessages((m) => m.filter((msg) => msg.id !== msgId));
+      await deleteMessage(activeChatId, msgId);
+    } catch (e) {
+      console.error("Failed to delete message");
+      // Could revert optimistic update here, but let's just log for now
+    }
+  }, [activeChatId]);
+
   const sendMessage = useCallback(async (text: string) => {
     if (!text || pending) return;
     setStreamError(null);
@@ -191,7 +216,7 @@ export default function Chat() {
     <div className="flex h-screen min-h-0 overflow-hidden bg-background">
       <Sidebar activeNav="chat" onNewChat={handleNewChat} onSelectChat={loadConversation} recentChats={recentChats} activeChatId={activeChatId} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <Topbar activeChatTitle={activeChatTitle} onUpdateTitle={handleUpdateTitle} />
+        <Topbar activeChatTitle={activeChatTitle} onUpdateTitle={handleUpdateTitle} onDeleteChat={handleDeleteConversation} />
 
         <AnimatePresence mode="wait">
           {isEmpty ? (
@@ -242,7 +267,7 @@ export default function Chat() {
               transition={{ duration: 0.3 }}
               className="flex min-h-0 flex-1 flex-col"
             >
-              <ChatWindow messages={messages} />
+              <ChatWindow messages={messages} onDeleteMessage={handleDeleteMessage} />
               <motion.div
                 layoutId="chat-input-container"
                 transition={{ type: "spring", stiffness: 260, damping: 30 }}

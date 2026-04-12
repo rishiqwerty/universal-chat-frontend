@@ -62,6 +62,14 @@ export async function createConversation(title: string): Promise<Conversation> {
   return data;
 }
 
+export async function deleteConversation(id: string): Promise<void> {
+  await client.delete(`/chat/conversations/${id}`);
+}
+
+export async function deleteMessage(conversationId: string, messageId: string): Promise<void> {
+  await client.delete(`/chat/conversations/${conversationId}/messages/${messageId}`);
+}
+
 export async function updateConversationTitle(id: string, title: string): Promise<Conversation> {
   const { data } = await client.put(`/chat/conversations/${id}`, { title });
   return data;

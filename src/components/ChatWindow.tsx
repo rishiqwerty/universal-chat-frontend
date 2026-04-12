@@ -9,9 +9,10 @@ export type ChatMessage = {
 
 type ChatWindowProps = {
   messages: ChatMessage[];
+  onDeleteMessage?: (id: string) => void;
 };
 
-export default function ChatWindow({ messages }: ChatWindowProps) {
+export default function ChatWindow({ messages, onDeleteMessage }: ChatWindowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [userScrolledUp, setUserScrolledUp] = useState(false);
@@ -57,7 +58,7 @@ export default function ChatWindow({ messages }: ChatWindowProps) {
       >
         <div className="mx-auto flex max-w-4xl flex-col gap-4">
           {messages.map((m) => (
-            <MessageBubble key={m.id} role={m.role} content={m.content} />
+            <MessageBubble key={m.id} role={m.role} content={m.content} onDelete={onDeleteMessage ? () => onDeleteMessage(m.id) : undefined} />
           ))}
           <div ref={bottomRef} />
         </div>
