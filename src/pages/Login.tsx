@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { loginAccount } from "../api/api";
 
 function LogoMark() {
   return (
@@ -17,10 +18,22 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [persist, setPersist] = useState(true);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    navigate("/library");
+    setError("");
+    setLoading(true);
+    try {
+      await loginAccount({ email, password });
+      localStorage.setItem("isAuthenticated", "true");
+      navigate("/library");
+    } catch {
+      setError("Login failed. Check your credentials.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -42,6 +55,12 @@ export default function Login() {
           onSubmit={handleLogin}
           className="mt-10 rounded-card bg-surface p-8 shadow-none ring-1 ring-border/40"
         >
+          {error ? (
+            <p className="mb-4 rounded-input bg-elevated px-3 py-2 text-sm text-textSecondary ring-1 ring-border/50">
+              {error}
+            </p>
+          ) : null}
+
           <label className="block">
             <span className="text-xs font-medium text-textSecondary">Email</span>
             <div className="relative mt-2">
@@ -110,9 +129,10 @@ export default function Login() {
 
           <button
             type="submit"
-            className="mt-8 w-full rounded-input bg-primary py-3 text-sm font-bold text-background shadow-[0_0_24px_rgba(217,255,0,0.35)] transition-colors hover:bg-primaryHover"
+            disabled={loading}
+            className="mt-8 w-full rounded-input bg-primary py-3 text-sm font-bold text-background shadow-[0_0_24px_rgba(217,255,0,0.35)] transition-colors hover:bg-primaryHover disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Secure Login
+            {loading ? "Authenticating…" : "Secure Login"}
           </button>
 
           <p className="mt-8 text-center text-[10px] font-semibold uppercase tracking-widest text-textMuted">

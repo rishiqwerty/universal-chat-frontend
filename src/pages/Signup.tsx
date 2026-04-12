@@ -33,8 +33,9 @@ export default function Signup() {
     try {
       await signupAccount({ email, password });
       navigate("/login");
-    } catch {
-      setError("Could not create account. Try again.");
+    } catch (err: any) {
+      const serverMessage = err.response?.data?.message || err.response?.data?.detail;
+      setError(serverMessage || "Could not create account. Try again.");
     } finally {
       setLoading(false);
     }

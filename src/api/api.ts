@@ -22,4 +22,8 @@ export async function signupAccount(payload: SignupPayload): Promise<void> {
   await client.post("/auth/register", payload);
 }
 
+export async function loginAccount(payload: SignupPayload): Promise<void> {
+  await client.post("/auth/login", payload);
+}
+
 export { client };
