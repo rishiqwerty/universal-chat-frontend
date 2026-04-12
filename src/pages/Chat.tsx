@@ -5,6 +5,7 @@ import ChatWindow, { type ChatMessage } from "../components/ChatWindow";
 import MessageInput from "../components/MessageInput";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
+import WelcomeScreen from "../components/WelcomeScreen";
 
 const initialMessages: ChatMessage[] = [];
 
@@ -15,6 +16,8 @@ export default function Chat() {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const [lastFailedText, setLastFailedText] = useState<string | null>(null);
   
   const [activeChatId, setActiveChatId] = useState<string | null>(
     () => localStorage.getItem("activeChatId")
@@ -83,9 +86,11 @@ export default function Chat() {
     }
   }, [activeChatId]);
 
-  const send = useCallback(async () => {
-    const text = draft.trim();
+  const sendMessage = useCallback(async (text: string) => {
     if (!text || pending) return;
+    setStreamError(null);
+    setLastFailedText(null);
+
     const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: "user", content: text };
     setMessages((m) => [...m, userMsg]);
     setDraft("");
@@ -103,6 +108,8 @@ export default function Chat() {
         getRecentConversations(true).then((chats) => setRecentChats(chats)).catch(() => {});
       } catch (e) {
         console.error("Failed to create chat");
+        setStreamError("Failed to create conversation.");
+        setLastFailedText(text);
         setPending(false);
         return;
       }
@@ -120,19 +127,71 @@ export default function Chat() {
         );
       });
     } catch (e) {
-      console.error("Failed to stream stream");
+      console.error("Failed to stream response");
+      // Remove the empty assistant bubble
+      setMessages((m) => m.filter((msg) => msg.id !== assistantMsgId));
+      setStreamError("Failed to get a response. Please try again.");
+      setLastFailedText(text);
     } finally {
       setPending(false);
     }
-  }, [draft, pending, activeChatId, activeChatTitle]);
+  }, [pending, activeChatId, activeChatTitle]);
+
+  const send = useCallback(() => {
+    const text = draft.trim();
+    if (!text) return;
+    sendMessage(text);
+  }, [draft, sendMessage]);
+
+  const handleRetry = useCallback(() => {
+    if (!lastFailedText) return;
+    // Remove the last user message so sendMessage re-adds it
+    setMessages((m) => m.slice(0, -1));
+    setStreamError(null);
+    sendMessage(lastFailedText);
+  }, [lastFailedText, sendMessage]);
+
+  const isEmpty = messages.length === 0;
 
   return (
     <div className="flex h-screen min-h-0 overflow-hidden bg-background">
       <Sidebar activeNav="chat" onNewChat={handleNewChat} onSelectChat={loadConversation} recentChats={recentChats} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <Topbar activeChatTitle={activeChatTitle} onUpdateTitle={handleUpdateTitle} />
-        <ChatWindow messages={messages} />
-        <MessageInput value={draft} onChange={setDraft} onSend={send} disabled={pending} />
+
+        {isEmpty ? (
+          /* Welcome layout — everything centered as one block */
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center bg-background px-6">
+            <WelcomeScreen />
+            <div className="mt-8 w-full max-w-2xl">
+              <MessageInput value={draft} onChange={setDraft} onSend={send} disabled={pending} />
+            </div>
+          </div>
+        ) : (
+          /* Normal chat layout */
+          <>
+            <ChatWindow messages={messages} />
+            {streamError && (
+              <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-6 py-3">
+                <p className="flex-1 rounded-input bg-primary/10 px-4 py-2 text-sm text-primary ring-1 ring-primary/50">
+                  {streamError}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  className="flex items-center gap-2 rounded-input bg-primary px-4 py-2 text-sm font-semibold text-background shadow-[0_0_12px_rgba(217,255,0,0.2)] transition-colors hover:bg-primaryHover"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M1 4v6h6M23 20v-6h-6" />
+                    <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
+                  </svg>
+                  Retry
+                </button>
+              </div>
+            )}
+            <MessageInput value={draft} onChange={setDraft} onSend={send} disabled={pending} />
+          </>
+        )}
       </div>
     </div>
   );
