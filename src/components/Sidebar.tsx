@@ -1,11 +1,14 @@
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { getRecentConversations, type Conversation } from "../api/api";
 
 type NavKey = "chat" | "models" | "settings";
 
 type SidebarProps = {
   activeNav: NavKey;
   onNewChat?: () => void;
-  recentChats?: { id: string; title: string }[];
+  onSelectChat?: (id: string) => void;
+  recentChats?: Conversation[];
 };
 
 function LogoMark() {
@@ -48,18 +51,28 @@ function NavIcon({ name }: { name: NavKey }) {
   );
 }
 
-export default function Sidebar({ activeNav, onNewChat, recentChats }: SidebarProps) {
+export default function Sidebar({ activeNav, onNewChat, onSelectChat, recentChats: propsRecentChats }: SidebarProps) {
   const navigate = useNavigate();
+  const [internalRecentChats, setInternalRecentChats] = useState<Conversation[]>([]);
+
+  useEffect(() => {
+    // Only fetch if not managed by parent or to keep it synchronized if parent is null
+    getRecentConversations()
+      .then((data) => setInternalRecentChats(data))
+      .catch(() => { });
+  }, []);
+
+  const displayedRecentChats = propsRecentChats || internalRecentChats;
   const item = (key: NavKey, label: string, to: string) => {
     const on = activeNav === key;
     return (
       <Link
         to={to}
-        className={`flex items-center gap-3 rounded-input px-3 py-2.5 text-sm font-medium transition-colors ${
-          on
-            ? "bg-surface text-primary"
-            : "text-textSecondary hover:bg-surface/60 hover:text-textPrimary"
-        }`}
+        style={key === "chat" ? { fontFamily: "'Space Grotesk', sans-serif" } : undefined}
+        className={`flex items-center gap-3 rounded-input px-3 py-2.5 text-sm font-headline font-semibold transition-colors ${on
+          ? "bg-surface text-primary"
+          : "text-textSecondary hover:bg-surface/60 hover:text-textPrimary"
+          }`}
       >
         <span className={on ? "text-primary" : "text-textMuted"}>
           <NavIcon name={key} />
@@ -74,7 +87,7 @@ export default function Sidebar({ activeNav, onNewChat, recentChats }: SidebarPr
       <div className="flex items-start gap-3">
         <LogoMark />
         <div>
-          <p className="text-base font-bold leading-tight text-textPrimary">Neural Architect</p>
+          <p className="text-base font-headline font-bold leading-tight text-textPrimary" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Neural Architect</p>
           <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-textMuted">
             V1.0.4-BETA
           </p>
@@ -94,14 +107,21 @@ export default function Sidebar({ activeNav, onNewChat, recentChats }: SidebarPr
         + New Chat
       </button>
 
-      {recentChats && recentChats.length > 0 && (
+      {displayedRecentChats && displayedRecentChats.length > 0 && (
         <div className="mt-4 flex flex-col gap-1">
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-textMuted px-3">
             Recent
           </p>
-          {recentChats.map((chat) => (
+          {displayedRecentChats.map((chat) => (
             <button
               key={chat.id}
+              onClick={() => {
+                if (onSelectChat) {
+                  onSelectChat(chat.id);
+                } else {
+                  navigate("/chat", { state: { chatId: chat.id } });
+                }
+              }}
               className="flex items-center justify-between rounded-input px-3 py-2 text-left text-sm text-textSecondary transition-colors hover:bg-surface/80 hover:text-textPrimary"
             >
               <span className="truncate">{chat.title}</span>
@@ -111,7 +131,6 @@ export default function Sidebar({ activeNav, onNewChat, recentChats }: SidebarPr
       )}
 
       <nav className="mt-8 flex flex-col gap-1">
-        {item("chat", "Chat", "/chat")}
         {item("models", "Models", "/library")}
         {item("settings", "Settings", "/settings")}
       </nav>

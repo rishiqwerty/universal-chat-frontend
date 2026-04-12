@@ -34,7 +34,8 @@ export default function Topbar({ activeChatTitle, onUpdateTitle }: TopbarProps) 
             onChange={(e) => setEditingTitle(e.target.value)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            className="w-full bg-transparent text-lg font-semibold text-textPrimary placeholder:text-textMuted focus:outline-none"
+            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            className="w-full bg-transparent text-lg font-headline font-semibold text-textPrimary placeholder:text-textMuted focus:outline-none"
             placeholder="Conversation Title"
           />
         ) : (

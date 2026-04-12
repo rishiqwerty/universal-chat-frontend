@@ -1,30 +1,12 @@
 import { useCallback, useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { mockChatReply, createConversation, updateConversationTitle, getRecentConversations, type Conversation } from "../api/api";
+import { createConversation, updateConversationTitle, getRecentConversations, getConversationDetails, getConversationMessages, sendMessageStream, type Conversation } from "../api/api";
 import ChatWindow, { type ChatMessage } from "../components/ChatWindow";
 import MessageInput from "../components/MessageInput";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 
-const initialMessages: ChatMessage[] = [
-  {
-    id: "m1",
-    role: "assistant",
-    content:
-      "Session restored. I am ready to assist with architecture, security reviews, and implementation planning. What should we tackle first?",
-  },
-  {
-    id: "m2",
-    role: "user",
-    content: "Outline a minimal event-sourcing boundary for order intake.",
-  },
-  {
-    id: "m3",
-    role: "assistant",
-    content:
-      "Start with an append-only event log per aggregate, idempotent command handlers, and snapshots when replay exceeds your latency budget. Keep projections async and version your schemas explicitly.",
-  },
-];
+const initialMessages: ChatMessage[] = [];
 
 export default function Chat() {
   const location = useLocation();
@@ -34,7 +16,9 @@ export default function Chat() {
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [activeChatId, setActiveChatId] = useState<string | null>(
+    () => localStorage.getItem("activeChatId")
+  );
   const [activeChatTitle, setActiveChatTitle] = useState<string | null>(null);
   const [recentChats, setRecentChats] = useState<Conversation[]>([]);
 
@@ -46,16 +30,44 @@ export default function Chat() {
 
   const handleNewChat = useCallback(() => {
     setActiveChatId(null);
+    localStorage.removeItem("activeChatId");
     setActiveChatTitle("Untitled Chat");
     setMessages([]);
+  }, []);
+
+  const loadConversation = useCallback(async (id: string) => {
+    try {
+      const [details, msgs] = await Promise.all([
+        getConversationDetails(id),
+        getConversationMessages(id),
+      ]);
+      setActiveChatId(details.id);
+      localStorage.setItem("activeChatId", details.id);
+      setActiveChatTitle(details.title);
+      // Map server roles down to valid UI Chat window roles
+      const formatted: ChatMessage[] = msgs.map((m) => ({
+        id: m.id,
+        role: m.role === "system" ? "assistant" : m.role,
+        content: m.content,
+      }));
+      setMessages(formatted);
+    } catch {
+      console.error("Failed to load chat history");
+    }
   }, []);
 
   useEffect(() => {
     if (location.state?.newChat) {
       handleNewChat();
       navigate(".", { replace: true, state: {} });
+    } else if (location.state?.chatId) {
+      loadConversation(location.state.chatId);
+      navigate(".", { replace: true, state: {} });
+    } else if (activeChatId && messages.length === 0) {
+      // Restore last conversation on refresh
+      loadConversation(activeChatId);
     }
-  }, [location.state, handleNewChat, navigate]);
+  }, [location.state, handleNewChat, navigate, loadConversation]);  // activeChatId intentionally excluded to avoid re-trigger
 
   const handleUpdateTitle = useCallback(async (newTitle: string) => {
     if (!activeChatId) {
@@ -85,22 +97,38 @@ export default function Chat() {
         const conv = await createConversation(activeChatTitle || "Untitled Chat");
         currentChatId = conv.id;
         setActiveChatId(conv.id);
+        localStorage.setItem("activeChatId", conv.id);
         setActiveChatTitle(conv.title);
         
         getRecentConversations(true).then((chats) => setRecentChats(chats)).catch(() => {});
       } catch (e) {
         console.error("Failed to create chat");
+        setPending(false);
+        return;
       }
     }
 
-    const reply = await mockChatReply(text);
-    setMessages((m) => [...m, { id: `a-${Date.now()}`, role: "assistant", content: reply }]);
-    setPending(false);
+    const assistantMsgId = `a-${Date.now()}`;
+    setMessages((m) => [...m, { id: assistantMsgId, role: "assistant", content: "" }]);
+
+    try {
+      await sendMessageStream(currentChatId, text, (chunk) => {
+        setMessages((m) =>
+          m.map((msg) =>
+            msg.id === assistantMsgId ? { ...msg, content: msg.content + chunk } : msg
+          )
+        );
+      });
+    } catch (e) {
+      console.error("Failed to stream stream");
+    } finally {
+      setPending(false);
+    }
   }, [draft, pending, activeChatId, activeChatTitle]);
 
   return (
     <div className="flex h-screen min-h-0 overflow-hidden bg-background">
-      <Sidebar activeNav="chat" onNewChat={handleNewChat} recentChats={recentChats} />
+      <Sidebar activeNav="chat" onNewChat={handleNewChat} onSelectChat={loadConversation} recentChats={recentChats} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <Topbar activeChatTitle={activeChatTitle} onUpdateTitle={handleUpdateTitle} />
         <ChatWindow messages={messages} />

@@ -22,7 +22,7 @@ elevated: #202124
 primary: #D9FF00
 primaryHover: #C7F000
 
-textPrimary: #FFFFFF
+textPrimary: #e8ecd5ff
 textSecondary: #A1A1AA
 textMuted: #71717A
 

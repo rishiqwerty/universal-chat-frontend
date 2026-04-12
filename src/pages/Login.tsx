@@ -30,8 +30,8 @@ export default function Login() {
       localStorage.setItem("isAuthenticated", "true");
       localStorage.setItem("access_token", token);
       navigate("/library");
-    } catch {
-      setError("Login failed. Check your credentials.");
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.response?.data?.detail || "Login failed. Check your credentials.");
     } finally {
       setLoading(false);
     }
@@ -45,7 +45,7 @@ export default function Login() {
       />
       <div className="relative w-full max-w-[420px]">
         <LogoMark />
-        <h1 className="mt-5 text-center text-2xl font-bold tracking-tight text-textPrimary">
+        <h1 className="mt-5 text-center text-2xl font-headline font-bold tracking-tight text-textPrimary">
           Neural Architect
         </h1>
         <p className="mt-1 text-center text-xs text-textSecondary">
@@ -57,7 +57,7 @@ export default function Login() {
           className="mt-10 rounded-card bg-surface p-8 shadow-none ring-1 ring-border/40"
         >
           {error ? (
-            <p className="mb-4 rounded-input bg-elevated px-3 py-2 text-sm text-textSecondary ring-1 ring-border/50">
+            <p className="mb-4 rounded-input bg-primary/10 px-3 py-2 text-sm text-primary ring-1 ring-primary/50">
               {error}
             </p>
           ) : null}

@@ -24,7 +24,9 @@ client.interceptors.response.use(
       localStorage.removeItem("isAuthenticated");
       localStorage.removeItem("access_token");
       clearChatCache();
-      window.location.href = "/login";
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }
@@ -65,6 +67,100 @@ export async function updateConversationTitle(id: string, title: string): Promis
   return data;
 }
 
+export type ApiMessage = {
+  id: string;
+  conversation_id: string;
+  role: "system" | "user" | "assistant";
+  content: string;
+  provider: string;
+  model: string;
+  created_at: string;
+};
+
+export async function getConversationDetails(id: string): Promise<Conversation> {
+  const { data } = await client.get(`/chat/conversations/${id}`);
+  return data;
+}
+
+export async function getConversationMessages(id: string): Promise<ApiMessage[]> {
+  const { data } = await client.get(`/chat/conversations/${id}/messages`);
+  return data;
+}
+
+export async function sendMessageStream(
+  conversationId: string,
+  message: string,
+  onChunk: (chunk: string) => void
+): Promise<void> {
+  const token = localStorage.getItem("access_token");
+  const response = await fetch(`${apiRoot}/chat/conversations/${conversationId}/messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      provider: "gemini",
+      model: "gemini-3-flash-preview",
+      message: message,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem("isAuthenticated");
+      localStorage.removeItem("access_token");
+      clearChatCache();
+      window.location.href = "/login";
+    }
+    throw new Error("Failed to send message stream");
+  }
+
+  const reader = response.body?.getReader();
+  console.log("reader", reader);
+  if (!reader) return;
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // Process complete SSE lines (each terminated by \n\n)
+    const lines = buffer.split("\n");
+    buffer = "";
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      // If this is the last element and doesn't end with newline, it's partial — re-buffer
+      if (i === lines.length - 1 && line !== "") {
+        buffer = lines[i];
+        break;
+      }
+
+      if (!line.startsWith("data: ")) continue;
+
+      const payload = line.slice(6); // strip "data: "
+
+      if (payload === "[DONE]") return;
+
+      try {
+        const parsed = JSON.parse(payload);
+        if (parsed.content) {
+          onChunk(parsed.content);
+        }
+      } catch {
+        // ignore malformed JSON chunks
+      }
+    }
+  }
+}
+
 let cachedRecentChats: Conversation[] | null = null;
 
 export function clearChatCache() {
@@ -76,6 +172,25 @@ export async function getRecentConversations(forceRefresh = false): Promise<Conv
   const { data } = await client.get("/chat/conversations?limit=5");
   cachedRecentChats = data;
   return data;
+}
+
+export type ApiKey = {
+  id: string;
+  provider: string;
+  created_at: string;
+};
+
+export async function getApiKeys(): Promise<ApiKey[]> {
+  const { data } = await client.get("/api-keys");
+  return data;
+}
+
+export async function addApiKey(provider: string, apiKey: string): Promise<void> {
+  await client.post("/api-keys", { provider, api_key: apiKey });
+}
+
+export async function removeApiKey(id: string): Promise<void> {
+  await client.delete(`/api-keys/${id}`);
 }
 
 export { client };

@@ -4,8 +4,11 @@
 
 @layer base {
   html {
-    @apply antialiased;
-    font-family: "Inter", system-ui, sans-serif;
+    @apply antialiased font-sans;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Space Grotesk", sans-serif;
   }
 
   body {
