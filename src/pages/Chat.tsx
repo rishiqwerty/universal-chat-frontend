@@ -105,6 +105,7 @@ export default function Chat() {
         provider: m.provider,
         model: m.model,
         isComplete: m.is_complete,
+        images: m.images,
       }));
       setMessages(formatted);
 
@@ -157,8 +158,28 @@ export default function Chat() {
         provider: m.provider,
         model: m.model,
         isComplete: m.is_complete,
+        images: m.images,
       }));
-      setMessages(formatted);
+      setMessages((prev) => {
+        // Find our last locally generated assistant message
+        const lastLocalAssistant = [...prev].reverse().find(m => m.role === "assistant");
+        
+        return formatted.map((newMsg, idx) => {
+          // 1. Try exact ID match
+          let old = prev.find((p) => p.id === newMsg.id);
+          
+          // 2. If no exact match but it's the last assistant message and we're syncing,
+          // it might be our temporary ID transitioning to a real one.
+          if (!old && newMsg.role === "assistant" && idx === formatted.length - 1 && lastLocalAssistant) {
+             old = lastLocalAssistant;
+          }
+          
+          if (old && old.images?.length && (!newMsg.images || newMsg.images.length === 0)) {
+            return { ...newMsg, images: old.images };
+          }
+          return newMsg;
+        });
+      });
     } catch {
       console.error("Failed to sync messages");
     }
@@ -290,6 +311,7 @@ export default function Chat() {
     const controller = new AbortController();
     streamControllerRef.current = controller;
 
+    let accumulatedChunks = "";
     try {
       await sendMessageStream(
         currentChatId,
@@ -297,12 +319,47 @@ export default function Chat() {
         selectedProvider,
         selectedModel,
         (chunk) => {
+          accumulatedChunks += chunk;
+          
+          // Check for image markers
+          const markerStart = "__IMAGE_START__";
+          const markerEnd = "__IMAGE_END__";
+          
+          let displayContent = accumulatedChunks;
+          let foundImages: string[] = [];
+          
+          // While there are complete markers, extract them
+          while (displayContent.includes(markerStart) && displayContent.includes(markerEnd)) {
+            const startIdx = displayContent.indexOf(markerStart);
+            const endIdx = displayContent.indexOf(markerEnd) + markerEnd.length;
+            
+            const markerPayload = displayContent.substring(startIdx + markerStart.length, endIdx - markerEnd.length);
+            try {
+              const data = JSON.parse(markerPayload.trim());
+              if (data.url) foundImages.push(data.url);
+            } catch (e) {
+              console.error("Failed to parse image marker", e);
+            }
+            
+            // Remove marker from the display content
+            displayContent = displayContent.substring(0, startIdx) + displayContent.substring(endIdx);
+          }
+
           setMessages((m) =>
-            m.map((msg) =>
-              msg.id === assistantMsgId
-                ? { ...msg, content: msg.content + chunk, provider: selectedProvider, model: selectedModel }
-                : msg
-            )
+            m.map((msg) => {
+              if (msg.id !== assistantMsgId) return msg;
+
+              // Use a Set to ensure unique images if we were to append, 
+              // but since foundImages contains ALL images in accumulatedChunks,
+              // we can just use foundImages directly to represent the state of that message.
+              return { 
+                ...msg, 
+                content: displayContent.trim() === "" ? "" : displayContent, 
+                images: foundImages.length > 0 ? foundImages : msg.images,
+                provider: selectedProvider, 
+                model: selectedModel 
+              };
+            })
           );
         },
         controller.signal

@@ -94,6 +94,7 @@ export type ApiMessage = {
   provider: string;
   model: string;
   is_complete: boolean;
+  images?: string[];
   created_at: string;
 };
 
@@ -233,6 +234,14 @@ export async function addApiKey(provider: string, apiKey: string): Promise<void>
 
 export async function removeApiKey(id: string): Promise<void> {
   await client.delete(`/api-keys/${id}`);
+}
+
+export function resolveImagePath(path: string): string {
+  if (!path) return "";
+  if (path.startsWith("http")) return path;
+  const base = getApiBaseUrl().replace(/\/+$/, "");
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${cleanPath}`;
 }
 
 export { client };

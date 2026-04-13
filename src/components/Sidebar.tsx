@@ -129,6 +129,7 @@ export default function Sidebar({ activeNav, onNewChat, onSelectChat, onDeleteCh
             <div key={chat.id} className="group relative">
               <button
                 onClick={() => {
+                  if (chat.id === activeChatId) return;
                   if (onSelectChat) {
                     onSelectChat(chat.id);
                   } else {
