@@ -59,7 +59,8 @@ export type Conversation = {
 
 export type ProviderModels = {
   provider: string;
-  models: string[];
+  text_models: string[];
+  image_models?: string[];
 };
 
 export async function getAvailableModels(): Promise<ProviderModels[]> {

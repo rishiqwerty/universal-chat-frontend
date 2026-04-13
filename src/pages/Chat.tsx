@@ -136,9 +136,9 @@ export default function Chat() {
           } else if (availableModels.length > 0) {
             // Priority 4: Absolute latest from available models
             const lastProv = availableModels[availableModels.length - 1];
-            const lastMod = lastProv.models[lastProv.models.length - 1];
+            const lastMod = lastProv.text_models?.[0] || lastProv.image_models?.[0];
             setSelectedProvider(lastProv.provider);
-            setSelectedModel(lastMod);
+            setSelectedModel(lastMod || null);
           }
         }
       }
@@ -388,11 +388,11 @@ export default function Chat() {
             setSelectedProvider(provider);
             setSelectedModel(model);
           } else {
-            // Default to absolute latest (last provider, last model)
+            // Default to absolute latest (last provider, first available model)
             const lastProv = models[models.length - 1];
-            const lastMod = lastProv.models[lastProv.models.length - 1];
+            const lastMod = lastProv.text_models?.[0] || lastProv.image_models?.[0];
             setSelectedProvider(lastProv.provider);
-            setSelectedModel(lastMod);
+            setSelectedModel(lastMod || null);
           }
         }
       })
