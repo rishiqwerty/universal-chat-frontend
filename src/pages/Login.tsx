@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { loginAccount } from "../api/api";
+import { loginAccount, clearChatCache } from "../api/api";
 import PageTransition from "../components/PageTransition";
 
 function LogoMark() {
@@ -27,6 +27,11 @@ export default function Login() {
     setError("");
     try {
       const token = await loginAccount({ email, password });
+      
+      // Reset all states and local storage for a fresh session
+      localStorage.clear();
+      clearChatCache();
+      
       localStorage.setItem("access_token", token);
       localStorage.setItem("isAuthenticated", "true");
       navigate("/chat");

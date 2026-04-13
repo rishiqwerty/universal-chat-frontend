@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { signupAccount } from "../api/api";
+import { signupAccount, clearChatCache } from "../api/api";
 
 function LogoMark() {
   return (
@@ -39,6 +39,7 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
       await signupAccount({ email, password });
       // Fresh start for new user
       localStorage.clear();
+      clearChatCache();
       
       if (onSuccess) {
         onSuccess();

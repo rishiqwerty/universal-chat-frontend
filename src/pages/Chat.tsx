@@ -373,7 +373,7 @@ export default function Chat() {
   }, [activeChatId, isProcessing, pending, syncMessages]);
 
   useEffect(() => {
-    getRecentConversations()
+    getRecentConversations(true)
       .then((chats) => setRecentChats(chats))
       .catch(() => { });
 
