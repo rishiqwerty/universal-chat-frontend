@@ -59,7 +59,8 @@ export type Conversation = {
 
 export type ProviderModels = {
   provider: string;
-  models: string[];
+  text_models: string[];
+  image_models?: string[];
 };
 
 export async function getAvailableModels(): Promise<ProviderModels[]> {
@@ -93,6 +94,7 @@ export type ApiMessage = {
   provider: string;
   model: string;
   is_complete: boolean;
+  images?: string[];
   created_at: string;
 };
 
@@ -138,7 +140,7 @@ export async function sendMessageStream(
       window.location.href = "/login";
       throw new Error("Session expired. Please login again.");
     }
-    
+
     let errorMsg = `Server error (${response.status})`;
     try {
       const errorData = await response.json();
@@ -232,6 +234,14 @@ export async function addApiKey(provider: string, apiKey: string): Promise<void>
 
 export async function removeApiKey(id: string): Promise<void> {
   await client.delete(`/api-keys/${id}`);
+}
+
+export function resolveImagePath(path: string): string {
+  if (!path) return "";
+  if (path.startsWith("http")) return path;
+  const base = getApiBaseUrl().replace(/\/+$/, "");
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${cleanPath}`;
 }
 
 export { client };

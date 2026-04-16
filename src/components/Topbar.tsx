@@ -1,4 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import ConfirmModal from "./ConfirmModal";
+import SignupModal from "./SignupModal";
 
 type TopbarProps = {
   activeChatTitle?: string | null;
@@ -7,7 +11,22 @@ type TopbarProps = {
 };
 
 export default function Topbar({ activeChatTitle, onUpdateTitle, onDeleteChat }: TopbarProps) {
+  const navigate = useNavigate();
   const [editingTitle, setEditingTitle] = useState("");
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showSignupModal, setShowSignupModal] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (activeChatTitle) setEditingTitle(activeChatTitle);
@@ -101,14 +120,104 @@ export default function Topbar({ activeChatTitle, onUpdateTitle, onDeleteChat }:
             <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2" />
           </svg>
         </button>
-        <button
-          type="button"
-          className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-elevated ring-1 ring-border/50"
-          aria-label="Profile"
-        >
-          <span className="text-xs font-semibold text-textSecondary">OP</span>
-        </button>
+        <div className="relative" ref={profileMenuRef}>
+          <button
+            type="button"
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            className={`flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-elevated ring-1 transition-all ${showProfileMenu ? "ring-primary" : "ring-border/50 hover:ring-border"
+              }`}
+            aria-label="Profile"
+          >
+            <span className="text-xs font-semibold text-textSecondary uppercase">OP</span>
+          </button>
+
+          <AnimatePresence>
+            {showProfileMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="absolute right-0 mt-2 w-56 overflow-hidden rounded-input border border-border/60 bg-elevated p-1 shadow-2xl z-50"
+              >
+                <div className="px-3 py-2 border-b border-border/20 mb-1">
+                  <p className="text-xs font-bold text-textPrimary uppercase tracking-tight">Original Pro</p>
+                  <p className="text-[10px] text-textMuted font-medium uppercase tracking-wider">Free Tier Account</p>
+                </div>
+
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                  </svg>
+                  Profile Settings
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="13" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="13" width="7" height="7" rx="1" />
+                    <rect x="13" y="13" width="7" height="7" rx="1" />
+                  </svg>
+                  My Library
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    setShowSignupModal(true);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                  </svg>
+                  Add Account
+                </button>
+
+                <div className="my-1 h-px bg-border/20" />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    setShowLogoutConfirm(true);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                  </svg>
+                  Log out
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={() => {
+          localStorage.clear();
+          navigate("/login");
+        }}
+        title="Account Logout"
+        message="Are you sure you want to log out? You will need to sign in again to access your conversations."
+        confirmText="Log Out"
+        confirmVariant="danger"
+      />
+
+      <SignupModal
+        isOpen={showSignupModal}
+        onClose={() => setShowSignupModal(false)}
+      />
     </header>
   );
 }

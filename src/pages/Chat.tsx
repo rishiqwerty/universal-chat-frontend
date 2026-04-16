@@ -8,6 +8,7 @@ import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import WelcomeScreen from "../components/WelcomeScreen";
 import ConfirmModal from "../components/ConfirmModal";
+import PageTransition from "../components/PageTransition";
 
 const initialMessages: ChatMessage[] = [];
 
@@ -26,11 +27,11 @@ export default function Chat() {
   );
   const [activeChatTitle, setActiveChatTitle] = useState<string | null>(null);
   const [recentChats, setRecentChats] = useState<Conversation[]>([]);
-  
+
   const [availableModels, setAvailableModels] = useState<ProviderModels[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
-  
+
   const streamControllerRef = useRef<AbortController | null>(null);
   const messageInputRef = useRef<MessageInputHandle>(null);
 
@@ -76,7 +77,8 @@ export default function Chat() {
   }, [cancelActiveStream, activeChatId, messages.length]);
 
   const loadConversation = useCallback(async (id: string) => {
-    if (id === activeChatId) return;
+    // Only return early if we already have messages for this chat
+    if (id === activeChatId && messages.length > 0) return;
 
     cancelActiveStream();
     setPending(false);
@@ -103,27 +105,48 @@ export default function Chat() {
         provider: m.provider,
         model: m.model,
         isComplete: m.is_complete,
+        images: m.images,
       }));
       setMessages(formatted);
 
-      // Restore per-chat model config or fall back to default
-      const savedChatConfig = localStorage.getItem(`chat_model_config_${id}`);
-      if (savedChatConfig) {
-        const { provider, model } = JSON.parse(savedChatConfig);
-        setSelectedProvider(provider);
-        setSelectedModel(model);
+      // Priority 1: Latest assistant message in history
+      const latestAssistantMsg = [...msgs].reverse().find(m => m.role === "assistant" && m.provider && m.model);
+
+      if (latestAssistantMsg) {
+        setSelectedProvider(latestAssistantMsg.provider);
+        setSelectedModel(latestAssistantMsg.model);
+        // Sync to local storage for quick access next time
+        localStorage.setItem(`chat_model_config_${id}`, JSON.stringify({
+          provider: latestAssistantMsg.provider,
+          model: latestAssistantMsg.model
+        }));
       } else {
-        const savedDefault = localStorage.getItem("default_model_config");
-        if (savedDefault) {
-          const { provider, model } = JSON.parse(savedDefault);
+        // Priority 2: Per-chat model config
+        const savedChatConfig = localStorage.getItem(`chat_model_config_${id}`);
+        if (savedChatConfig) {
+          const { provider, model } = JSON.parse(savedChatConfig);
           setSelectedProvider(provider);
           setSelectedModel(model);
+        } else {
+          // Priority 3: Global default
+          const savedDefault = localStorage.getItem("default_model_config");
+          if (savedDefault) {
+            const { provider, model } = JSON.parse(savedDefault);
+            setSelectedProvider(provider);
+            setSelectedModel(model);
+          } else if (availableModels.length > 0) {
+            // Priority 4: Absolute latest from available models
+            const lastProv = availableModels[availableModels.length - 1];
+            const lastMod = lastProv.text_models?.[0] || lastProv.image_models?.[0];
+            setSelectedProvider(lastProv.provider);
+            setSelectedModel(lastMod || null);
+          }
         }
       }
     } catch {
       console.error("Failed to load chat history");
     }
-  }, [cancelActiveStream, activeChatId]);
+  }, [cancelActiveStream, activeChatId, messages.length]);
 
   const syncMessages = useCallback(async (id: string) => {
     try {
@@ -135,8 +158,28 @@ export default function Chat() {
         provider: m.provider,
         model: m.model,
         isComplete: m.is_complete,
+        images: m.images,
       }));
-      setMessages(formatted);
+      setMessages((prev) => {
+        // Find our last locally generated assistant message
+        const lastLocalAssistant = [...prev].reverse().find(m => m.role === "assistant");
+        
+        return formatted.map((newMsg, idx) => {
+          // 1. Try exact ID match
+          let old = prev.find((p) => p.id === newMsg.id);
+          
+          // 2. If no exact match but it's the last assistant message and we're syncing,
+          // it might be our temporary ID transitioning to a real one.
+          if (!old && newMsg.role === "assistant" && idx === formatted.length - 1 && lastLocalAssistant) {
+             old = lastLocalAssistant;
+          }
+          
+          if (old && old.images?.length && (!newMsg.images || newMsg.images.length === 0)) {
+            return { ...newMsg, images: old.images };
+          }
+          return newMsg;
+        });
+      });
     } catch {
       console.error("Failed to sync messages");
     }
@@ -172,7 +215,7 @@ export default function Chat() {
   const handleModelChange = useCallback((provider: string, model: string) => {
     setSelectedProvider(provider);
     setSelectedModel(model);
-    
+
     const config = JSON.stringify({ provider, model });
     if (activeChatId) {
       localStorage.setItem(`chat_model_config_${activeChatId}`, config);
@@ -268,6 +311,8 @@ export default function Chat() {
     const controller = new AbortController();
     streamControllerRef.current = controller;
 
+    let accumulatedChunks = "";
+    let hasError = false;
     try {
       await sendMessageStream(
         currentChatId,
@@ -275,12 +320,44 @@ export default function Chat() {
         selectedProvider,
         selectedModel,
         (chunk) => {
+          accumulatedChunks += chunk;
+          
+          // Check for image markers
+          const markerStart = "__IMAGE_START__";
+          const markerEnd = "__IMAGE_END__";
+          
+          let displayContent = accumulatedChunks;
+          let foundImages: string[] = [];
+          
+          // While there are complete markers, extract them
+          while (displayContent.includes(markerStart) && displayContent.includes(markerEnd)) {
+            const startIdx = displayContent.indexOf(markerStart);
+            const endIdx = displayContent.indexOf(markerEnd) + markerEnd.length;
+            
+            const markerPayload = displayContent.substring(startIdx + markerStart.length, endIdx - markerEnd.length);
+            try {
+              const data = JSON.parse(markerPayload.trim());
+              if (data.url) foundImages.push(data.url);
+            } catch (e) {
+              console.error("Failed to parse image marker", e);
+            }
+            
+            // Remove marker from the display content
+            displayContent = displayContent.substring(0, startIdx) + displayContent.substring(endIdx);
+          }
+
           setMessages((m) =>
-            m.map((msg) =>
-              msg.id === assistantMsgId
-                ? { ...msg, content: msg.content + chunk, provider: selectedProvider, model: selectedModel }
-                : msg
-            )
+            m.map((msg) => {
+              if (msg.id !== assistantMsgId) return msg;
+
+              return { 
+                ...msg, 
+                content: displayContent.trim() === "" ? "" : displayContent, 
+                images: foundImages.length > 0 ? foundImages : msg.images,
+                provider: selectedProvider, 
+                model: selectedModel 
+              };
+            })
           );
         },
         controller.signal
@@ -290,7 +367,8 @@ export default function Chat() {
         console.log("Stream aborted");
         return;
       }
-      console.error("Failed to stream response");
+      hasError = true;
+      console.error("Failed to stream response", e);
       // Remove the empty assistant bubble
       setMessages((m) => m.filter((msg) => msg.id !== assistantMsgId));
       setStreamError(e.message || "Please try again.");
@@ -299,14 +377,21 @@ export default function Chat() {
       if (streamControllerRef.current === controller) {
         streamControllerRef.current = null;
         setPending(false);
-        // Silent sync after stream finishes to get real DB IDs (required for deletion)
-        // This avoids reloading the whole conversation details/title
-        if (currentChatId) {
+        
+        // ONLY sync if no error occurred. Syncing on error causes the 
+        // failed message (which isn't in DB yet) to be overwritten by stale state.
+        if (currentChatId && !hasError) {
           syncMessages(currentChatId);
-          
+
           // Refresh sidebar to catch auto-generated title from backend
           getRecentConversations(true)
-            .then((chats) => setRecentChats(chats))
+            .then((chats) => {
+              setRecentChats(chats);
+              const updated = chats.find(c => c.id === currentChatId);
+              if (updated) {
+                setActiveChatTitle(updated.title);
+              }
+            })
             .catch(() => { });
         }
       }
@@ -345,7 +430,7 @@ export default function Chat() {
   }, [activeChatId, isProcessing, pending, syncMessages]);
 
   useEffect(() => {
-    getRecentConversations()
+    getRecentConversations(true)
       .then((chats) => setRecentChats(chats))
       .catch(() => { });
 
@@ -360,8 +445,11 @@ export default function Chat() {
             setSelectedProvider(provider);
             setSelectedModel(model);
           } else {
-            setSelectedProvider(models[0].provider);
-            setSelectedModel(models[0].models[0]);
+            // Default to absolute latest (last provider, first available model)
+            const lastProv = models[models.length - 1];
+            const lastMod = lastProv.text_models?.[0] || lastProv.image_models?.[0];
+            setSelectedProvider(lastProv.provider);
+            setSelectedModel(lastMod || null);
           }
         }
       })
@@ -371,136 +459,138 @@ export default function Chat() {
   const isEmpty = messages.length === 0;
 
   return (
-    <div className="flex h-screen min-h-0 overflow-hidden bg-background">
-      <Sidebar activeNav="chat" onNewChat={handleNewChat} onSelectChat={loadConversation} onDeleteChat={handleDeleteConversation} recentChats={recentChats} activeChatId={activeChatId} />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <Topbar activeChatTitle={activeChatTitle} onUpdateTitle={handleUpdateTitle} onDeleteChat={activeChatId ? () => handleDeleteConversation() : undefined} />
+    <PageTransition>
+      <div className="flex h-screen min-h-0 overflow-hidden bg-background">
+        <Sidebar activeNav="chat" onNewChat={handleNewChat} onSelectChat={loadConversation} onDeleteChat={handleDeleteConversation} recentChats={recentChats} activeChatId={activeChatId} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <Topbar activeChatTitle={activeChatTitle} onUpdateTitle={handleUpdateTitle} onDeleteChat={activeChatId ? () => handleDeleteConversation() : undefined} />
 
-        <AnimatePresence mode="wait">
-          {isEmpty ? (
-            /* Welcome layout — everything centered as one block */
-            <motion.div
-              key="welcome-screen"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex min-h-0 flex-1 flex-col items-center justify-center bg-background px-6"
-            >
-              <WelcomeScreen />
+          <AnimatePresence mode="wait">
+            {isEmpty ? (
+              /* Welcome layout — everything centered as one block */
               <motion.div
-                layoutId="chat-input-container"
-                transition={{ type: "spring", stiffness: 260, damping: 30 }}
-                className="mt-8 w-full max-w-2xl"
+                key="welcome-screen"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="flex min-h-0 flex-1 flex-col items-center justify-center bg-background px-6"
               >
-                <div className="mx-auto flex w-full flex-col gap-4">
-                  {streamError && (
-                    <div className="flex items-center gap-3 animate-fade-in">
-                      <p className="flex-1 rounded-input bg-primary/10 px-4 py-2 text-sm text-primary ring-1 ring-primary/50">
-                        {streamError}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleRetry}
-                        className="flex items-center gap-2 rounded-input bg-primary px-4 py-2 text-sm font-semibold text-background shadow-[0_0_12px_rgba(217,255,0,0.2)] transition-colors hover:bg-primaryHover"
-                      >
-                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M1 4v6h6M23 20v-6h-6" />
-                          <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
-                        </svg>
-                        Retry
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => messageInputRef.current?.openPicker()}
-                        className="flex items-center gap-2 rounded-input border border-border bg-sidebar px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-elevated"
-                      >
-                        Change Model
-                      </button>
-                    </div>
-                  )}
-                  <MessageInput
-                    ref={messageInputRef}
-                    value={draft}
-                    onChange={setDraft}
-                    onSend={send}
-                    disabled={!!streamError || isProcessing}
-                    isStreaming={pending}
-                    availableModels={availableModels}
-                    selectedProvider={selectedProvider}
-                    selectedModel={selectedModel}
-                    onModelChange={handleModelChange}
-                  />
-                </div>
+                <WelcomeScreen />
+                <motion.div
+                  layoutId="chat-input-container"
+                  transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                  className="mt-8 w-full max-w-2xl"
+                >
+                  <div className="mx-auto flex w-full flex-col gap-4">
+                    {streamError && (
+                      <div className="flex items-center gap-3 animate-fade-in">
+                        <p className="flex-1 rounded-input bg-primary/10 px-4 py-2 text-sm text-primary ring-1 ring-primary/50">
+                          {streamError}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleRetry}
+                          className="flex items-center gap-2 rounded-input bg-primary px-4 py-2 text-sm font-semibold text-background shadow-[0_0_12px_rgba(217,255,0,0.2)] transition-colors hover:bg-primaryHover"
+                        >
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M1 4v6h6M23 20v-6h-6" />
+                            <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
+                          </svg>
+                          Retry
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => messageInputRef.current?.openPicker()}
+                          className="flex items-center gap-2 rounded-input border border-border bg-sidebar px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-elevated"
+                        >
+                          Change Model
+                        </button>
+                      </div>
+                    )}
+                    <MessageInput
+                      ref={messageInputRef}
+                      value={draft}
+                      onChange={setDraft}
+                      onSend={send}
+                      disabled={!!streamError || isProcessing}
+                      isStreaming={pending}
+                      availableModels={availableModels}
+                      selectedProvider={selectedProvider}
+                      selectedModel={selectedModel}
+                      onModelChange={handleModelChange}
+                    />
+                  </div>
+                </motion.div>
               </motion.div>
-            </motion.div>
-          ) : (
-            /* Normal chat layout */
-            <motion.div
-              key="chat-screen"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-              className="flex min-h-0 flex-1 flex-col"
-            >
-              <ChatWindow messages={messages} onDeleteMessage={handleDeleteMessage} />
+            ) : (
+              /* Normal chat layout */
               <motion.div
-                layoutId="chat-input-container"
-                transition={{ type: "spring", stiffness: 260, damping: 30 }}
-                className="w-full"
+                key="chat-screen"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className="flex min-h-0 flex-1 flex-col"
               >
-                <div className="mx-auto w-full max-w-4xl px-6 pb-6 pt-2">
-                  {streamError && (
-                    <div className="mb-4 flex items-center gap-3 animate-fade-in">
-                      <p className="flex-1 rounded-input bg-primary/10 px-4 py-2 text-sm text-primary ring-1 ring-primary/50">
-                        {streamError}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleRetry}
-                        className="flex items-center gap-2 rounded-input bg-primary px-4 py-2 text-sm font-semibold text-background shadow-[0_0_12px_rgba(217,255,0,0.2)] transition-colors hover:bg-primaryHover"
-                      >
-                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M1 4v6h6M23 20v-6h-6" />
-                          <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
-                        </svg>
-                        Retry
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => messageInputRef.current?.openPicker()}
-                        className="flex items-center gap-2 rounded-input border border-border bg-sidebar px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-elevated"
-                      >
-                        Change Model
-                      </button>
-                    </div>
-                  )}
-                  <MessageInput
-                    ref={messageInputRef}
-                    value={draft}
-                    onChange={setDraft}
-                    onSend={send}
-                    disabled={!!streamError || isProcessing}
-                    isStreaming={pending}
-                    availableModels={availableModels}
-                    selectedProvider={selectedProvider}
-                    selectedModel={selectedModel}
-                    onModelChange={handleModelChange}
-                  />
-                </div>
+                <ChatWindow messages={messages} onDeleteMessage={handleDeleteMessage} />
+                <motion.div
+                  layoutId="chat-input-container"
+                  transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                  className="w-full"
+                >
+                  <div className="mx-auto w-full max-w-4xl px-6 pb-6 pt-2">
+                    {streamError && (
+                      <div className="mb-4 flex items-center gap-3 animate-fade-in">
+                        <p className="flex-1 rounded-input bg-primary/10 px-4 py-2 text-sm text-primary ring-1 ring-primary/50">
+                          {streamError}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleRetry}
+                          className="flex items-center gap-2 rounded-input bg-primary px-4 py-2 text-sm font-semibold text-background shadow-[0_0_12px_rgba(217,255,0,0.2)] transition-colors hover:bg-primaryHover"
+                        >
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M1 4v6h6M23 20v-6h-6" />
+                            <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
+                          </svg>
+                          Retry
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => messageInputRef.current?.openPicker()}
+                          className="flex items-center gap-2 rounded-input border border-border bg-sidebar px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-elevated"
+                        >
+                          Change Model
+                        </button>
+                      </div>
+                    )}
+                    <MessageInput
+                      ref={messageInputRef}
+                      value={draft}
+                      onChange={setDraft}
+                      onSend={send}
+                      disabled={!!streamError || isProcessing}
+                      isStreaming={pending}
+                      availableModels={availableModels}
+                      selectedProvider={selectedProvider}
+                      selectedModel={selectedModel}
+                      onModelChange={handleModelChange}
+                    />
+                  </div>
+                </motion.div>
               </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <ConfirmModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          onConfirm={handleConfirmDelete}
+          title="Delete Conversation"
+          message="Are you sure you want to delete this conversation? This action cannot be undone and will remove all messages associated with it."
+        />
       </div>
-
-      <ConfirmModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={handleConfirmDelete}
-        title="Delete Conversation"
-        message="Are you sure you want to delete this conversation? This action cannot be undone and will remove all messages associated with it."
-      />
-    </div>
+    </PageTransition>
   );
 }

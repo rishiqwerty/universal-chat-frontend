@@ -8,6 +8,7 @@ export type ChatMessage = {
   provider?: string;
   model?: string;
   isComplete?: boolean;
+  images?: string[];
 };
 
 type ChatWindowProps = {
@@ -61,7 +62,16 @@ export default function ChatWindow({ messages, onDeleteMessage }: ChatWindowProp
       >
         <div className="mx-auto flex max-w-4xl flex-col gap-4">
           {messages.map((m) => (
-            <MessageBubble key={m.id} role={m.role} content={m.content} provider={m.provider} model={m.model} isComplete={m.isComplete} onDelete={onDeleteMessage ? () => onDeleteMessage(m.id) : undefined} />
+            <MessageBubble 
+              key={m.id} 
+              role={m.role} 
+              content={m.content} 
+              images={m.images}
+              provider={m.provider} 
+              model={m.model} 
+              isComplete={m.isComplete} 
+              onDelete={onDeleteMessage ? () => onDeleteMessage(m.id) : undefined} 
+            />
           ))}
           <div ref={bottomRef} />
         </div>

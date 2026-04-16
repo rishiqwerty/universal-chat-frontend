@@ -86,10 +86,21 @@ export default function Sidebar({ activeNav, onNewChat, onSelectChat, onDeleteCh
 
   return (
     <aside className="flex h-full min-h-0 w-[260px] shrink-0 flex-col border-r border-border/40 bg-sidebar px-4 pb-6 pt-6">
-      <div className="flex items-start gap-3">
-        <LogoMark />
+      <div 
+        className="flex items-start gap-3 cursor-pointer group"
+        onClick={() => {
+          if (onNewChat) {
+            onNewChat();
+          } else {
+            navigate("/chat", { state: { newChat: true } });
+          }
+        }}
+      >
+        <div className="transition-transform group-hover:scale-110 duration-200">
+          <LogoMark />
+        </div>
         <div>
-          <p className="text-base font-headline font-bold leading-tight text-textPrimary" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Neural Architect</p>
+          <p className="text-base font-headline font-bold leading-tight text-textPrimary group-hover:text-primary transition-colors" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Neural Architect</p>
           <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-textMuted">
             V1.0.4-BETA
           </p>
@@ -118,6 +129,7 @@ export default function Sidebar({ activeNav, onNewChat, onSelectChat, onDeleteCh
             <div key={chat.id} className="group relative">
               <button
                 onClick={() => {
+                  if (chat.id === activeChatId) return;
                   if (onSelectChat) {
                     onSelectChat(chat.id);
                   } else {
