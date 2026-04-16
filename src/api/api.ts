@@ -140,7 +140,7 @@ export async function sendMessageStream(
       window.location.href = "/login";
       throw new Error("Session expired. Please login again.");
     }
-    
+
     let errorMsg = `Server error (${response.status})`;
     try {
       const errorData = await response.json();

@@ -312,6 +312,7 @@ export default function Chat() {
     streamControllerRef.current = controller;
 
     let accumulatedChunks = "";
+    let hasError = false;
     try {
       await sendMessageStream(
         currentChatId,
@@ -349,9 +350,6 @@ export default function Chat() {
             m.map((msg) => {
               if (msg.id !== assistantMsgId) return msg;
 
-              // Use a Set to ensure unique images if we were to append, 
-              // but since foundImages contains ALL images in accumulatedChunks,
-              // we can just use foundImages directly to represent the state of that message.
               return { 
                 ...msg, 
                 content: displayContent.trim() === "" ? "" : displayContent, 
@@ -369,7 +367,8 @@ export default function Chat() {
         console.log("Stream aborted");
         return;
       }
-      console.error("Failed to stream response");
+      hasError = true;
+      console.error("Failed to stream response", e);
       // Remove the empty assistant bubble
       setMessages((m) => m.filter((msg) => msg.id !== assistantMsgId));
       setStreamError(e.message || "Please try again.");
@@ -378,12 +377,13 @@ export default function Chat() {
       if (streamControllerRef.current === controller) {
         streamControllerRef.current = null;
         setPending(false);
-        // Silent sync after stream finishes to get real DB IDs (required for deletion)
-        // This avoids reloading the whole conversation details/title
-        if (currentChatId) {
+        
+        // ONLY sync if no error occurred. Syncing on error causes the 
+        // failed message (which isn't in DB yet) to be overwritten by stale state.
+        if (currentChatId && !hasError) {
           syncMessages(currentChatId);
 
-          // Refresh sidebar to catch auto-generated title from backend and update top bar
+          // Refresh sidebar to catch auto-generated title from backend
           getRecentConversations(true)
             .then((chats) => {
               setRecentChats(chats);
