@@ -110,16 +110,6 @@ export default function Topbar({ activeChatTitle, onUpdateTitle, onDeleteChat }:
             <path d="M5 19l.75 2.25L8 22l-2.25.75L5 25l-.75-2.25L2 22l2.25-.75L5 19z" />
           </svg>
         </button>
-        <button
-          type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-input text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
-          aria-label="Settings"
-        >
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2" />
-          </svg>
-        </button>
         <div className="relative" ref={profileMenuRef}>
           <button
             type="button"
