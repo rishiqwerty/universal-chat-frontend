@@ -4,9 +4,16 @@ import SignupForm from "./SignupForm";
 type SignupModalProps = {
   isOpen: boolean;
   onClose: () => void;
+  title?: string;
+  subtitle?: string;
 };
 
-export default function SignupModal({ isOpen, onClose }: SignupModalProps) {
+export default function SignupModal({ 
+  isOpen, 
+  onClose, 
+  title = "Add New Operative", 
+  subtitle = "Initialize Account" 
+}: SignupModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -32,8 +39,8 @@ export default function SignupModal({ isOpen, onClose }: SignupModalProps) {
               {/* Header */}
               <div className="flex items-center justify-between border-b border-border/20 px-6 py-4 bg-background/50">
                 <div>
-                  <h3 className="text-lg font-headline font-bold text-textPrimary">Add New Operative</h3>
-                  <p className="text-xs text-textSecondary uppercase tracking-widest font-semibold mt-0.5">Initialize Account</p>
+                  <h3 className="text-lg font-headline font-bold text-textPrimary">{title}</h3>
+                  <p className="text-xs text-textSecondary uppercase tracking-widest font-semibold mt-0.5">{subtitle}</p>
                 </div>
                 <button
                   type="button"

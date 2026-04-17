@@ -173,8 +173,7 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
           {loading ? "Creating account…" : "Create account"}
         </button>
 
-        {!isModal && (
-          <div className="mt-8 border-t border-border/20 pt-8">
+        <div className="mt-8 border-t border-border/20 pt-8">
             <p className="text-center text-[10px] font-semibold uppercase tracking-widest text-textMuted">
               Third party validation
             </p>
@@ -200,17 +199,14 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
               </button>
             </div>
           </div>
-        )}
       </form>
 
-      {!isModal && (
-        <p className="mt-8 text-center text-sm text-textSecondary">
-          Already registered?{" "}
-          <Link to="/login" className="font-medium text-primary hover:text-primaryHover">
-            Sign in
-          </Link>
-        </p>
-      )}
+      <p className="mt-8 text-center text-sm text-textSecondary">
+        Already registered?{" "}
+        <Link to="/login" className="font-medium text-primary hover:text-primaryHover">
+          Sign in
+        </Link>
+      </p>
     </div>
   );
 }

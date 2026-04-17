@@ -10,6 +10,7 @@ type TopbarProps = {
   onDeleteChat?: () => void;
   isTempMode?: boolean;
   onToggleTempMode?: () => void;
+  isAuthenticated?: boolean;
 };
 
 export default function Topbar({ 
@@ -17,7 +18,8 @@ export default function Topbar({
   onUpdateTitle, 
   onDeleteChat,
   isTempMode,
-  onToggleTempMode 
+  onToggleTempMode,
+  isAuthenticated = true
 }: TopbarProps) {
   const navigate = useNavigate();
   const [editingTitle, setEditingTitle] = useState("");
@@ -110,31 +112,106 @@ export default function Topbar({
         </button>
         <button
           type="button"
-          onClick={onToggleTempMode}
+          onClick={() => {
+            if (!isAuthenticated) {
+              setShowSignupModal(true);
+            } else if (onToggleTempMode) {
+              onToggleTempMode();
+            }
+          }}
           className={`flex h-9 items-center gap-2 rounded-input px-3 transition-all ${
             isTempMode 
-            ? "bg-primary text-background shadow-[0_0_15px_rgba(217,255,0,0.3)]" 
+            ? "border border-dashed border-primary/50 bg-primary/5 text-primary shadow-[0_0_12px_rgba(217,255,0,0.15)] hover:bg-primary/10" 
             : "text-textSecondary hover:bg-surface hover:text-textPrimary"
           }`}
           aria-label="Temporary Mode"
-          title={isTempMode ? "Exit Temporary Mode" : "Start Temporary Chat"}
+          title={!isAuthenticated ? "Login to save chats" : (isTempMode ? "Exit Temporary Mode" : "Start Temporary Chat")}
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11V7a4 4 0 118 0v4c0 1.28.192 2.515.547 3.672M12 11c1.744 2.772 2.753 6.054 2.753 9.571m-9.643-.513c-.322-.135-.351-.303-.351-.488V11a4 4 0 118 0v4c0 .185-.029.353-.351.488m-9.292-2.128a13.916 13.916 0 0113.111-9.444" />
           </svg>
-          <span className="text-xs font-bold uppercase tracking-wider">
-            {isTempMode ? "Go Public" : "Incognito"}
+          <span className="text-[10px] font-bold uppercase tracking-widest">
+            {!isAuthenticated ? "Guest Mode" : (isTempMode ? "Go Public" : "Incognito")}
           </span>
         </button>
+        {!isAuthenticated && (
+          <motion.button
+            type="button"
+            onClick={() => setShowSignupModal(true)}
+            animate={{ 
+              boxShadow: [
+                "0 0 15px rgba(217,255,0,0.3)",
+                "0 0 25px rgba(217,255,0,0.6)",
+                "0 0 15px rgba(217,255,0,0.3)"
+              ],
+              scale: [1, 1.02, 1]
+            }}
+            transition={{ 
+              duration: 2, 
+              repeat: Infinity, 
+              ease: "easeInOut" 
+            }}
+            className="flex h-9 items-center gap-2 rounded-input bg-primary px-4 text-xs font-bold uppercase tracking-wider text-background transition-all hover:bg-primaryHover active:scale-[0.98]"
+          >
+            Join / Sign In
+          </motion.button>
+        )}
         <div className="relative" ref={profileMenuRef}>
           <button
             type="button"
             onClick={() => setShowProfileMenu(!showProfileMenu)}
-            className={`flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-elevated ring-1 transition-all ${showProfileMenu ? "ring-primary" : "ring-border/50 hover:ring-border"
+            className={`flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-elevated ring-1 transition-all ${showProfileMenu ? "ring-primary shadow-[0_0_15px_rgba(217,255,0,0.3)]" : "ring-border/50 hover:ring-border hover:shadow-[0_0_10px_rgba(255,255,255,0.05)]"
               }`}
             aria-label="Profile"
           >
-            <span className="text-xs font-semibold text-textSecondary uppercase">OP</span>
+            {isAuthenticated ? (
+              <span className="text-xs font-semibold text-textSecondary uppercase">
+                OP
+              </span>
+            ) : (
+              <motion.div
+                className="relative h-full w-full flex items-center justify-center p-0.5"
+                initial="initial"
+                animate="guiding"
+              >
+                {/* Subtle background glow */}
+                <div className="absolute inset-0 bg-primary/10 blur-md rounded-full" />
+                
+                {/* The Mascot */}
+                <motion.img
+                  src="/mascot_avatar.png"
+                  alt="Assistant"
+                  className="h-full w-full object-cover rounded-full relative z-10"
+                  variants={{
+                    initial: { rotate: 0, scale: 1 },
+                    guiding: {
+                      rotateX: [0, 15, 0, 0, 0],
+                      rotateY: [0, -25, 0, 0, 0],
+                      scale: [1, 1.05, 1, 1, 1],
+                      transition: {
+                        duration: 6,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        times: [0, 0.2, 0.4, 0.8, 1]
+                      }
+                    }
+                  }}
+                />
+                
+                {/* Continuous Wave Layer */}
+                <motion.div
+                  className="absolute inset-0 pointer-events-none z-20"
+                  animate={{ 
+                    rotate: [-2, 2, -2],
+                  }}
+                  transition={{ 
+                    duration: 2, 
+                    repeat: Infinity, 
+                    ease: "easeInOut" 
+                  }}
+                />
+              </motion.div>
+            )}
           </button>
 
           <AnimatePresence>
@@ -147,31 +224,39 @@ export default function Topbar({
                 className="absolute right-0 mt-2 w-56 overflow-hidden rounded-input border border-border/60 bg-elevated p-1 shadow-2xl z-50"
               >
                 <div className="px-3 py-2 border-b border-border/20 mb-1">
-                  <p className="text-xs font-bold text-textPrimary uppercase tracking-tight">Original Pro</p>
-                  <p className="text-[10px] text-textMuted font-medium uppercase tracking-wider">Free Tier Account</p>
+                  <p className="text-xs font-bold text-textPrimary uppercase tracking-tight">
+                    {isAuthenticated ? "Original Pro" : "Guest Operative"}
+                  </p>
+                  <p className="text-[10px] text-textMuted font-medium uppercase tracking-wider">
+                    {isAuthenticated ? "Free Tier Account" : "Temporary Session"}
+                  </p>
                 </div>
 
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                  </svg>
-                  Profile Settings
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <rect x="3" y="3" width="7" height="7" rx="1" />
-                    <rect x="13" y="3" width="7" height="7" rx="1" />
-                    <rect x="3" y="13" width="7" height="7" rx="1" />
-                    <rect x="13" y="13" width="7" height="7" rx="1" />
-                  </svg>
-                  My Library
-                </button>
+                {isAuthenticated && (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                    </svg>
+                    Profile Settings
+                  </button>
+                )}
+                {isAuthenticated && (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <rect x="3" y="3" width="7" height="7" rx="1" />
+                      <rect x="13" y="3" width="7" height="7" rx="1" />
+                      <rect x="3" y="13" width="7" height="7" rx="1" />
+                      <rect x="13" y="13" width="7" height="7" rx="1" />
+                    </svg>
+                    My Library
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -183,24 +268,26 @@ export default function Topbar({
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                   </svg>
-                  Add Account
+                  {isAuthenticated ? "Add Account" : "Sign In / Join"}
                 </button>
 
                 <div className="my-1 h-px bg-border/20" />
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    setShowLogoutConfirm(true);
-                  }}
-                  className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-                  </svg>
-                  Log out
-                </button>
+                {isAuthenticated && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      setShowLogoutConfirm(true);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                    </svg>
+                    Log out
+                  </button>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

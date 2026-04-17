@@ -12,6 +12,7 @@ type MessageInputProps = {
   selectedProvider: string | null;
   selectedModel: string | null;
   onModelChange: (provider: string, model: string) => void;
+  isTempMode?: boolean;
 };
 
 export interface MessageInputHandle {
@@ -30,6 +31,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   selectedProvider,
   selectedModel,
   onModelChange,
+  isTempMode,
 }, ref) => {
   const [showPicker, setShowPicker] = useState(false);
   const [isGlowing, setIsGlowing] = useState(false);
@@ -92,30 +94,32 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
             </motion.div>
             
             {/* Model Selector Trigger */}
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-              <button
-                type="button"
-                onClick={() => setShowPicker(!showPicker)}
-                disabled={isStreaming || availableModels.length === 0}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all duration-300 ${
-                  isImageModel 
-                    ? 'bg-primary/10 text-primary ring-1 ring-primary/30 hover:bg-primary/20' 
-                    : 'bg-elevated/50 text-textSecondary hover:bg-elevated hover:text-textPrimary'
-                } disabled:opacity-30`}
-              >
-                {isImageModel && (
-                  <svg className="h-3 w-3 animate-pulse text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <circle cx="8.5" cy="8.5" r="1.5" />
-                    <polyline points="21 15 16 10 5 21" />
+            {!isTempMode && (
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+                <button
+                  type="button"
+                  onClick={() => setShowPicker(!showPicker)}
+                  disabled={isStreaming || availableModels.length === 0}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all duration-300 ${
+                    isImageModel 
+                      ? 'bg-primary/10 text-primary ring-1 ring-primary/30 hover:bg-primary/20' 
+                      : 'bg-elevated/50 text-textSecondary hover:bg-elevated hover:text-textPrimary'
+                  } disabled:opacity-30`}
+                >
+                  {isImageModel && (
+                    <svg className="h-3 w-3 animate-pulse text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                  )}
+                  <span className="max-w-[80px] truncate">{selectedModel || "Select Model"}</span>
+                  <svg className={`h-3 w-3 transition-transform ${showPicker ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
                   </svg>
-                )}
-                <span className="max-w-[80px] truncate">{selectedModel || "Select Model"}</span>
-                <svg className={`h-3 w-3 transition-transform ${showPicker ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
+                </button>
+              </div>
+            )}
           </div>
 
           <button

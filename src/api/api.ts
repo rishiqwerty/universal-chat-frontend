@@ -24,9 +24,6 @@ client.interceptors.response.use(
       localStorage.removeItem("isAuthenticated");
       localStorage.removeItem("access_token");
       clearChatCache();
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
-      }
     }
     return Promise.reject(error);
   }
@@ -137,7 +134,6 @@ export async function sendMessageStream(
       localStorage.removeItem("isAuthenticated");
       localStorage.removeItem("access_token");
       clearChatCache();
-      window.location.href = "/login";
       throw new Error("Session expired. Please login again.");
     }
 

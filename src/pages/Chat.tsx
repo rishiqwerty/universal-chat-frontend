@@ -9,6 +9,7 @@ import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import WelcomeScreen from "../components/WelcomeScreen";
 import ConfirmModal from "../components/ConfirmModal";
+import SignupModal from "../components/SignupModal";
 import PageTransition from "../components/PageTransition";
 
 const initialMessages: ChatMessage[] = [];
@@ -33,14 +34,18 @@ export default function Chat() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
 
-  const [isTempMode, setIsTempMode] = useState(false);
+  const [isTempMode, setIsTempMode] = useState(() => {
+    return localStorage.getItem("isAuthenticated") !== "true";
+  });
   const [tempMessages, setTempMessages] = useState<ChatMessage[]>([]);
+  const isAuthenticated = useMemo(() => localStorage.getItem("isAuthenticated") === "true", []);
 
   const streamControllerRef = useRef<AbortController | null>(null);
   const messageInputRef = useRef<MessageInputHandle>(null);
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [chatIdToDelete, setChatIdToDelete] = useState<string | null>(null);
+  const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
 
   const cancelActiveStream = useCallback(() => {
     if (streamControllerRef.current) {
@@ -63,7 +68,7 @@ export default function Chat() {
 
     cancelActiveStream();
     setPending(false);
-    
+
     if (isTempMode) {
       setTempMessages([]);
       setTimeout(() => messageInputRef.current?.focus(), 100);
@@ -174,17 +179,17 @@ export default function Chat() {
       setMessages((prev) => {
         // Find our last locally generated assistant message
         const lastLocalAssistant = [...prev].reverse().find(m => m.role === "assistant");
-        
+
         return formatted.map((newMsg, idx) => {
           // 1. Try exact ID match
           let old = prev.find((p) => p.id === newMsg.id);
-          
+
           // 2. If no exact match but it's the last assistant message and we're syncing,
           // it might be our temporary ID transitioning to a real one.
           if (!old && newMsg.role === "assistant" && idx === formatted.length - 1 && lastLocalAssistant) {
-             old = lastLocalAssistant;
+            old = lastLocalAssistant;
           }
-          
+
           if (old && old.images?.length && (!newMsg.images || newMsg.images.length === 0)) {
             return { ...newMsg, images: old.images };
           }
@@ -278,13 +283,18 @@ export default function Chat() {
     setLastFailedText(null);
 
     const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: "user", content: text };
-    
+
     if (isTempMode) {
+      const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
+      if (!isAuthenticated && tempMessages.length >= 30) {
+        setIsSignupModalOpen(true);
+        return;
+      }
       setTempMessages((m) => [...m, userMsg]);
     } else {
       setMessages((m) => [...m, userMsg]);
     }
-    
+
     setDraft("");
     setPending(true);
 
@@ -292,37 +302,37 @@ export default function Chat() {
       // Temporary mode logic: use shared system endpoint
       const assistantMsgId = `a-${Date.now()}`;
       setTempMessages((m) => [...m, { id: assistantMsgId, role: "assistant", content: "" }]);
-      
+
       const controller = new AbortController();
       streamControllerRef.current = controller;
-      
+
       try {
         // Prepare context
         const context: UnifiedMessage[] = [...tempMessages, userMsg].map(m => ({
           role: m.role,
           content: m.content
         }));
-        
+
         let accumulated = "";
         await sendTempChatMessageStream(
           context,
           (chunk) => {
             accumulated += chunk;
-            
+
             // Check for image markers
             const markerStart = "__IMAGE_START__";
             const markerEnd = "__IMAGE_END__";
             const metaStart = "__METADATA_START__";
             const metaEnd = "__METADATA_END__";
-            
+
             let displayContent = accumulated;
             let foundImages: string[] = [];
-            
+
             // While there are complete markers, extract them
             while (displayContent.includes(markerStart) && displayContent.includes(markerEnd)) {
               const startIdx = displayContent.indexOf(markerStart);
               const endIdx = displayContent.indexOf(markerEnd) + markerEnd.length;
-              
+
               const markerPayload = displayContent.substring(startIdx + markerStart.length, endIdx - markerEnd.length);
               try {
                 const data = JSON.parse(markerPayload.trim());
@@ -330,7 +340,7 @@ export default function Chat() {
               } catch (e) {
                 console.error("Failed to parse image marker", e);
               }
-              
+
               displayContent = displayContent.substring(0, startIdx) + displayContent.substring(endIdx);
             }
 
@@ -341,14 +351,14 @@ export default function Chat() {
               displayContent = displayContent.substring(0, startIdx) + displayContent.substring(endIdx);
             }
 
-            setTempMessages((m) => m.map(msg => 
-              msg.id === assistantMsgId 
-              ? { 
-                  ...msg, 
+            setTempMessages((m) => m.map(msg =>
+              msg.id === assistantMsgId
+                ? {
+                  ...msg,
                   content: displayContent.trim() === "" ? "" : displayContent,
-                  images: foundImages.length > 0 ? [...(msg.images || []), ...foundImages] : msg.images 
-                } 
-              : msg
+                  images: foundImages.length > 0 ? [...(msg.images || []), ...foundImages] : msg.images
+                }
+                : msg
             ));
           },
           controller.signal
@@ -413,19 +423,19 @@ export default function Chat() {
         selectedModel,
         (chunk) => {
           accumulatedChunks += chunk;
-          
+
           // Check for image markers
           const markerStart = "__IMAGE_START__";
           const markerEnd = "__IMAGE_END__";
-          
+
           let displayContent = accumulatedChunks;
           let foundImages: string[] = [];
-          
+
           // While there are complete markers, extract them
           while (displayContent.includes(markerStart) && displayContent.includes(markerEnd)) {
             const startIdx = displayContent.indexOf(markerStart);
             const endIdx = displayContent.indexOf(markerEnd) + markerEnd.length;
-            
+
             const markerPayload = displayContent.substring(startIdx + markerStart.length, endIdx - markerEnd.length);
             try {
               const data = JSON.parse(markerPayload.trim());
@@ -433,7 +443,7 @@ export default function Chat() {
             } catch (e) {
               console.error("Failed to parse image marker", e);
             }
-            
+
             // Remove marker from the display content
             displayContent = displayContent.substring(0, startIdx) + displayContent.substring(endIdx);
           }
@@ -442,12 +452,12 @@ export default function Chat() {
             m.map((msg) => {
               if (msg.id !== assistantMsgId) return msg;
 
-              return { 
-                ...msg, 
-                content: displayContent.trim() === "" ? "" : displayContent, 
+              return {
+                ...msg,
+                content: displayContent.trim() === "" ? "" : displayContent,
                 images: foundImages.length > 0 ? foundImages : msg.images,
-                provider: selectedProvider, 
-                model: selectedModel 
+                provider: selectedProvider,
+                model: selectedModel
               };
             })
           );
@@ -469,7 +479,7 @@ export default function Chat() {
       if (streamControllerRef.current === controller) {
         streamControllerRef.current = null;
         setPending(false);
-        
+
         // ONLY sync if no error occurred. Syncing on error causes the 
         // failed message (which isn't in DB yet) to be overwritten by stale state.
         if (currentChatId && !hasError) {
@@ -499,10 +509,14 @@ export default function Chat() {
   const handleRetry = useCallback(() => {
     if (!lastFailedText) return;
     // Remove the last user message so sendMessage re-adds it
-    setMessages((m) => m.slice(0, -1));
+    if (isTempMode) {
+      setTempMessages((m) => m.slice(0, -1));
+    } else {
+      setMessages((m) => m.slice(0, -1));
+    }
     setStreamError(null);
     sendMessage(lastFailedText);
-  }, [lastFailedText, sendMessage]);
+  }, [isTempMode, lastFailedText, sendMessage]);
 
   const lastMessage = messages[messages.length - 1];
   const isProcessing = useMemo(() => {
@@ -522,9 +536,11 @@ export default function Chat() {
   }, [activeChatId, isProcessing, pending, syncMessages]);
 
   useEffect(() => {
-    getRecentConversations(true)
-      .then((chats) => setRecentChats(chats))
-      .catch(() => { });
+    if (isAuthenticated) {
+      getRecentConversations(true)
+        .then((chats) => setRecentChats(chats))
+        .catch(() => { });
+    }
 
     getAvailableModels()
       .then((models) => {
@@ -554,24 +570,26 @@ export default function Chat() {
   return (
     <PageTransition>
       <div className="flex h-screen min-h-0 overflow-hidden bg-background">
-        <Sidebar 
-          activeNav="chat" 
-          onNewChat={handleNewChat} 
-          onSelectChat={loadConversation} 
-          onDeleteChat={handleDeleteConversation} 
-          recentChats={recentChats} 
-          activeChatId={isTempMode ? null : activeChatId} 
+        <Sidebar
+          activeNav="chat"
+          onNewChat={handleNewChat}
+          onSelectChat={loadConversation}
+          onDeleteChat={handleDeleteConversation}
+          recentChats={recentChats}
+          activeChatId={isTempMode ? null : activeChatId}
+          isAuthenticated={isAuthenticated}
         />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <Topbar 
-            activeChatTitle={isTempMode ? "Temporary Chat" : activeChatTitle} 
-            onUpdateTitle={isTempMode ? undefined : handleUpdateTitle} 
-            onDeleteChat={(!isTempMode && activeChatId) ? () => handleDeleteConversation() : undefined} 
+          <Topbar
+            activeChatTitle={isTempMode ? "Temporary Chat" : activeChatTitle}
+            onUpdateTitle={isTempMode ? undefined : handleUpdateTitle}
+            onDeleteChat={(!isTempMode && activeChatId) ? () => handleDeleteConversation() : undefined}
             isTempMode={isTempMode}
             onToggleTempMode={() => {
               setIsTempMode(!isTempMode);
               handleNewChat();
             }}
+            isAuthenticated={isAuthenticated}
           />
 
           <AnimatePresence mode="wait">
@@ -608,13 +626,15 @@ export default function Chat() {
                           </svg>
                           Retry
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => messageInputRef.current?.openPicker()}
-                          className="flex items-center gap-2 rounded-input border border-border bg-sidebar px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-elevated"
-                        >
-                          Change Model
-                        </button>
+                        {!isTempMode && (
+                          <button
+                            type="button"
+                            onClick={() => messageInputRef.current?.openPicker()}
+                            className="flex items-center gap-2 rounded-input border border-border bg-sidebar px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-elevated"
+                          >
+                            Change Model
+                          </button>
+                        )}
                       </div>
                     )}
                     <MessageInput
@@ -628,6 +648,7 @@ export default function Chat() {
                       selectedProvider={selectedProvider}
                       selectedModel={selectedModel}
                       onModelChange={handleModelChange}
+                      isTempMode={isTempMode}
                     />
                   </div>
                 </motion.div>
@@ -664,13 +685,15 @@ export default function Chat() {
                           </svg>
                           Retry
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => messageInputRef.current?.openPicker()}
-                          className="flex items-center gap-2 rounded-input border border-border bg-sidebar px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-elevated"
-                        >
-                          Change Model
-                        </button>
+                        {!isTempMode && (
+                          <button
+                            type="button"
+                            onClick={() => messageInputRef.current?.openPicker()}
+                            className="flex items-center gap-2 rounded-input border border-border bg-sidebar px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-elevated"
+                          >
+                            Change Model
+                          </button>
+                        )}
                       </div>
                     )}
                     <MessageInput
@@ -684,6 +707,7 @@ export default function Chat() {
                       selectedProvider={selectedProvider}
                       selectedModel={selectedModel}
                       onModelChange={handleModelChange}
+                      isTempMode={isTempMode}
                     />
                   </div>
                 </motion.div>
@@ -698,6 +722,13 @@ export default function Chat() {
           onConfirm={handleConfirmDelete}
           title="Delete Conversation"
           message="Are you sure you want to delete this conversation? This action cannot be undone and will remove all messages associated with it."
+        />
+
+        <SignupModal
+          isOpen={isSignupModalOpen}
+          onClose={() => setIsSignupModalOpen(false)}
+          title="Message Limit Reached"
+          subtitle="Create an account to continue chatting"
         />
       </div>
     </PageTransition>
