@@ -11,6 +11,7 @@ type SidebarProps = {
   onDeleteChat?: (id: string) => void;
   recentChats?: Conversation[];
   activeChatId?: string | null;
+  isAuthenticated?: boolean;
 };
 
 function LogoMark() {
@@ -53,7 +54,15 @@ function NavIcon({ name }: { name: NavKey }) {
   );
 }
 
-export default function Sidebar({ activeNav, onNewChat, onSelectChat, onDeleteChat, recentChats: propsRecentChats, activeChatId }: SidebarProps) {
+export default function Sidebar({ 
+  activeNav, 
+  onNewChat, 
+  onSelectChat, 
+  onDeleteChat, 
+  recentChats: propsRecentChats, 
+  activeChatId,
+  isAuthenticated = true
+}: SidebarProps) {
   const navigate = useNavigate();
   const [internalRecentChats, setInternalRecentChats] = useState<Conversation[]>([]);
 
@@ -120,7 +129,7 @@ export default function Sidebar({ activeNav, onNewChat, onSelectChat, onDeleteCh
         + New Chat
       </button>
 
-      {displayedRecentChats && displayedRecentChats.length > 0 && (
+      {isAuthenticated && displayedRecentChats && displayedRecentChats.length > 0 && (
         <div className="mt-4 flex flex-col gap-1">
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-textMuted px-3">
             Recent
@@ -146,12 +155,7 @@ export default function Sidebar({ activeNav, onNewChat, onSelectChat, onDeleteCh
               </button>
               
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onDeleteChat) {
-                    onDeleteChat(chat.id);
-                  }
-                }}
+                onClick={(e) => { e.stopPropagation(); if (onDeleteChat) onDeleteChat(chat.id); }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-textMuted opacity-0 group-hover:opacity-100 transition-all hover:text-red-500"
                 title="Delete conversation"
               >
@@ -165,33 +169,27 @@ export default function Sidebar({ activeNav, onNewChat, onSelectChat, onDeleteCh
       )}
 
       <nav className="mt-8 flex flex-col gap-1">
-        {item("models", "Models", "/library")}
-        {item("settings", "Settings", "/settings")}
+        {isAuthenticated && item("models", "Models", "/library")}
+        {isAuthenticated && item("settings", "Settings", "/settings")}
       </nav>
 
-      <p className="mb-3 mt-10 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
-        Library filters
-      </p>
-      <div className="flex flex-col gap-1">
-        <button
-          type="button"
-          className="flex items-center justify-between rounded-input px-3 py-2 text-left text-sm text-textSecondary transition-colors hover:bg-surface/80 hover:text-textPrimary"
-        >
-          <span>Archived</span>
-          <span className="rounded bg-elevated px-2 py-0.5 text-xs font-medium text-textMuted">
-            12
-          </span>
-        </button>
-        <button
-          type="button"
-          className="flex items-center justify-between rounded-input px-3 py-2 text-left text-sm text-textSecondary transition-colors hover:bg-surface/80 hover:text-textPrimary"
-        >
-          <span>Star Marked</span>
-          <span className="rounded bg-elevated px-2 py-0.5 text-xs font-medium text-textMuted">
-            5
-          </span>
-        </button>
-      </div>
+      {isAuthenticated && (
+        <>
+          <p className="mb-3 mt-10 text-[10px] font-semibold uppercase tracking-wider text-textMuted text-px-3">
+            Library filters
+          </p>
+          <div className="flex flex-col gap-1">
+            <button type="button" className="flex items-center justify-between rounded-input px-3 py-2 text-left text-sm text-textSecondary hover:bg-surface/80 hover:text-textPrimary">
+              <span>Archived</span>
+              <span className="rounded bg-elevated px-2 py-0.5 text-xs font-medium text-textMuted">12</span>
+            </button>
+            <button type="button" className="flex items-center justify-between rounded-input px-3 py-2 text-left text-sm text-textSecondary hover:bg-surface/80 hover:text-textPrimary">
+              <span>Star Marked</span>
+              <span className="rounded bg-elevated px-2 py-0.5 text-xs font-medium text-textMuted">5</span>
+            </button>
+          </div>
+        </>
+      )}
 
       <div className="mt-auto flex flex-col gap-2 border-t border-border/30 pt-6">
         <button

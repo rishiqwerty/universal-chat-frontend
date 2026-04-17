@@ -24,9 +24,6 @@ client.interceptors.response.use(
       localStorage.removeItem("isAuthenticated");
       localStorage.removeItem("access_token");
       clearChatCache();
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
-      }
     }
     return Promise.reject(error);
   }
@@ -137,7 +134,6 @@ export async function sendMessageStream(
       localStorage.removeItem("isAuthenticated");
       localStorage.removeItem("access_token");
       clearChatCache();
-      window.location.href = "/login";
       throw new Error("Session expired. Please login again.");
     }
 
@@ -155,7 +151,6 @@ export async function sendMessageStream(
   }
 
   const reader = response.body?.getReader();
-  console.log("reader", reader);
   if (!reader) return;
 
   const decoder = new TextDecoder();
@@ -204,6 +199,59 @@ export async function sendMessageStream(
   }
 }
 
+export async function sendTempChatMessageStream(
+  messages: UnifiedMessage[],
+  onChunk: (chunk: string) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  const response = await fetch(`${apiRoot}/chat/temp`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messages,
+    }),
+    signal,
+  });
+
+  if (!response.ok) {
+    let errorMsg = `Server error (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMsg = errorData.detail || errorData.message || errorMsg;
+    } catch {
+      // ignore
+    }
+    throw new Error(errorMsg);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) return;
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = "";
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (i === lines.length - 1 && line !== "" && !line.endsWith("\n") && lines.length > 1) {
+        buffer = lines[i];
+        break;
+      }
+      if (!line) continue;
+      onChunk(line);
+    }
+  }
+}
+
 let cachedRecentChats: Conversation[] | null = null;
 
 export function clearChatCache() {
@@ -220,6 +268,8 @@ export async function getRecentConversations(forceRefresh = false): Promise<Conv
 export type ApiKey = {
   id: string;
   provider: string;
+  label: string;
+  is_active: boolean;
   created_at: string;
 };
 
@@ -228,12 +278,22 @@ export async function getApiKeys(): Promise<ApiKey[]> {
   return data;
 }
 
-export async function addApiKey(provider: string, apiKey: string): Promise<void> {
-  await client.post("/api-keys", { provider, api_key: apiKey });
+export async function addApiKey(provider: string, apiKey: string, label: string): Promise<void> {
+  await client.post("/api-keys", { provider, api_key: apiKey, label });
 }
 
 export async function removeApiKey(id: string): Promise<void> {
   await client.delete(`/api-keys/${id}`);
+}
+
+export async function activateApiKey(id: string): Promise<ApiKey> {
+  const { data } = await client.patch(`/api-keys/${id}/activate`);
+  return data;
+}
+
+export async function toggleApiKey(id: string): Promise<ApiKey> {
+  const { data } = await client.patch(`/api-keys/${id}/toggle`);
+  return data;
 }
 
 export function resolveImagePath(path: string): string {

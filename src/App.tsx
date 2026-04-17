@@ -23,13 +23,19 @@ export default function App() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<Navigate to={isAuth ? "/chat" : "/login"} replace />} />
+        {/* Homepage and /chat are fully public, allowing guest access to Incognito mode */}
+        <Route path="/" element={<Chat />} />
+        <Route path="/chat" element={<Chat />} />
+        
+        {/* Unauthenticated routes: Restricted for logged-in users */}
         <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
         <Route path="/signup" element={<Signup />} />
+        
+        {/* Protected routes: Redirect to /login if unauthenticated */}
         <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-        <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-        <Route path="*" element={<Navigate to={isAuth ? "/chat" : "/login"} replace />} />
+        
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AnimatePresence>
   );
