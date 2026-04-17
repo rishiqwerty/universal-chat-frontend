@@ -1,13 +1,21 @@
 import { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { getApiKeys, addApiKey, removeApiKey, type ApiKey } from "../api/api";
+import { 
+  getApiKeys, 
+  addApiKey, 
+  removeApiKey, 
+  activateApiKey,
+  toggleApiKey,
+  type ApiKey 
+} from "../api/api";
 import PageTransition from "../components/PageTransition";
 
 export default function Settings() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [provider, setProvider] = useState("openai");
   const [apiKeyParam, setApiKeyParam] = useState("");
+  const [label, setLabel] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -26,12 +34,13 @@ export default function Settings() {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!apiKeyParam.trim()) return;
+    if (!apiKeyParam.trim() || !label.trim()) return;
     setLoading(true);
     setError("");
     try {
-      await addApiKey(provider, apiKeyParam.trim());
+      await addApiKey(provider, apiKeyParam.trim(), label.trim());
       setApiKeyParam("");
+      setLabel("");
       await loadKeys();
     } catch (err: any) {
       setError(err.response?.data?.message || err.response?.data?.detail || "Failed to add key");
@@ -49,9 +58,27 @@ export default function Settings() {
     }
   };
 
+  const handleToggle = async (id: string) => {
+    try {
+      await toggleApiKey(id);
+      await loadKeys();
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleActivate = async (id: string) => {
+    try {
+      await activateApiKey(id);
+      await loadKeys();
+    } catch {
+      // ignore
+    }
+  };
+
   const formatDate = (ds: string) => {
     try {
-      return new Date(ds).toLocaleString();
+      return new Date(ds).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
     } catch {
       return ds;
     }
@@ -66,7 +93,7 @@ export default function Settings() {
           <main className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full">
             <h1 className="text-2xl font-bold text-textPrimary">Settings</h1>
             <p className="mt-1 text-sm text-textSecondary">
-              Configure your model providers and securely manage API keys.
+              Configure your model providers and securely manage multiple API keys.
             </p>
 
             <form onSubmit={handleAdd} className="mt-8 rounded-card bg-surface p-6 shadow-none ring-1 ring-border/40">
@@ -76,7 +103,7 @@ export default function Settings() {
                   {error}
                 </p>
               )}
-              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-4">
                 <label className="block sm:col-span-1">
                   <span className="text-xs font-medium text-textSecondary">Provider</span>
                   <select
@@ -88,6 +115,17 @@ export default function Settings() {
                     <option value="anthropic">Anthropic</option>
                     <option value="gemini">Gemini</option>
                   </select>
+                </label>
+
+                <label className="block sm:col-span-1">
+                  <span className="text-xs font-medium text-textSecondary">Key Label</span>
+                  <input
+                    type="text"
+                    value={label}
+                    onChange={(e) => setLabel(e.target.value)}
+                    placeholder="e.g. Primary Key"
+                    className="mt-2 h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  />
                 </label>
 
                 <label className="block sm:col-span-2">
@@ -109,15 +147,14 @@ export default function Settings() {
                   </svg>
                 </div>
                 <p className="text-[11px] leading-relaxed text-textSecondary">
-                  Your API key is <span className="font-bold text-textPrimary">encrypted</span> and cannot be accessed by anyone. 
-                  We only use your API key to send requests directly to the provider. 
-                  We do not store or reuse it outside your requests.
+                  Your API key is <span className="font-bold text-textPrimary">encrypted</span> at rest. Only one key per provider 
+                  can be <span className="text-primary font-bold">active</span> at a time.
                 </p>
               </div>
               
               <button
                 type="submit"
-                disabled={loading || !apiKeyParam.trim()}
+                disabled={loading || !apiKeyParam.trim() || !label.trim()}
                 className="mt-6 w-full rounded-input bg-primary py-2.5 text-sm font-bold text-background shadow-[0_0_16px_rgba(217,255,0,0.2)] transition-colors hover:bg-primaryHover disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:px-8"
               >
                 {loading ? "Adding..." : "Securely Add Key"}
@@ -131,26 +168,60 @@ export default function Settings() {
                   <p className="text-sm text-textMuted">No API keys installed yet.</p>
                 ) : (
                   keys.map((k) => (
-                    <div key={k.id} className="flex items-center justify-between rounded-input border border-border/50 bg-surface px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <span className="h-2 w-2 rounded-full bg-primary" />
+                    <div key={k.id} className={`flex items-center justify-between rounded-input border transition-all duration-300 px-4 py-3 ${
+                      k.is_active ? 'border-primary/50 bg-primary/5 shadow-[0_0_20px_rgba(217,255,0,0.05)]' : 'border-border/30 bg-surface grayscale'
+                    }`}>
+                      <div className="flex items-center gap-4">
+                        <div className="relative">
+                          <span className={`h-2.5 w-2.5 block rounded-full ${k.is_active ? 'bg-primary' : 'bg-textMuted'}`} />
+                          {k.is_active && (
+                            <span className="absolute -inset-1 rounded-full bg-primary/30 animate-ping" />
+                          )}
+                        </div>
                         <div>
-                          <p className="text-sm font-medium text-textPrimary capitalize">{k.provider}</p>
-                          <p className="text-[10px] font-semibold text-textMuted uppercase tracking-wide">
+                          <div className="flex items-center gap-2">
+                            <p className="text-[11px] font-bold text-textSecondary uppercase tracking-widest">{k.provider}</p>
+                            {k.is_active && (
+                              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-black uppercase text-primary ring-1 ring-primary/30">Active</span>
+                            )}
+                          </div>
+                          <p className={`text-base font-semibold ${k.is_active ? 'text-textPrimary' : 'text-textSecondary'}`}>{k.label}</p>
+                          <p className="text-[10px] text-textMuted mt-0.5">
                             Added: {formatDate(k.created_at)}
                           </p>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemove(k.id)}
-                        className="flex items-center gap-2 rounded-input border border-border/80 bg-transparent px-3 py-1.5 text-xs font-medium text-textSecondary transition-colors hover:bg-elevated hover:text-textPrimary"
-                      >
-                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2" />
-                        </svg>
-                        Delete
-                      </button>
+                      
+                      <div className="flex items-center gap-2">
+                        {!k.is_active ? (
+                          <button
+                            type="button"
+                            onClick={() => handleActivate(k.id)}
+                            className="rounded-input bg-elevated px-3 py-1.5 text-xs font-bold text-primary transition-all hover:bg-primary/20 hover:text-primary ring-1 ring-primary/20"
+                          >
+                            Activate
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggle(k.id)}
+                            className="rounded-input bg-background/50 px-3 py-1.5 text-xs font-bold text-textSecondary transition-all hover:bg-elevated hover:text-textPrimary border border-border/50"
+                          >
+                            Disable
+                          </button>
+                        )}
+                        
+                        <button
+                          type="button"
+                          onClick={() => handleRemove(k.id)}
+                          className="flex h-8 w-8 items-center justify-center rounded-input text-textMuted transition-all hover:bg-elevated hover:text-error"
+                          title="Delete Key"
+                        >
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -162,4 +233,5 @@ export default function Settings() {
     </PageTransition>
   );
 }
+
 

@@ -220,6 +220,8 @@ export async function getRecentConversations(forceRefresh = false): Promise<Conv
 export type ApiKey = {
   id: string;
   provider: string;
+  label: string;
+  is_active: boolean;
   created_at: string;
 };
 
@@ -228,12 +230,22 @@ export async function getApiKeys(): Promise<ApiKey[]> {
   return data;
 }
 
-export async function addApiKey(provider: string, apiKey: string): Promise<void> {
-  await client.post("/api-keys", { provider, api_key: apiKey });
+export async function addApiKey(provider: string, apiKey: string, label: string): Promise<void> {
+  await client.post("/api-keys", { provider, api_key: apiKey, label });
 }
 
 export async function removeApiKey(id: string): Promise<void> {
   await client.delete(`/api-keys/${id}`);
+}
+
+export async function activateApiKey(id: string): Promise<ApiKey> {
+  const { data } = await client.patch(`/api-keys/${id}/activate`);
+  return data;
+}
+
+export async function toggleApiKey(id: string): Promise<ApiKey> {
+  const { data } = await client.patch(`/api-keys/${id}/toggle`);
+  return data;
 }
 
 export function resolveImagePath(path: string): string {
