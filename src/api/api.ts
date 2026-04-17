@@ -155,7 +155,6 @@ export async function sendMessageStream(
   }
 
   const reader = response.body?.getReader();
-  console.log("reader", reader);
   if (!reader) return;
 
   const decoder = new TextDecoder();
@@ -200,6 +199,59 @@ export async function sendMessageStream(
         }
         // ignore malformed JSON chunks
       }
+    }
+  }
+}
+
+export async function sendTempChatMessageStream(
+  messages: UnifiedMessage[],
+  onChunk: (chunk: string) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  const response = await fetch(`${apiRoot}/chat/temp`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messages,
+    }),
+    signal,
+  });
+
+  if (!response.ok) {
+    let errorMsg = `Server error (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMsg = errorData.detail || errorData.message || errorMsg;
+    } catch {
+      // ignore
+    }
+    throw new Error(errorMsg);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) return;
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = "";
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (i === lines.length - 1 && line !== "" && !line.endsWith("\n") && lines.length > 1) {
+        buffer = lines[i];
+        break;
+      }
+      if (!line) continue;
+      onChunk(line);
     }
   }
 }

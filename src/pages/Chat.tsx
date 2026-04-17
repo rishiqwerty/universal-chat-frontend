@@ -1,7 +1,8 @@
 import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { createConversation, updateConversationTitle, getRecentConversations, getConversationDetails, getConversationMessages, sendMessageStream, deleteConversation, deleteMessage, getAvailableModels, type Conversation, type ProviderModels } from "../api/api";
+import { createConversation, updateConversationTitle, getRecentConversations, getConversationDetails, getConversationMessages, sendMessageStream, sendTempChatMessageStream, deleteConversation, deleteMessage, getAvailableModels, type Conversation, type ProviderModels } from "../api/api";
+import { type UnifiedMessage } from "../schemas/chat";
 import ChatWindow, { type ChatMessage } from "../components/ChatWindow";
 import MessageInput, { type MessageInputHandle } from "../components/MessageInput";
 import Sidebar from "../components/Sidebar";
@@ -32,6 +33,9 @@ export default function Chat() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
 
+  const [isTempMode, setIsTempMode] = useState(false);
+  const [tempMessages, setTempMessages] = useState<ChatMessage[]>([]);
+
   const streamControllerRef = useRef<AbortController | null>(null);
   const messageInputRef = useRef<MessageInputHandle>(null);
 
@@ -59,6 +63,13 @@ export default function Chat() {
 
     cancelActiveStream();
     setPending(false);
+    
+    if (isTempMode) {
+      setTempMessages([]);
+      setTimeout(() => messageInputRef.current?.focus(), 100);
+      return;
+    }
+
     setActiveChatId(null);
     localStorage.removeItem("activeChatId");
     setActiveChatTitle("Untitled Chat");
@@ -267,9 +278,91 @@ export default function Chat() {
     setLastFailedText(null);
 
     const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: "user", content: text };
-    setMessages((m) => [...m, userMsg]);
+    
+    if (isTempMode) {
+      setTempMessages((m) => [...m, userMsg]);
+    } else {
+      setMessages((m) => [...m, userMsg]);
+    }
+    
     setDraft("");
     setPending(true);
+
+    if (isTempMode) {
+      // Temporary mode logic: use shared system endpoint
+      const assistantMsgId = `a-${Date.now()}`;
+      setTempMessages((m) => [...m, { id: assistantMsgId, role: "assistant", content: "" }]);
+      
+      const controller = new AbortController();
+      streamControllerRef.current = controller;
+      
+      try {
+        // Prepare context
+        const context: UnifiedMessage[] = [...tempMessages, userMsg].map(m => ({
+          role: m.role,
+          content: m.content
+        }));
+        
+        let accumulated = "";
+        await sendTempChatMessageStream(
+          context,
+          (chunk) => {
+            accumulated += chunk;
+            
+            // Check for image markers
+            const markerStart = "__IMAGE_START__";
+            const markerEnd = "__IMAGE_END__";
+            const metaStart = "__METADATA_START__";
+            const metaEnd = "__METADATA_END__";
+            
+            let displayContent = accumulated;
+            let foundImages: string[] = [];
+            
+            // While there are complete markers, extract them
+            while (displayContent.includes(markerStart) && displayContent.includes(markerEnd)) {
+              const startIdx = displayContent.indexOf(markerStart);
+              const endIdx = displayContent.indexOf(markerEnd) + markerEnd.length;
+              
+              const markerPayload = displayContent.substring(startIdx + markerStart.length, endIdx - markerEnd.length);
+              try {
+                const data = JSON.parse(markerPayload.trim());
+                if (data.url) foundImages.push(data.url);
+              } catch (e) {
+                console.error("Failed to parse image marker", e);
+              }
+              
+              displayContent = displayContent.substring(0, startIdx) + displayContent.substring(endIdx);
+            }
+
+            // Also strip metadata markers
+            while (displayContent.includes(metaStart) && displayContent.includes(metaEnd)) {
+              const startIdx = displayContent.indexOf(metaStart);
+              const endIdx = displayContent.indexOf(metaEnd) + metaEnd.length;
+              displayContent = displayContent.substring(0, startIdx) + displayContent.substring(endIdx);
+            }
+
+            setTempMessages((m) => m.map(msg => 
+              msg.id === assistantMsgId 
+              ? { 
+                  ...msg, 
+                  content: displayContent.trim() === "" ? "" : displayContent,
+                  images: foundImages.length > 0 ? [...(msg.images || []), ...foundImages] : msg.images 
+                } 
+              : msg
+            ));
+          },
+          controller.signal
+        );
+      } catch (e: any) {
+        if (e.name === "AbortError") return;
+        setTempMessages((m) => m.filter((msg) => msg.id !== assistantMsgId));
+        setStreamError(e.message || "Temporary chat failed. Please try again.");
+      } finally {
+        setPending(false);
+        streamControllerRef.current = null;
+      }
+      return;
+    }
 
     let currentChatId = activeChatId;
     if (!currentChatId) {
@@ -288,7 +381,6 @@ export default function Chat() {
           }));
         }
 
-        console.log
         getRecentConversations(true).then((chats) => setRecentChats(chats)).catch(() => { });
       } catch (e) {
         console.error("Failed to create chat");
@@ -396,7 +488,7 @@ export default function Chat() {
         }
       }
     }
-  }, [pending, activeChatId, activeChatTitle, cancelActiveStream, selectedProvider, selectedModel]);
+  }, [pending, isTempMode, tempMessages, activeChatId, activeChatTitle, cancelActiveStream, selectedProvider, selectedModel, syncMessages]);
 
   const send = useCallback(() => {
     const text = draft.trim();
@@ -456,14 +548,31 @@ export default function Chat() {
       .catch(() => { });
   }, []);
 
-  const isEmpty = messages.length === 0;
+  const displayedMessages = isTempMode ? tempMessages : messages;
+  const isEmpty = displayedMessages.length === 0;
 
   return (
     <PageTransition>
       <div className="flex h-screen min-h-0 overflow-hidden bg-background">
-        <Sidebar activeNav="chat" onNewChat={handleNewChat} onSelectChat={loadConversation} onDeleteChat={handleDeleteConversation} recentChats={recentChats} activeChatId={activeChatId} />
+        <Sidebar 
+          activeNav="chat" 
+          onNewChat={handleNewChat} 
+          onSelectChat={loadConversation} 
+          onDeleteChat={handleDeleteConversation} 
+          recentChats={recentChats} 
+          activeChatId={isTempMode ? null : activeChatId} 
+        />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <Topbar activeChatTitle={activeChatTitle} onUpdateTitle={handleUpdateTitle} onDeleteChat={activeChatId ? () => handleDeleteConversation() : undefined} />
+          <Topbar 
+            activeChatTitle={isTempMode ? "Temporary Chat" : activeChatTitle} 
+            onUpdateTitle={isTempMode ? undefined : handleUpdateTitle} 
+            onDeleteChat={(!isTempMode && activeChatId) ? () => handleDeleteConversation() : undefined} 
+            isTempMode={isTempMode}
+            onToggleTempMode={() => {
+              setIsTempMode(!isTempMode);
+              handleNewChat();
+            }}
+          />
 
           <AnimatePresence mode="wait">
             {isEmpty ? (
@@ -532,7 +641,7 @@ export default function Chat() {
                 transition={{ duration: 0.3 }}
                 className="flex min-h-0 flex-1 flex-col"
               >
-                <ChatWindow messages={messages} onDeleteMessage={handleDeleteMessage} />
+                <ChatWindow messages={displayedMessages} onDeleteMessage={isTempMode ? undefined : handleDeleteMessage} />
                 <motion.div
                   layoutId="chat-input-container"
                   transition={{ type: "spring", stiffness: 260, damping: 30 }}

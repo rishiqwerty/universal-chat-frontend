@@ -8,9 +8,17 @@ type TopbarProps = {
   activeChatTitle?: string | null;
   onUpdateTitle?: (newTitle: string) => void;
   onDeleteChat?: () => void;
+  isTempMode?: boolean;
+  onToggleTempMode?: () => void;
 };
 
-export default function Topbar({ activeChatTitle, onUpdateTitle, onDeleteChat }: TopbarProps) {
+export default function Topbar({ 
+  activeChatTitle, 
+  onUpdateTitle, 
+  onDeleteChat,
+  isTempMode,
+  onToggleTempMode 
+}: TopbarProps) {
   const navigate = useNavigate();
   const [editingTitle, setEditingTitle] = useState("");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -102,13 +110,21 @@ export default function Topbar({ activeChatTitle, onUpdateTitle, onDeleteChat }:
         </button>
         <button
           type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-input text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
-          aria-label="AI"
+          onClick={onToggleTempMode}
+          className={`flex h-9 items-center gap-2 rounded-input px-3 transition-all ${
+            isTempMode 
+            ? "bg-primary text-background shadow-[0_0_15px_rgba(217,255,0,0.3)]" 
+            : "text-textSecondary hover:bg-surface hover:text-textPrimary"
+          }`}
+          aria-label="Temporary Mode"
+          title={isTempMode ? "Exit Temporary Mode" : "Start Temporary Chat"}
         >
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" />
-            <path d="M5 19l.75 2.25L8 22l-2.25.75L5 25l-.75-2.25L2 22l2.25-.75L5 19z" />
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11V7a4 4 0 118 0v4c0 1.28.192 2.515.547 3.672M12 11c1.744 2.772 2.753 6.054 2.753 9.571m-9.643-.513c-.322-.135-.351-.303-.351-.488V11a4 4 0 118 0v4c0 .185-.029.353-.351.488m-9.292-2.128a13.916 13.916 0 0113.111-9.444" />
           </svg>
+          <span className="text-xs font-bold uppercase tracking-wider">
+            {isTempMode ? "Go Public" : "Incognito"}
+          </span>
         </button>
         <div className="relative" ref={profileMenuRef}>
           <button
