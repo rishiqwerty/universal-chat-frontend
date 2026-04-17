@@ -95,6 +95,11 @@ export type ApiMessage = {
   created_at: string;
 };
 
+export type UnifiedMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+};
+
 export async function getConversationDetails(id: string): Promise<Conversation> {
   const { data } = await client.get(`/chat/conversations/${id}`);
   return data;

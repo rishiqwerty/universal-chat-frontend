@@ -50,7 +50,7 @@ export default function Topbar({
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") {
-      e.currentTarget.blur();
+      (e.currentTarget as HTMLInputElement).blur();
     }
   }
 
