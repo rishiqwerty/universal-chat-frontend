@@ -2,7 +2,7 @@ import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { createConversation, updateConversationTitle, getRecentConversations, getConversationDetails, getConversationMessages, sendMessageStream, sendTempChatMessageStream, deleteConversation, deleteMessage, getAvailableModels, type Conversation, type ProviderModels } from "../api/api";
-import { type UnifiedMessage } from "../schemas/chat";
+import { type UnifiedMessage } from "../api/api";
 import ChatWindow, { type ChatMessage } from "../components/ChatWindow";
 import MessageInput, { type MessageInputHandle } from "../components/MessageInput";
 import Sidebar from "../components/Sidebar";

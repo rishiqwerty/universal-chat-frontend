@@ -17,7 +17,6 @@ function GuestRoute({ children }: { children: JSX.Element }) {
 }
 
 export default function App() {
-  const isAuth = localStorage.getItem("isAuthenticated") === "true";
   const location = useLocation();
 
   return (
