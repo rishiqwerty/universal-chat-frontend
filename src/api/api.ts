@@ -56,6 +56,8 @@ export type Conversation = {
 
 export type ProviderModels = {
   provider: string;
+  display_name?: string;
+  is_free?: boolean;
   text_models: string[];
   image_models?: string[];
 };
@@ -256,7 +258,32 @@ export async function sendTempChatMessageStream(
     }
   }
 }
+export type CreditBalance = {
+  balance: number;
+};
 
+export type CreditTransaction = {
+  id: string;
+  amount: number;
+  type: string;
+  description: string | null;
+  created_at: string;
+};
+
+export async function getCreditBalance(): Promise<CreditBalance> {
+  const { data } = await client.get("/credits/balance");
+  return data;
+}
+
+export async function topupCredits(amount: number): Promise<CreditBalance> {
+  const { data } = await client.post("/credits/topup", { amount });
+  return data;
+}
+
+export async function getCreditTransactions(): Promise<CreditTransaction[]> {
+  const { data } = await client.get("/credits/transactions");
+  return data;
+}
 let cachedRecentChats: Conversation[] | null = null;
 
 export function clearChatCache() {

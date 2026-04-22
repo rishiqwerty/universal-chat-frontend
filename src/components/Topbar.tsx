@@ -1,8 +1,91 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import ConfirmModal from "./ConfirmModal";
 import SignupModal from "./SignupModal";
+import TopupModal from "./TopupModal";
+import { getCreditBalance } from "../api/api";
+
+function FuelGauge({ credits }: { credits: number | null }) {
+  const percentage = credits !== null ? Math.min(Math.max(credits, 0), 100) : 0;
+
+  const color =
+    credits === null || credits >= 30 ? "#D9FF00" :
+      credits >= 10 ? "#fbbf24" : "#ef4444";
+
+  return (
+    <div className="relative h-5 w-3.5 flex flex-col justify-end group-hover:scale-110 transition-transform duration-300">
+      {/* Tank Cap */}
+      <div className="absolute -top-[2px] left-1/2 -translate-x-1/2 w-1.5 h-[2px] bg-border/80 rounded-t-[1px]" />
+
+      {/* Tank Body */}
+      <div className="absolute inset-0 border border-border/60 rounded-[3px] bg-background/20" />
+
+      {/* Glass Reflection */}
+      <div className="absolute top-0.5 left-0.5 bottom-0.5 w-[1px] bg-white/5 rounded-full z-20 pointer-events-none" />
+
+      {/* Liquid Container */}
+      <div className="absolute inset-[1px] bottom-[1px] overflow-hidden rounded-[1.5px] bg-black/20 flex flex-col justify-end">
+        <motion.div
+          initial={{ height: "0%" }}
+          animate={{ height: `${percentage}%` }}
+          transition={{ type: "spring", stiffness: 40, damping: 12, mass: 1 }}
+          className="w-full relative"
+          style={{ 
+            backgroundColor: color,
+          }}
+        >
+          {/* Internal Glowing Pulse */}
+          <motion.div
+            className="absolute inset-0 z-0"
+            animate={{ 
+              boxShadow: [
+                `0 0 4px ${color}aa`,
+                `0 0 12px ${color}ff`,
+                `0 0 4px ${color}aa`
+              ]
+            }}
+            transition={{ 
+              duration: 2, 
+              repeat: Infinity, 
+              ease: "easeInOut" 
+            }}
+          />
+
+          {/* Animated Liquid Wave/Surface */}
+          <motion.div 
+            className="absolute -top-1 left-[-150%] w-[400%] h-1.5 opacity-40 mix-blend-screen"
+            style={{
+              background: `radial-gradient(circle at center, white 0%, transparent 70%)`,
+              backgroundColor: color,
+              borderRadius: "45% 45% 0 0",
+            }}
+            animate={{
+              x: ["-25%", "0%"],
+              rotate: [0, 5, -5, 0]
+            }}
+            transition={{
+              x: { duration: 3, repeat: Infinity, ease: "linear" },
+              rotate: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+            }}
+          />
+
+          {/* Internal Glow */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-white/20" />
+        </motion.div>
+      </div>
+
+      {/* Outer Pulse for Critical */}
+      {credits !== null && credits < 10 && (
+        <motion.div
+          className="absolute -inset-1 rounded-[5px] border border-red-500/30"
+          animate={{ opacity: [0.2, 0.6, 0.2], scale: [1, 1.05, 1] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+        />
+      )}
+    </div>
+  );
+}
 
 type TopbarProps = {
   activeChatTitle?: string | null;
@@ -13,9 +96,9 @@ type TopbarProps = {
   isAuthenticated?: boolean;
 };
 
-export default function Topbar({ 
-  activeChatTitle, 
-  onUpdateTitle, 
+export default function Topbar({
+  activeChatTitle,
+  onUpdateTitle,
   onDeleteChat,
   isTempMode,
   onToggleTempMode,
@@ -26,7 +109,28 @@ export default function Topbar({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
+  const [showTopupModal, setShowTopupModal] = useState(false);
+  const [showFuelTooltip, setShowFuelTooltip] = useState(false);
+  const [credits, setCredits] = useState<number | null>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  const fetchBalance = useCallback(async () => {
+    if (isAuthenticated && !isTempMode) {
+      try {
+        const data = await getCreditBalance();
+        setCredits(data.balance);
+      } catch (err) {
+        console.error("Failed to fetch credits", err);
+      }
+    }
+  }, [isAuthenticated, isTempMode]);
+
+  useEffect(() => {
+    fetchBalance();
+    // Poll every 30 seconds for balance updates (e.g. from chat deductions)
+    const interval = setInterval(fetchBalance, 30000);
+    return () => clearInterval(interval);
+  }, [fetchBalance]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -98,6 +202,74 @@ export default function Topbar({
             </svg>
           </button>
         )}
+        {isAuthenticated && !isTempMode && (
+          <div className="flex items-center gap-1.5 px-2 relative group">
+            <button
+              onClick={() => setShowTopupModal(true)}
+              onMouseEnter={() => setShowFuelTooltip(true)}
+              onMouseLeave={() => setShowFuelTooltip(false)}
+              className={`group flex h-9 items-center gap-2 rounded-input bg-elevated/50 pl-2.5 pr-3.5 border transition-all hover:bg-elevated hover:scale-[1.02] active:scale-[0.98] ${credits !== null && credits < 10
+                ? "border-red-500/50 hover:border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
+                : credits !== null && credits < 30
+                  ? "border-amber-500/50 hover:border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.1)]"
+                  : "border-border/30 hover:border-primary/30"
+                }`}
+            >
+              <div className="flex h-6 w-5 items-center justify-center">
+                <FuelGauge credits={credits} />
+              </div>
+              <div className="flex flex-col items-start -space-y-0.5">
+                <span className={`text-[10px] font-bold uppercase tracking-tight transition-colors ${credits !== null && credits < 10
+                  ? "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+                  : credits !== null && credits < 30
+                    ? "text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.4)]"
+                    : "text-textPrimary"
+                  }`}>
+                  {credits !== null ? credits : "--"} CREDITS
+                </span>
+                <span className={`text-[8px] font-bold uppercase tracking-widest opacity-80 group-hover:opacity-100 italic transition-colors ${credits !== null && credits < 10
+                  ? "text-red-400"
+                  : credits !== null && credits < 30
+                    ? "text-amber-400"
+                    : "text-primary"
+                  }`}>
+                  Refuel
+                </span>
+              </div>
+            </button>
+
+            {/* Custom Tooltip */}
+            <AnimatePresence>
+              {showFuelTooltip && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 5 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="absolute right-0 top-full mt-3 z-50 w-52 pointer-events-none"
+                >
+                  <div className="relative rounded-xl border border-primary/20 bg-elevated/95 p-3 shadow-2xl backdrop-blur-md">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Credit Usage</span>
+                        <p className="text-[11px] leading-relaxed text-textSecondary">
+                          Use credits to generate <span className="text-textPrimary font-semibold">images and videos</span>.
+                        </p>
+                      </div>
+                    </div>
+                    {/* Tooltip Arrow */}
+                    <div className="absolute -top-1.5 right-6 h-3 w-3 rotate-45 border-l border-t border-primary/20 bg-elevated/95" />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
         <button
           type="button"
           className="flex h-9 w-9 items-center justify-center rounded-input text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
@@ -119,11 +291,10 @@ export default function Topbar({
               onToggleTempMode();
             }
           }}
-          className={`flex h-9 items-center gap-2 rounded-input px-3 transition-all ${
-            isTempMode 
-            ? "border border-dashed border-primary/50 bg-primary/5 text-primary shadow-[0_0_12px_rgba(217,255,0,0.15)] hover:bg-primary/10" 
+          className={`flex h-9 items-center gap-2 rounded-input px-3 transition-all ${isTempMode
+            ? "border border-dashed border-primary/50 bg-primary/5 text-primary shadow-[0_0_12px_rgba(217,255,0,0.15)] hover:bg-primary/10"
             : "text-textSecondary hover:bg-surface hover:text-textPrimary"
-          }`}
+            }`}
           aria-label="Temporary Mode"
           title={!isAuthenticated ? "Login to save chats" : (isTempMode ? "Exit Temporary Mode" : "Start Temporary Chat")}
         >
@@ -138,7 +309,7 @@ export default function Topbar({
           <motion.button
             type="button"
             onClick={() => setShowSignupModal(true)}
-            animate={{ 
+            animate={{
               boxShadow: [
                 "0 0 15px rgba(217,255,0,0.3)",
                 "0 0 25px rgba(217,255,0,0.6)",
@@ -146,10 +317,10 @@ export default function Topbar({
               ],
               scale: [1, 1.02, 1]
             }}
-            transition={{ 
-              duration: 2, 
-              repeat: Infinity, 
-              ease: "easeInOut" 
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
             }}
             className="flex h-9 items-center gap-2 rounded-input bg-primary px-4 text-xs font-bold uppercase tracking-wider text-background transition-all hover:bg-primaryHover active:scale-[0.98]"
           >
@@ -176,7 +347,7 @@ export default function Topbar({
               >
                 {/* Subtle background glow */}
                 <div className="absolute inset-0 bg-primary/10 blur-md rounded-full" />
-                
+
                 {/* The Mascot */}
                 <motion.img
                   src="/mascot_avatar.png"
@@ -197,17 +368,17 @@ export default function Topbar({
                     }
                   }}
                 />
-                
+
                 {/* Continuous Wave Layer */}
                 <motion.div
                   className="absolute inset-0 pointer-events-none z-20"
-                  animate={{ 
+                  animate={{
                     rotate: [-2, 2, -2],
                   }}
-                  transition={{ 
-                    duration: 2, 
-                    repeat: Infinity, 
-                    ease: "easeInOut" 
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
                   }}
                 />
               </motion.div>
@@ -310,6 +481,12 @@ export default function Topbar({
       <SignupModal
         isOpen={showSignupModal}
         onClose={() => setShowSignupModal(false)}
+      />
+
+      <TopupModal
+        isOpen={showTopupModal}
+        onClose={() => setShowTopupModal(false)}
+        onSuccess={(newBalance) => setCredits(newBalance)}
       />
     </header>
   );

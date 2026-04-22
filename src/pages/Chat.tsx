@@ -11,6 +11,7 @@ import WelcomeScreen from "../components/WelcomeScreen";
 import ConfirmModal from "../components/ConfirmModal";
 import SignupModal from "../components/SignupModal";
 import PageTransition from "../components/PageTransition";
+import UpgradeFlyer from "../components/UpgradeFlyer";
 
 const initialMessages: ChatMessage[] = [];
 
@@ -46,6 +47,7 @@ export default function Chat() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [chatIdToDelete, setChatIdToDelete] = useState<string | null>(null);
   const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
+  const [showUpgradeFlyer, setShowUpgradeFlyer] = useState(false);
 
   const cancelActiveStream = useCallback(() => {
     if (streamControllerRef.current) {
@@ -545,6 +547,20 @@ export default function Chat() {
     getAvailableModels()
       .then((models) => {
         setAvailableModels(models);
+
+        // Detect Free Tier Only
+        if (isAuthenticated && !isTempMode && models.length === 1 && models[0].is_free) {
+          const lastSeenStr = localStorage.getItem("lastSeenUpgradeFlyer");
+          const lastSeen = lastSeenStr ? parseInt(lastSeenStr, 10) : 0;
+          const now = Date.now();
+          const cooldown = 1 * 60 * 1000; // 10 minutes
+
+          if (now - lastSeen > cooldown) {
+            // Delay slightly for premium feel
+            setTimeout(() => setShowUpgradeFlyer(true), 2000);
+          }
+        }
+
         // Set initial selection if none exists
         if (!selectedModel && models.length > 0) {
           const savedDefault = localStorage.getItem("default_model_config");
@@ -729,6 +745,14 @@ export default function Chat() {
           onClose={() => setIsSignupModalOpen(false)}
           title="Message Limit Reached"
           subtitle="Create an account to continue chatting"
+        />
+
+        <UpgradeFlyer
+          isOpen={showUpgradeFlyer}
+          onClose={() => {
+            setShowUpgradeFlyer(false);
+            localStorage.setItem("lastSeenUpgradeFlyer", Date.now().toString());
+          }}
         />
       </div>
     </PageTransition>
