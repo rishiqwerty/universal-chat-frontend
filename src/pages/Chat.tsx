@@ -619,7 +619,7 @@ export default function Chat() {
                 transition={{ duration: 0.3 }}
                 className="flex min-h-0 flex-1 flex-col items-center justify-center bg-background px-6"
               >
-                <WelcomeScreen />
+                <WelcomeScreen isAuthenticated={isAuthenticated} isTempMode={isTempMode} />
                 <motion.div
                   layoutId="chat-input-container"
                   transition={{ type: "spring", stiffness: 260, damping: 30 }}

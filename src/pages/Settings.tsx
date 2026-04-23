@@ -10,12 +10,15 @@ import {
   type ApiKey 
 } from "../api/api";
 import PageTransition from "../components/PageTransition";
+import { useTheme } from "../hooks/useTheme";
 
 export default function Settings() {
+  const { accentColor, setAccentColor, availableColors } = useTheme();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [provider, setProvider] = useState("openai");
   const [apiKeyParam, setApiKeyParam] = useState("");
   const [label, setLabel] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -38,9 +41,10 @@ export default function Settings() {
     setLoading(true);
     setError("");
     try {
-      await addApiKey(provider, apiKeyParam.trim(), label.trim());
+      await addApiKey(provider, apiKeyParam.trim(), label.trim(), baseUrl.trim() || undefined);
       setApiKeyParam("");
       setLabel("");
+      setBaseUrl("");
       await loadKeys();
     } catch (err: any) {
       setError(err.response?.data?.message || err.response?.data?.detail || "Failed to add key");
@@ -114,8 +118,22 @@ export default function Settings() {
                     <option value="openai">OpenAI</option>
                     <option value="anthropic">Anthropic</option>
                     <option value="gemini">Gemini</option>
+                    <option value="local">Local LLM</option>
                   </select>
                 </label>
+
+                {provider === "local" && (
+                  <label className="block sm:col-span-1">
+                    <span className="text-xs font-medium text-textSecondary">Base URL</span>
+                    <input
+                      type="text"
+                      value={baseUrl}
+                      onChange={(e) => setBaseUrl(e.target.value)}
+                      placeholder="http://localhost:11434/v1"
+                      className="mt-2 h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+                    />
+                  </label>
+                )}
 
                 <label className="block sm:col-span-1">
                   <span className="text-xs font-medium text-textSecondary">Key Label</span>
@@ -128,13 +146,13 @@ export default function Settings() {
                   />
                 </label>
 
-                <label className="block sm:col-span-2">
+                <label className={`block ${provider === "local" ? "sm:col-span-2" : "sm:col-span-2"}`}>
                   <span className="text-xs font-medium text-textSecondary">API Key</span>
                   <input
                     type="password"
                     value={apiKeyParam}
                     onChange={(e) => setApiKeyParam(e.target.value)}
-                    placeholder="sk-..."
+                    placeholder={provider === "local" ? "None (or local key)" : "sk-..."}
                     className="mt-2 h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
                   />
                 </label>
@@ -161,6 +179,38 @@ export default function Settings() {
               </button>
             </form>
 
+            <div className="mt-10 rounded-card bg-surface p-6 shadow-none ring-1 ring-border/40">
+              <h2 className="text-lg font-semibold text-textPrimary">Appearance</h2>
+              <p className="text-xs text-textSecondary mt-1">Select your personalized neural accent color.</p>
+              
+              <div className="mt-6 flex flex-wrap gap-4">
+                {availableColors.map((color) => (
+                  <button
+                    key={color.value}
+                    onClick={() => setAccentColor(color.value)}
+                    className={`group relative flex h-14 w-14 items-center justify-center rounded-xl transition-all duration-300 ${
+                      accentColor === color.value 
+                        ? 'ring-2 ring-primary ring-offset-4 ring-offset-background scale-110' 
+                        : 'hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: color.value }}
+                    title={color.name}
+                  >
+                    {accentColor === color.value && (
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-background/40 backdrop-blur-sm text-white">
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                    <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-textPrimary">{color.name}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="mt-10 pb-10">
               <h2 className="text-lg font-semibold text-textPrimary">Configured Keys</h2>
               <div className="mt-4 flex flex-col gap-3">
@@ -186,6 +236,9 @@ export default function Settings() {
                             )}
                           </div>
                           <p className={`text-base font-semibold ${k.is_active ? 'text-textPrimary' : 'text-textSecondary'}`}>{k.label}</p>
+                          {k.base_url && (
+                            <p className="text-[10px] font-mono text-textMuted truncate max-w-[200px]">Endpoint: {k.base_url}</p>
+                          )}
                           <p className="text-[10px] text-textMuted mt-0.5">
                             Added: {formatDate(k.created_at)}
                           </p>

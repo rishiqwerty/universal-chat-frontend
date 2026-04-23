@@ -302,6 +302,7 @@ export type ApiKey = {
   provider: string;
   label: string;
   is_active: boolean;
+  base_url?: string;
   created_at: string;
 };
 
@@ -310,8 +311,8 @@ export async function getApiKeys(): Promise<ApiKey[]> {
   return data;
 }
 
-export async function addApiKey(provider: string, apiKey: string, label: string): Promise<void> {
-  await client.post("/api-keys", { provider, api_key: apiKey, label });
+export async function addApiKey(provider: string, apiKey: string, label: string, baseUrl?: string): Promise<void> {
+  await client.post("/api-keys", { provider, api_key: apiKey, label, base_url: baseUrl });
 }
 
 export async function removeApiKey(id: string): Promise<void> {
@@ -334,6 +335,52 @@ export function resolveImagePath(path: string): string {
   const base = getApiBaseUrl().replace(/\/+$/, "");
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return `${base}${cleanPath}`;
+}
+
+// --- Image Studio ---
+
+export type StudioModels = Record<string, string[]>;
+
+export async function getStudioModels(): Promise<StudioModels> {
+  const { data } = await client.get("/studio/models");
+  return data;
+}
+
+export type GeneratedImage = {
+  id: string;
+  prompt: string;
+  image_url: string;
+  aspect_ratio: string;
+  provider: string;
+  model: string;
+  used_credits: string;
+  created_at: string;
+};
+
+export async function generateStudioImage(
+  prompt: string,
+  provider: string,
+  model: string,
+  aspectRatio: string,
+  useCredits: boolean
+): Promise<GeneratedImage> {
+  const { data } = await client.post("/studio/generate", {
+    prompt,
+    provider,
+    model,
+    aspect_ratio: aspectRatio,
+    use_credits: useCredits,
+  }, { timeout: 120000 }); // 2 minute timeout for image generation
+  return data;
+}
+
+export async function getStudioGallery(limit = 50, offset = 0): Promise<GeneratedImage[]> {
+  const { data } = await client.get(`/studio/gallery?limit=${limit}&offset=${offset}`);
+  return data;
+}
+
+export async function deleteStudioImage(imageId: string): Promise<void> {
+  await client.delete(`/studio/${imageId}`);
 }
 
 export { client };

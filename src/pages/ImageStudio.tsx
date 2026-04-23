@@ -1,0 +1,411 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import Sidebar from "../components/Sidebar";
+import Topbar from "../components/Topbar";
+import ImageLightbox from "../components/ImageLightbox";
+import PageTransition from "../components/PageTransition";
+import {
+  getStudioModels,
+  generateStudioImage,
+  getStudioGallery,
+  deleteStudioImage,
+  resolveImagePath,
+  type StudioModels,
+  type GeneratedImage,
+} from "../api/api";
+
+const ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3"];
+const PREVIEW_COUNT = 6;
+
+export default function ImageStudio() {
+  const [models, setModels] = useState<StudioModels>({});
+  const [selectedProvider, setSelectedProvider] = useState("");
+  const [selectedModel, setSelectedModel] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [useCredits, setUseCredits] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreditSuggestion, setShowCreditSuggestion] = useState(false);
+  const [showFullGallery, setShowFullGallery] = useState(false);
+
+  const [gallery, setGallery] = useState<GeneratedImage[]>([]);
+  const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
+  const galleryEndRef = useRef<HTMLDivElement>(null);
+
+  // Fetch available image models
+  useEffect(() => {
+    getStudioModels()
+      .then((data) => {
+        setModels(data);
+        const providers = Object.keys(data);
+        if (providers.length > 0) {
+          setSelectedProvider(providers[0]);
+          setSelectedModel(data[providers[0]][0]);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch gallery
+  const refreshGallery = useCallback(() => {
+    getStudioGallery()
+      .then(setGallery)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshGallery();
+  }, [refreshGallery]);
+
+  // Update model when provider changes
+  const handleProviderChange = (provider: string) => {
+    setSelectedProvider(provider);
+    if (models[provider]?.length > 0) {
+      setSelectedModel(models[provider][0]);
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!prompt.trim() || !selectedProvider || !selectedModel) return;
+    setGenerating(true);
+    setError(null);
+
+    try {
+      const newImage = await generateStudioImage(
+        prompt,
+        selectedProvider,
+        selectedModel,
+        aspectRatio,
+        useCredits
+      );
+      setGallery((prev) => [newImage, ...prev]);
+      setPrompt("");
+      setShowCreditSuggestion(false);
+      // Scroll to top to show new image
+      galleryEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || "";
+      const status = err?.response?.status;
+      // Detect API key related failures when using own key
+      const isKeyError = !useCredits && (
+        status === 400 || status === 502 ||
+        /api.key|key.not|no.*key|unauthorized|invalid.*key|forbidden/i.test(detail)
+      );
+      if (isKeyError) {
+        setError(detail || "Your API key failed. Try switching to credits.");
+        setShowCreditSuggestion(true);
+      } else {
+        setError(detail || "Image generation failed. Please try again.");
+        setShowCreditSuggestion(false);
+      }
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleDelete = async (imageId: string) => {
+    try {
+      await deleteStudioImage(imageId);
+      setGallery((prev) => prev.filter((img) => img.id !== imageId));
+      if (lightboxImage?.id === imageId) setLightboxImage(null);
+    } catch {
+      // silent
+    }
+  };
+
+  const providerKeys = Object.keys(models);
+  const hasModels = providerKeys.length > 0;
+  const displayedGallery = showFullGallery ? gallery : gallery.slice(0, PREVIEW_COUNT);
+  const hasMore = gallery.length > PREVIEW_COUNT;
+
+  return (
+    <PageTransition>
+      <div className="flex h-screen overflow-hidden bg-background">
+        <Sidebar activeNav="studio" isAuthenticated={true} />
+
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <Topbar />
+
+          {/* Scrollable Gallery Area */}
+          <div className="flex-1 overflow-y-auto px-8 py-6">
+            <div ref={galleryEndRef} />
+
+            {/* Page Header */}
+            <div className="mb-6">
+              <h1
+                className="text-2xl font-bold text-textPrimary"
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              >
+                Studio
+              </h1>
+              <p className="mt-1 text-sm text-textMuted">
+                Generate images from text prompts
+              </p>
+            </div>
+
+            {/* Gallery Grid */}
+            {gallery.length > 0 ? (
+              <div>
+                <div className="mb-4 flex items-center justify-between">
+                  <h2
+                    className="text-sm font-bold uppercase tracking-wider text-textSecondary"
+                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                  >
+                    Recent Generations
+                  </h2>
+                  {hasMore && (
+                    <button
+                      onClick={() => setShowFullGallery(!showFullGallery)}
+                      className="text-xs font-bold uppercase tracking-wider text-primary transition-colors hover:text-primaryHover"
+                    >
+                      {showFullGallery ? "Show Less" : `View All (${gallery.length})`}
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  <AnimatePresence>
+                    {displayedGallery.map((img) => (
+                      <motion.div
+                        key={img.id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        className="group relative cursor-pointer overflow-hidden rounded-card border border-border/30 bg-surface transition-all hover:border-primary/30 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.06)]"
+                        onClick={() => setLightboxImage(img)}
+                      >
+                        <div className="aspect-square overflow-hidden">
+                          <img
+                            src={resolveImagePath(img.image_url)}
+                            alt={img.prompt}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="p-2.5">
+                          <p className="truncate text-[11px] text-textSecondary">
+                            {img.prompt}
+                          </p>
+                          <p className="mt-0.5 text-[9px] text-textMuted">
+                            {new Date(img.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        {/* Delete button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(img.id);
+                          }}
+                          className="absolute right-2 top-2 rounded-full bg-background/70 p-1.5 text-textMuted opacity-0 backdrop-blur-sm transition-all group-hover:opacity-100 hover:text-red-400"
+                        >
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </div>
+            ) : (
+              /* Empty State */
+              !generating && (
+                <div className="flex flex-1 flex-col items-center justify-center py-20 text-center">
+                  <div className="mb-4 rounded-full bg-surface p-5">
+                    <svg className="h-10 w-10 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <path d="m21 15-5-5L5 21" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-textMuted">
+                    Your generated images will appear here
+                  </p>
+                  <p className="mt-1 text-xs text-textMuted/50">
+                    Describe something in the prompt below to get started
+                  </p>
+                </div>
+              )
+            )}
+
+            {/* Generating skeleton */}
+            {generating && (
+              <div className="mt-6 flex justify-center">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex items-center gap-3 rounded-card border border-primary/20 bg-primary/5 px-5 py-3"
+                >
+                  <svg className="h-5 w-5 animate-spin text-primary" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                  <span className="text-sm font-medium text-primary">Generating your image…</span>
+                </motion.div>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Input Bar — pinned */}
+          <div className="shrink-0 border-t border-border/40 bg-sidebar/80 backdrop-blur-xl px-6 py-4">
+            {/* Error */}
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  className={`mb-3 rounded-card border px-4 py-2.5 text-sm ${
+                    showCreditSuggestion
+                      ? "border-primary/30 bg-primary/5 text-textSecondary"
+                      : "border-red-500/30 bg-red-500/10 text-red-400"
+                  }`}
+                >
+                  <p>{error}</p>
+                  {showCreditSuggestion && (
+                    <button
+                      onClick={() => {
+                        setUseCredits(true);
+                        setError(null);
+                        setShowCreditSuggestion(false);
+                      }}
+                      className="mt-1.5 rounded-input bg-primary px-4 py-1 text-xs font-semibold text-background transition-colors hover:bg-primaryHover"
+                    >
+                      Switch to Credits & Retry
+                    </button>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="mx-auto flex w-full max-w-4xl flex-col gap-3">
+              {/* Top row: controls */}
+              <div className="flex flex-wrap items-end gap-3">
+                {/* Provider & Model */}
+                {hasModels ? (
+                  <>
+                    <div className="min-w-[120px]">
+                      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Provider</label>
+                      <select
+                        value={selectedProvider}
+                        onChange={(e) => handleProviderChange(e.target.value)}
+                        className="w-full rounded-input border border-border/60 bg-surface px-2.5 py-2 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
+                      >
+                        {providerKeys.map((p) => (
+                          <option key={p} value={p}>
+                            {p.charAt(0).toUpperCase() + p.slice(1)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="min-w-[160px]">
+                      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Model</label>
+                      <select
+                        value={selectedModel}
+                        onChange={(e) => setSelectedModel(e.target.value)}
+                        className="w-full rounded-input border border-border/60 bg-surface px-2.5 py-2 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
+                      >
+                        {(models[selectedProvider] || []).map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-input border border-border/40 bg-surface/50 px-3 py-2 text-xs text-textMuted">
+                    No image models found.{" "}
+                    <a href="/settings" className="text-primary underline">Add a key</a>.
+                  </div>
+                )}
+
+                {/* Aspect Ratio */}
+                <div className="flex items-center gap-1.5">
+                  {ASPECT_RATIOS.map((ar) => (
+                    <button
+                      key={ar}
+                      onClick={() => setAspectRatio(ar)}
+                      className={`rounded-full px-3 py-1.5 text-[10px] font-bold transition-all ${
+                        aspectRatio === ar
+                          ? "bg-primary text-background"
+                          : "bg-surface text-textSecondary hover:bg-elevated hover:text-textPrimary"
+                      }`}
+                    >
+                      {ar}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Payment Toggle */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setUseCredits(false)}
+                    className={`rounded-full px-3 py-1.5 text-[10px] font-bold transition-all ${
+                      !useCredits
+                        ? "bg-primary text-background"
+                        : "bg-surface text-textSecondary hover:bg-elevated hover:text-textPrimary"
+                    }`}
+                  >
+                    Own Key
+                  </button>
+                  <button
+                    onClick={() => setUseCredits(true)}
+                    className={`rounded-full px-3 py-1.5 text-[10px] font-bold transition-all ${
+                      useCredits
+                        ? "bg-primary text-background"
+                        : "bg-surface text-textSecondary hover:bg-elevated hover:text-textPrimary"
+                    }`}
+                  >
+                    Credits (5/img)
+                  </button>
+                </div>
+              </div>
+
+              {/* Prompt + Generate */}
+              <div className="flex gap-3">
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey && !generating) {
+                      e.preventDefault();
+                      handleGenerate();
+                    }
+                  }}
+                  placeholder="Describe the image you want to create..."
+                  rows={1}
+                  disabled={generating}
+                  className="flex-1 resize-none rounded-card border border-border/60 bg-surface px-4 py-3 text-sm text-textPrimary placeholder-textMuted outline-none focus:border-primary/50 focus:shadow-[0_0_0_3px_rgba(var(--color-primary),0.08)] transition-all disabled:opacity-50"
+                />
+                <button
+                  onClick={handleGenerate}
+                  disabled={generating || !prompt.trim() || !hasModels}
+                  className="shrink-0 rounded-card bg-primary px-6 py-3 text-sm font-bold text-background shadow-[0_0_20px_rgba(var(--color-primary),0.25)] transition-all hover:bg-primaryHover hover:shadow-[0_0_30px_rgba(var(--color-primary),0.35)] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
+                >
+                  {generating ? (
+                    <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                  ) : (
+                    "Generate"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Lightbox */}
+        <ImageLightbox
+          image={lightboxImage}
+          onClose={() => setLightboxImage(null)}
+          onDelete={(id) => {
+            handleDelete(id);
+            setLightboxImage(null);
+          }}
+        />
+      </div>
+    </PageTransition>
+  );
+}

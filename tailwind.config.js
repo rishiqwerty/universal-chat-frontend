@@ -12,20 +12,20 @@ export default {
         sidebar: "#121213",
         surface: "#1A1A1C",
         elevated: "#202124",
-        primary: "#D9FF00",
-        primaryHover: "#C7F000",
+        primary: "rgb(var(--color-primary) / <alpha-value>)",
+        primaryHover: "rgb(var(--color-primary-hover) / <alpha-value>)",
         textPrimary: "#e8ecd5ff",
         textSecondary: "#A1A1AA",
         textMuted: "#71717A",
         border: "#2A2A2D",
-        userBubble: "#D9FF0020",
+        userBubble: "rgb(var(--color-primary) / 0.12)",
       },
       borderRadius: {
         card: "8px",
         input: "6px",
       },
       accentColor: {
-        primary: "#D9FF00",
+        primary: "rgb(var(--color-primary))",
       },
       keyframes: {
         "fade-in": {

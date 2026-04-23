@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getRecentConversations, type Conversation } from "../api/api";
 
-type NavKey = "chat" | "models" | "settings";
+type NavKey = "chat" | "studio" | "models" | "settings";
 
 type SidebarProps = {
   activeNav: NavKey;
@@ -46,6 +46,13 @@ function NavIcon({ name }: { name: NavKey }) {
       </svg>
     );
   }
+  if (name === "studio") {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+      </svg>
+    );
+  }
   return (
     <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <circle cx="12" cy="12" r="3" />
@@ -76,19 +83,27 @@ export default function Sidebar({
   const displayedRecentChats = propsRecentChats || internalRecentChats;
   const item = (key: NavKey, label: string, to: string) => {
     const on = activeNav === key;
+    const isStudio = key === "studio";
     return (
       <Link
         to={to}
         style={key === "chat" ? { fontFamily: "'Space Grotesk', sans-serif" } : undefined}
-        className={`flex items-center gap-3 rounded-input px-3 py-2.5 text-sm font-headline font-semibold transition-colors ${on
+        className={`flex items-center gap-3 rounded-input px-3 py-2.5 text-sm font-headline font-semibold transition-all ${on
           ? "bg-surface text-primary"
-          : "text-textSecondary hover:bg-surface/60 hover:text-textPrimary"
+          : isStudio
+            ? "text-primary/80 bg-primary/5 border border-primary/20 hover:bg-primary/10 hover:text-primary shadow-[0_0_12px_rgba(var(--color-primary),0.08)]"
+            : "text-textSecondary hover:bg-surface/60 hover:text-textPrimary"
           }`}
       >
-        <span className={on ? "text-primary" : "text-textMuted"}>
+        <span className={on ? "text-primary" : isStudio && !on ? "text-primary" : "text-textMuted"}>
           <NavIcon name={key} />
         </span>
         {label}
+        {isStudio && !on && (
+          <span className="ml-auto rounded-full bg-primary/20 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-primary animate-pulse">
+            New
+          </span>
+        )}
       </Link>
     );
   };
@@ -169,6 +184,7 @@ export default function Sidebar({
       )}
 
       <nav className="mt-8 flex flex-col gap-1">
+        {isAuthenticated && item("studio", "Studio", "/studio")}
         {isAuthenticated && item("models", "Models", "/library")}
         {isAuthenticated && item("settings", "Settings", "/settings")}
       </nav>

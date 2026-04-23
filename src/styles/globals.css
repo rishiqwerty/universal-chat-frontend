@@ -5,6 +5,11 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-primary: 217 255 0;
+    --color-primary-hover: 199 240 0;
+  }
+
   html {
     @apply antialiased font-sans;
   }
