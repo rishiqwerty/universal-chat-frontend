@@ -349,11 +349,13 @@ export async function getStudioModels(): Promise<StudioModels> {
 export type GeneratedImage = {
   id: string;
   prompt: string;
-  image_url: string;
+  image_url: string | null;
   aspect_ratio: string;
   provider: string;
   model: string;
   used_credits: string;
+  status: string; // "pending" | "generating" | "completed" | "failed"
+  error_message: string | null;
   created_at: string;
 };
 
@@ -370,7 +372,17 @@ export async function generateStudioImage(
     model,
     aspect_ratio: aspectRatio,
     use_credits: useCredits,
-  }, { timeout: 120000 }); // 2 minute timeout for image generation
+  });
+  return data;
+}
+
+export async function getImageStatus(imageId: string): Promise<GeneratedImage> {
+  const { data } = await client.get(`/studio/status/${imageId}`);
+  return data;
+}
+
+export async function retryStudioImage(imageId: string): Promise<GeneratedImage> {
+  const { data } = await client.post(`/studio/retry/${imageId}`);
   return data;
 }
 

@@ -8,6 +8,8 @@ import {
   getStudioModels,
   generateStudioImage,
   getStudioGallery,
+  getImageStatus,
+  retryStudioImage,
   deleteStudioImage,
   resolveImagePath,
   type StudioModels,
@@ -32,6 +34,7 @@ export default function ImageStudio() {
   const [gallery, setGallery] = useState<GeneratedImage[]>([]);
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const galleryEndRef = useRef<HTMLDivElement>(null);
+  const pollingRef = useRef<Set<string>>(new Set());
 
   // Fetch available image models
   useEffect(() => {
@@ -50,13 +53,44 @@ export default function ImageStudio() {
   // Fetch gallery
   const refreshGallery = useCallback(() => {
     getStudioGallery()
-      .then(setGallery)
+      .then((images) => {
+        setGallery(images);
+        // Resume polling for any pending/generating images
+        images.forEach((img) => {
+          if ((img.status === "pending" || img.status === "generating") && !pollingRef.current.has(img.id)) {
+            pollForCompletion(img.id);
+          }
+        });
+      })
       .catch(() => { });
   }, []);
 
   useEffect(() => {
     refreshGallery();
   }, [refreshGallery]);
+
+  // Poll for image completion
+  const pollForCompletion = useCallback((imageId: string) => {
+    if (pollingRef.current.has(imageId)) return;
+    pollingRef.current.add(imageId);
+
+    const interval = setInterval(async () => {
+      try {
+        const updated = await getImageStatus(imageId);
+        if (updated.status === "completed" || updated.status === "failed") {
+          clearInterval(interval);
+          pollingRef.current.delete(imageId);
+          // Update the gallery entry in-place
+          setGallery((prev) =>
+            prev.map((img) => (img.id === imageId ? updated : img))
+          );
+        }
+      } catch {
+        clearInterval(interval);
+        pollingRef.current.delete(imageId);
+      }
+    }, 2000);
+  }, []);
 
   // Update model when provider changes
   const handleProviderChange = (provider: string) => {
@@ -72,16 +106,23 @@ export default function ImageStudio() {
     setError(null);
 
     try {
-      const newImage = await generateStudioImage(
+      // POST returns instantly with a pending record
+      const pendingImage = await generateStudioImage(
         prompt,
         selectedProvider,
         selectedModel,
         aspectRatio,
         useCredits
       );
-      setGallery((prev) => [newImage, ...prev]);
+      // Add the pending record to the gallery immediately
+      setGallery((prev) => [pendingImage, ...prev]);
       setPrompt("");
       setShowCreditSuggestion(false);
+      setGenerating(false);
+
+      // Start polling for this image
+      pollForCompletion(pendingImage.id);
+      
       // Scroll to top to show new image
       galleryEndRef.current?.scrollIntoView({ behavior: "smooth" });
     } catch (err: any) {
@@ -99,8 +140,21 @@ export default function ImageStudio() {
         setError(detail || "Image generation failed. Please try again.");
         setShowCreditSuggestion(false);
       }
-    } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleRetry = async (imageId: string) => {
+    try {
+      const updated = await retryStudioImage(imageId);
+      // Update gallery state to 'pending' immediately
+      setGallery((prev) =>
+        prev.map((img) => (img.id === imageId ? updated : img))
+      );
+      // Resume polling
+      pollForCompletion(imageId);
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || "Failed to retry generation.");
     }
   };
 
@@ -172,16 +226,60 @@ export default function ImageStudio() {
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
-                        className="group relative cursor-pointer overflow-hidden rounded-card border border-border/30 bg-surface transition-all hover:border-primary/30 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.06)]"
-                        onClick={() => setLightboxImage(img)}
+                        className={`group relative cursor-pointer overflow-hidden rounded-card border bg-surface transition-all ${
+                          img.status === "failed"
+                            ? "border-red-500/30"
+                            : img.status === "completed"
+                            ? "border-border/30 hover:border-primary/30 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.06)]"
+                            : "border-border/20"
+                        }`}
+                        onClick={() => img.status === "completed" && setLightboxImage(img)}
                       >
                         <div className="aspect-square overflow-hidden">
-                          <img
-                            src={resolveImagePath(img.image_url)}
-                            alt={img.prompt}
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                            loading="lazy"
-                          />
+                          {img.status === "completed" && img.image_url ? (
+                            <img
+                              src={resolveImagePath(img.image_url)}
+                              alt={img.prompt}
+                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                              loading="lazy"
+                            />
+                          ) : img.status === "failed" ? (
+                            <div className="flex h-full w-full flex-col items-center justify-center bg-red-500/5 p-4">
+                              <svg className="h-8 w-8 text-red-400/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <circle cx="12" cy="12" r="10" />
+                                <path d="M15 9l-6 6M9 9l6 6" />
+                              </svg>
+                              <p className="mt-2 text-[10px] text-red-400/80 text-center">
+                                {img.error_message?.slice(0, 60) || "Generation failed"}
+                              </p>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRetry(img.id);
+                                }}
+                                className="mt-2 rounded-full bg-red-500 px-3 py-1 text-[9px] font-bold text-white transition-all hover:bg-red-600"
+                              >
+                                Retry
+                              </button>
+                            </div>
+                          ) : (
+                            /* pending / generating — skeleton */
+                            <div className="flex h-full w-full items-center justify-center bg-elevated/50">
+                              <motion.div
+                                animate={{ opacity: [0.3, 0.7, 0.3] }}
+                                transition={{ duration: 1.5, repeat: Infinity }}
+                                className="flex flex-col items-center gap-2"
+                              >
+                                <svg className="h-6 w-6 animate-spin text-primary/50" viewBox="0 0 24 24" fill="none">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                </svg>
+                                <span className="text-[10px] font-semibold uppercase tracking-wider text-textMuted">
+                                  {img.status === "generating" ? "Generating…" : "Queued…"}
+                                </span>
+                              </motion.div>
+                            </div>
+                          )}
                         </div>
                         <div className="p-2.5">
                           <p className="truncate text-[11px] text-textSecondary">

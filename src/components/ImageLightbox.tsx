@@ -8,7 +8,7 @@ type Props = {
 };
 
 export default function ImageLightbox({ image, onClose, onDelete }: Props) {
-  if (!image) return null;
+  if (!image || !image.image_url) return null;
 
   const handleDownload = async () => {
     try {
