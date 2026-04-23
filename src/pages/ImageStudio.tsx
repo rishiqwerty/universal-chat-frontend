@@ -44,14 +44,14 @@ export default function ImageStudio() {
           setSelectedModel(data[providers[0]][0]);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Fetch gallery
   const refreshGallery = useCallback(() => {
     getStudioGallery()
       .then(setGallery)
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -256,11 +256,10 @@ export default function ImageStudio() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 8 }}
-                  className={`mb-3 rounded-card border px-4 py-2.5 text-sm ${
-                    showCreditSuggestion
-                      ? "border-primary/30 bg-primary/5 text-textSecondary"
-                      : "border-red-500/30 bg-red-500/10 text-red-400"
-                  }`}
+                  className={`mb-3 rounded-card border px-4 py-2.5 text-sm ${showCreditSuggestion
+                    ? "border-primary/30 bg-primary/5 text-textSecondary"
+                    : "border-red-500/30 bg-red-500/10 text-red-400"
+                    }`}
                 >
                   <p>{error}</p>
                   {showCreditSuggestion && (
@@ -290,7 +289,7 @@ export default function ImageStudio() {
                       <select
                         value={selectedProvider}
                         onChange={(e) => handleProviderChange(e.target.value)}
-                        className="w-full rounded-input border border-border/60 bg-surface px-2.5 py-2 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
+                        className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
                       >
                         {providerKeys.map((p) => (
                           <option key={p} value={p}>
@@ -304,7 +303,7 @@ export default function ImageStudio() {
                       <select
                         value={selectedModel}
                         onChange={(e) => setSelectedModel(e.target.value)}
-                        className="w-full rounded-input border border-border/60 bg-surface px-2.5 py-2 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
+                        className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
                       >
                         {(models[selectedProvider] || []).map((m) => (
                           <option key={m} value={m}>{m}</option>
@@ -313,84 +312,182 @@ export default function ImageStudio() {
                     </div>
                   </>
                 ) : (
-                  <div className="rounded-input border border-border/40 bg-surface/50 px-3 py-2 text-xs text-textMuted">
+                  <div className="h-9 flex items-center rounded-input border border-border/40 bg-surface/50 px-3 text-xs text-textMuted">
                     No image models found.{" "}
-                    <a href="/settings" className="text-primary underline">Add a key</a>.
+                    <a href="/settings" className="ml-1 text-primary underline">Add a key</a>.
                   </div>
                 )}
 
                 {/* Aspect Ratio */}
-                <div className="flex items-center gap-1.5">
-                  {ASPECT_RATIOS.map((ar) => (
-                    <button
-                      key={ar}
-                      onClick={() => setAspectRatio(ar)}
-                      className={`rounded-full px-3 py-1.5 text-[10px] font-bold transition-all ${
-                        aspectRatio === ar
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Aspect Ratio</label>
+                  <div className="flex h-9 items-center gap-1.5">
+                    {ASPECT_RATIOS.map((ar) => (
+                      <button
+                        key={ar}
+                        onClick={() => setAspectRatio(ar)}
+                        className={`h-full rounded-full px-4 text-[10px] font-bold transition-all ${aspectRatio === ar
                           ? "bg-primary text-background"
                           : "bg-surface text-textSecondary hover:bg-elevated hover:text-textPrimary"
-                      }`}
-                    >
-                      {ar}
-                    </button>
-                  ))}
+                          }`}
+                      >
+                        {ar}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Payment Toggle */}
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setUseCredits(false)}
-                    className={`rounded-full px-3 py-1.5 text-[10px] font-bold transition-all ${
-                      !useCredits
-                        ? "bg-primary text-background"
-                        : "bg-surface text-textSecondary hover:bg-elevated hover:text-textPrimary"
-                    }`}
-                  >
-                    Own Key
-                  </button>
-                  <button
-                    onClick={() => setUseCredits(true)}
-                    className={`rounded-full px-3 py-1.5 text-[10px] font-bold transition-all ${
-                      useCredits
-                        ? "bg-primary text-background"
-                        : "bg-surface text-textSecondary hover:bg-elevated hover:text-textPrimary"
-                    }`}
-                  >
-                    Credits (5/img)
-                  </button>
+                {/* Pill Shaped Switcher */}
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Payment</label>
+                  <div className="flex h-9 items-center rounded-full border border-border/40 bg-surface/40 p-1">
+                    <button
+                      onClick={() => setUseCredits(false)}
+                      className={`flex h-full items-center gap-2 rounded-full px-4 transition-all ${!useCredits
+                        ? "bg-elevated text-textPrimary shadow-sm"
+                        : "text-textMuted hover:text-textSecondary"
+                        }`}
+                    >
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                      </svg>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Personal</span>
+                    </button>
+
+                    <button
+                      onClick={() => setUseCredits(true)}
+                      className={`relative flex h-full items-center gap-2 rounded-full px-4 transition-all ${useCredits
+                        ? "bg-primary text-background shadow-[0_0_15px_rgba(var(--color-primary),0.4)]"
+                        : "text-textMuted hover:text-textSecondary"
+                        }`}
+                    >
+                      {useCredits && (
+                        <motion.div
+                          layoutId="pill-highlight"
+                          className="absolute inset-0 rounded-full bg-primary ring-2 ring-primary ring-offset-2 ring-offset-background"
+                          initial={false}
+                          transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                        />
+                      )}
+                      <div className="relative z-10 flex items-center gap-2">
+                        <motion.svg
+                          animate={{
+                            opacity: [1, 0.4, 1, 0.2, 1],
+                            filter: [
+                              "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 2px rgba(255, 0, 255, 0))",
+                              "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 12px rgba(255, 0, 255, 1))",
+                              "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 4px rgba(255, 0, 255, 0.5))",
+                              "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 15px rgba(255, 0, 255, 1))",
+                              "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 2px rgba(255, 0, 255, 0))"
+                            ],
+                            scale: [1, 1.1, 0.9, 1.2, 1],
+                          }}
+                          transition={{
+                            duration: 0.4,
+                            repeat: Infinity,
+                            repeatDelay: Math.random() * 2 + 1,
+                            times: [0, 0.1, 0.2, 0.3, 1]
+                          }}
+                          className="h-3 w-3 text-[#FF00FF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </motion.svg>
+                        <span className="text-[10px] font-black uppercase tracking-wider">Use Credits</span>
+                      </div>
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* Prompt + Generate */}
-              <div className="flex gap-3">
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey && !generating) {
-                      e.preventDefault();
-                      handleGenerate();
-                    }
-                  }}
-                  placeholder="Describe the image you want to create..."
-                  rows={1}
-                  disabled={generating}
-                  className="flex-1 resize-none rounded-card border border-border/60 bg-surface px-4 py-3 text-sm text-textPrimary placeholder-textMuted outline-none focus:border-primary/50 focus:shadow-[0_0_0_3px_rgba(var(--color-primary),0.08)] transition-all disabled:opacity-50"
-                />
-                <button
+              <div className="flex items-end gap-3">
+                <div className="relative flex-1">
+                  <textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey && !generating) {
+                        e.preventDefault();
+                        handleGenerate();
+                      }
+                    }}
+                    placeholder="Describe the image you want to create..."
+                    rows={1}
+                    disabled={generating}
+                    className="block min-h-[46px] w-full resize-none rounded-card border border-border/60 bg-surface px-4 py-[11px] text-sm text-textPrimary placeholder-textMuted outline-none focus:border-primary/50 focus:shadow-[0_0_0_3px_rgba(var(--color-primary),0.08)] transition-all disabled:opacity-50"
+                  />
+                  {useCredits && !generating && (
+                    <motion.div
+                      animate={{ opacity: [0.3, 0.6, 0.3] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      className="absolute bottom-0 left-0 h-[2px] bg-primary/30 w-full rounded-full"
+                    />
+                  )}
+                </div>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={handleGenerate}
                   disabled={generating || !prompt.trim() || !hasModels}
-                  className="shrink-0 rounded-card bg-primary px-6 py-3 text-sm font-bold text-background shadow-[0_0_20px_rgba(var(--color-primary),0.25)] transition-all hover:bg-primaryHover hover:shadow-[0_0_30px_rgba(var(--color-primary),0.35)] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
+                  className={`relative h-[46px] shrink-0 overflow-hidden rounded-card px-8 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${useCredits
+                    ? "bg-primary text-background shadow-[0_0_20px_rgba(var(--color-primary),0.25)]"
+                    : "bg-surface border border-border text-textPrimary hover:border-primary/50"
+                    }`}
                 >
-                  {generating ? (
-                    <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                    </svg>
-                  ) : (
-                    "Generate"
+                  <div className="relative z-10 flex items-center gap-2">
+                    {generating ? (
+                      <>
+                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                        </svg>
+                        <span>Architecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Generate</span>
+                        {useCredits && (
+                          <div className="flex items-center gap-1 border-l border-background/20 pl-2">
+                            <motion.svg
+                              animate={{
+                                opacity: [1, 0.4, 1, 0.2, 1],
+                                filter: [
+                                  "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 2px rgba(255, 0, 255, 0))",
+                                  "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 10px rgba(255, 0, 255, 1))",
+                                  "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 4px rgba(255, 0, 255, 0.5))",
+                                  "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 12px rgba(255, 0, 255, 1))",
+                                  "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 2px rgba(255, 0, 255, 0))"
+                                ],
+                                scale: [1, 1.2, 0.8, 1.4, 1],
+                              }}
+                              transition={{
+                                duration: 0.3,
+                                repeat: Infinity,
+                                repeatDelay: Math.random() * 3 + 0.5,
+                                times: [0, 0.1, 0.15, 0.25, 1]
+                              }}
+                              className="h-2.5 w-2.5 text-[#FF00FF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </motion.svg>
+                            <span className="text-[10px] font-black uppercase tracking-tighter">5 Credits</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Shine effect */}
+                  {!generating && (
+                    <motion.div
+                      className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      initial={{ x: "-100%" }}
+                      whileHover={{ x: "100%" }}
+                      transition={{ duration: 0.6 }}
+                    />
                   )}
-                </button>
+                </motion.button>
               </div>
             </div>
           </div>
