@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getRecentConversations, type Conversation } from "../api/api";
 
-type NavKey = "chat" | "models" | "settings";
+type NavKey = "chat" | "studio" | "models" | "settings";
 
 type SidebarProps = {
   activeNav: NavKey;
@@ -46,6 +46,13 @@ function NavIcon({ name }: { name: NavKey }) {
       </svg>
     );
   }
+  if (name === "studio") {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+      </svg>
+    );
+  }
   return (
     <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <circle cx="12" cy="12" r="3" />
@@ -76,19 +83,27 @@ export default function Sidebar({
   const displayedRecentChats = propsRecentChats || internalRecentChats;
   const item = (key: NavKey, label: string, to: string) => {
     const on = activeNav === key;
+    const isStudio = key === "studio";
     return (
       <Link
         to={to}
         style={key === "chat" ? { fontFamily: "'Space Grotesk', sans-serif" } : undefined}
-        className={`flex items-center gap-3 rounded-input px-3 py-2.5 text-sm font-headline font-semibold transition-colors ${on
+        className={`flex items-center gap-3 rounded-input px-3 py-2.5 text-sm font-headline font-semibold transition-all ${on
           ? "bg-surface text-primary"
-          : "text-textSecondary hover:bg-surface/60 hover:text-textPrimary"
+          : isStudio
+            ? "text-primary/80 bg-primary/5 border border-primary/20 hover:bg-primary/10 hover:text-primary shadow-[0_0_12px_rgba(var(--color-primary),0.08)]"
+            : "text-textSecondary hover:bg-surface/60 hover:text-textPrimary"
           }`}
       >
-        <span className={on ? "text-primary" : "text-textMuted"}>
+        <span className={on ? "text-primary" : isStudio && !on ? "text-primary" : "text-textMuted"}>
           <NavIcon name={key} />
         </span>
         {label}
+        {isStudio && !on && (
+          <span className="ml-auto rounded-full bg-primary/20 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-primary animate-pulse">
+            New
+          </span>
+        )}
       </Link>
     );
   };
@@ -124,74 +139,77 @@ export default function Sidebar({
             navigate("/chat", { state: { newChat: true } });
           }
         }}
-        className="mt-6 block w-full rounded-input bg-primary py-3 text-center text-sm font-semibold text-background shadow-[0_0_20px_rgba(217,255,0,0.25)] transition-colors hover:bg-primaryHover"
+        className="mt-6 block w-full shrink-0 rounded-input bg-primary py-3 text-center text-sm font-semibold text-background shadow-[0_0_20px_rgba(var(--color-primary),0.25)] transition-colors hover:bg-primaryHover"
       >
         + New Chat
       </button>
 
-      {isAuthenticated && displayedRecentChats && displayedRecentChats.length > 0 && (
-        <div className="mt-4 flex flex-col gap-1">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-textMuted px-3">
-            Recent
-          </p>
-          {displayedRecentChats.map((chat) => (
-            <div key={chat.id} className="group relative">
-              <button
-                onClick={() => {
-                  if (chat.id === activeChatId) return;
-                  if (onSelectChat) {
-                    onSelectChat(chat.id);
-                  } else {
-                    navigate("/chat", { state: { chatId: chat.id } });
-                  }
-                }}
-                className={`w-full flex items-center justify-between rounded-input px-3 py-2 text-left text-sm transition-colors pr-8 ${
-                  chat.id === activeChatId
+      {/* Scrollable middle section */}
+      <div className="mt-4 flex-1 overflow-y-auto pr-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden hover:[scrollbar-width:thin] hover:[&::-webkit-scrollbar]:block [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-track]:bg-transparent">
+        {isAuthenticated && displayedRecentChats && displayedRecentChats.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-textMuted px-3">
+              Recent
+            </p>
+            {displayedRecentChats.map((chat) => (
+              <div key={chat.id} className="group relative">
+                <button
+                  onClick={() => {
+                    if (chat.id === activeChatId) return;
+                    if (onSelectChat) {
+                      onSelectChat(chat.id);
+                    } else {
+                      navigate("/chat", { state: { chatId: chat.id } });
+                    }
+                  }}
+                  className={`w-full flex items-center justify-between rounded-input px-3 py-2 text-left text-sm transition-colors pr-8 ${chat.id === activeChatId
                     ? "bg-surface text-primary"
                     : "text-textSecondary hover:bg-surface/80 hover:text-textPrimary"
-                }`}
-              >
-                <span className="truncate">{chat.title}</span>
+                    }`}
+                >
+                  <span className="truncate">{chat.title}</span>
+                </button>
+
+                <button
+                  onClick={(e) => { e.stopPropagation(); if (onDeleteChat) onDeleteChat(chat.id); }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-textMuted opacity-0 group-hover:opacity-100 transition-all hover:text-red-500"
+                  title="Delete conversation"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <nav className="mt-8 flex flex-col gap-1">
+          {isAuthenticated && item("studio", "Studio", "/studio")}
+          {isAuthenticated && item("models", "Models", "/library")}
+          {isAuthenticated && item("settings", "Settings", "/settings")}
+        </nav>
+
+        {isAuthenticated && (
+          <>
+            <p className="mb-3 mt-10 text-[10px] font-semibold uppercase tracking-wider text-textMuted px-3">
+              Library filters
+            </p>
+            <div className="flex flex-col gap-1">
+              <button type="button" className="flex items-center justify-between rounded-input px-3 py-2 text-left text-sm text-textSecondary hover:bg-surface/80 hover:text-textPrimary">
+                <span>Archived</span>
+                <span className="rounded bg-elevated px-2 py-0.5 text-xs font-medium text-textMuted">12</span>
               </button>
-              
-              <button
-                onClick={(e) => { e.stopPropagation(); if (onDeleteChat) onDeleteChat(chat.id); }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-textMuted opacity-0 group-hover:opacity-100 transition-all hover:text-red-500"
-                title="Delete conversation"
-              >
-                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                </svg>
+              <button type="button" className="flex items-center justify-between rounded-input px-3 py-2 text-left text-sm text-textSecondary hover:bg-surface/80 hover:text-textPrimary">
+                <span>Star Marked</span>
+                <span className="rounded bg-elevated px-2 py-0.5 text-xs font-medium text-textMuted">5</span>
               </button>
             </div>
-          ))}
-        </div>
-      )}
+          </>
+        )}
+      </div>
 
-      <nav className="mt-8 flex flex-col gap-1">
-        {isAuthenticated && item("models", "Models", "/library")}
-        {isAuthenticated && item("settings", "Settings", "/settings")}
-      </nav>
-
-      {isAuthenticated && (
-        <>
-          <p className="mb-3 mt-10 text-[10px] font-semibold uppercase tracking-wider text-textMuted text-px-3">
-            Library filters
-          </p>
-          <div className="flex flex-col gap-1">
-            <button type="button" className="flex items-center justify-between rounded-input px-3 py-2 text-left text-sm text-textSecondary hover:bg-surface/80 hover:text-textPrimary">
-              <span>Archived</span>
-              <span className="rounded bg-elevated px-2 py-0.5 text-xs font-medium text-textMuted">12</span>
-            </button>
-            <button type="button" className="flex items-center justify-between rounded-input px-3 py-2 text-left text-sm text-textSecondary hover:bg-surface/80 hover:text-textPrimary">
-              <span>Star Marked</span>
-              <span className="rounded bg-elevated px-2 py-0.5 text-xs font-medium text-textMuted">5</span>
-            </button>
-          </div>
-        </>
-      )}
-
-      <div className="mt-auto flex flex-col gap-2 border-t border-border/30 pt-6">
+      <div className="mt-auto shrink-0 flex flex-col gap-2 border-t border-border/30 pt-6">
         <button
           type="button"
           className="flex items-center gap-2 text-sm text-textMuted transition-colors hover:text-textSecondary"

@@ -5,6 +5,8 @@ import Library from "./pages/Library";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Settings from "./pages/Settings";
+import ImageStudio from "./pages/ImageStudio";
+import { useTheme } from "./hooks/useTheme";
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const isAuth = localStorage.getItem("isAuthenticated") === "true";
@@ -18,6 +20,7 @@ function GuestRoute({ children }: { children: JSX.Element }) {
 
 export default function App() {
   const location = useLocation();
+  useTheme(); // Initialize global accent theme
 
   return (
     <AnimatePresence mode="wait">
@@ -32,6 +35,7 @@ export default function App() {
         
         {/* Protected routes: Redirect to /login if unauthenticated */}
         <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+        <Route path="/studio" element={<ProtectedRoute><ImageStudio /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         
         <Route path="*" element={<Navigate to="/" replace />} />

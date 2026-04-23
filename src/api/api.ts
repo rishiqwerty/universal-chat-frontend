@@ -56,6 +56,8 @@ export type Conversation = {
 
 export type ProviderModels = {
   provider: string;
+  display_name?: string;
+  is_free?: boolean;
   text_models: string[];
   image_models?: string[];
 };
@@ -256,7 +258,32 @@ export async function sendTempChatMessageStream(
     }
   }
 }
+export type CreditBalance = {
+  balance: number;
+};
 
+export type CreditTransaction = {
+  id: string;
+  amount: number;
+  type: string;
+  description: string | null;
+  created_at: string;
+};
+
+export async function getCreditBalance(): Promise<CreditBalance> {
+  const { data } = await client.get("/credits/balance");
+  return data;
+}
+
+export async function topupCredits(amount: number): Promise<CreditBalance> {
+  const { data } = await client.post("/credits/topup", { amount });
+  return data;
+}
+
+export async function getCreditTransactions(): Promise<CreditTransaction[]> {
+  const { data } = await client.get("/credits/transactions");
+  return data;
+}
 let cachedRecentChats: Conversation[] | null = null;
 
 export function clearChatCache() {
@@ -275,6 +302,7 @@ export type ApiKey = {
   provider: string;
   label: string;
   is_active: boolean;
+  base_url?: string;
   created_at: string;
 };
 
@@ -283,8 +311,8 @@ export async function getApiKeys(): Promise<ApiKey[]> {
   return data;
 }
 
-export async function addApiKey(provider: string, apiKey: string, label: string): Promise<void> {
-  await client.post("/api-keys", { provider, api_key: apiKey, label });
+export async function addApiKey(provider: string, apiKey: string, label: string, baseUrl?: string): Promise<void> {
+  await client.post("/api-keys", { provider, api_key: apiKey, label, base_url: baseUrl });
 }
 
 export async function removeApiKey(id: string): Promise<void> {
@@ -307,6 +335,64 @@ export function resolveImagePath(path: string): string {
   const base = getApiBaseUrl().replace(/\/+$/, "");
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return `${base}${cleanPath}`;
+}
+
+// --- Image Studio ---
+
+export type StudioModels = Record<string, string[]>;
+
+export async function getStudioModels(): Promise<StudioModels> {
+  const { data } = await client.get("/studio/models");
+  return data;
+}
+
+export type GeneratedImage = {
+  id: string;
+  prompt: string;
+  image_url: string | null;
+  aspect_ratio: string;
+  provider: string;
+  model: string;
+  used_credits: string;
+  status: string; // "pending" | "generating" | "completed" | "failed"
+  error_message: string | null;
+  created_at: string;
+};
+
+export async function generateStudioImage(
+  prompt: string,
+  provider: string,
+  model: string,
+  aspectRatio: string,
+  useCredits: boolean
+): Promise<GeneratedImage> {
+  const { data } = await client.post("/studio/generate", {
+    prompt,
+    provider,
+    model,
+    aspect_ratio: aspectRatio,
+    use_credits: useCredits,
+  });
+  return data;
+}
+
+export async function getImageStatus(imageId: string): Promise<GeneratedImage> {
+  const { data } = await client.get(`/studio/status/${imageId}`);
+  return data;
+}
+
+export async function retryStudioImage(imageId: string): Promise<GeneratedImage> {
+  const { data } = await client.post(`/studio/retry/${imageId}`);
+  return data;
+}
+
+export async function getStudioGallery(limit = 50, offset = 0): Promise<GeneratedImage[]> {
+  const { data } = await client.get(`/studio/gallery?limit=${limit}&offset=${offset}`);
+  return data;
+}
+
+export async function deleteStudioImage(imageId: string): Promise<void> {
+  await client.delete(`/studio/${imageId}`);
 }
 
 export { client };
