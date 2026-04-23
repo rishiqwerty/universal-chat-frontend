@@ -12,7 +12,7 @@ export default function ImageLightbox({ image, onClose, onDelete }: Props) {
 
   const handleDownload = async () => {
     try {
-      const url = resolveImagePath(image.image_url);
+      const url = resolveImagePath(image.image_url || "");
       const response = await fetch(url);
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
@@ -25,7 +25,7 @@ export default function ImageLightbox({ image, onClose, onDelete }: Props) {
       URL.revokeObjectURL(blobUrl);
     } catch {
       // fallback
-      window.open(resolveImagePath(image.image_url), "_blank");
+      window.open(resolveImagePath(image.image_url || ""), "_blank");
     }
   };
 
