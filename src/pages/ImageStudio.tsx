@@ -19,7 +19,6 @@ import {
 } from "../api/api";
 
 const ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3"];
-const PREVIEW_COUNT = 6;
 
 export default function ImageStudio() {
   const [models, setModels] = useState<StudioModels>({});
@@ -438,7 +437,7 @@ export default function ImageStudio() {
                                     style={{
                                       width: 100 + i * 30,
                                       height: 100 + i * 30,
-                                      borderDasharray: i === 1 ? "4 4" : "none"
+                                      borderStyle: i === 1 ? "dashed" : "solid"
                                     }}
                                   />
                                 ))}
@@ -588,7 +587,6 @@ export default function ImageStudio() {
                   {showCreditSuggestion && (
                     <button
                       onClick={() => {
-                        setUseCredits(true);
                         setError(null);
                         setShowCreditSuggestion(false);
                       }}
@@ -643,23 +641,17 @@ export default function ImageStudio() {
                   )
                 )}
 
-                {/* Aspect Ratio */}
-                <div>
+                <div className="min-w-[110px]">
                   <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Aspect Ratio</label>
-                  <div className="flex h-9 items-center gap-1.5">
+                  <select
+                    value={aspectRatio}
+                    onChange={(e) => setAspectRatio(e.target.value)}
+                    className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                  >
                     {ASPECT_RATIOS.map((ar) => (
-                      <button
-                        key={ar}
-                        onClick={() => setAspectRatio(ar)}
-                        className={`h-full rounded-full px-4 text-[10px] font-bold transition-all ${aspectRatio === ar
-                          ? "bg-primary text-background"
-                          : "bg-surface text-textSecondary hover:bg-elevated hover:text-textPrimary"
-                          }`}
-                      >
-                        {ar}
-                      </button>
+                      <option key={ar} value={ar}>{ar}</option>
                     ))}
-                  </div>
+                  </select>
                 </div>
 
                 {/* Pill Shaped Switcher */}
