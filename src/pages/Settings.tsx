@@ -93,7 +93,7 @@ export default function Settings() {
       <div className="flex h-screen min-h-0 overflow-hidden bg-background">
         <Sidebar activeNav="settings" />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <Topbar />
+          <Topbar hideIncognito={true} />
           <main className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full">
             <h1 className="text-2xl font-bold text-textPrimary">Settings</h1>
             <p className="mt-1 text-sm text-textSecondary">

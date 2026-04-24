@@ -99,6 +99,7 @@ export default function Chat() {
     if (id === activeChatId && messages.length > 0) return;
 
     cancelActiveStream();
+    setIsTempMode(false);
     setPending(false);
     setStreamError(null);
     try {
@@ -606,6 +607,7 @@ export default function Chat() {
               handleNewChat();
             }}
             isAuthenticated={isAuthenticated}
+            hideIncognito={!isEmpty}
           />
 
           <AnimatePresence mode="wait">

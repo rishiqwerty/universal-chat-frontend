@@ -108,7 +108,7 @@ export default function Library() {
       <div className="flex h-screen min-h-0 overflow-hidden bg-background">
         <Sidebar activeNav="chat" />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <Topbar />
+          <Topbar hideIncognito={true} />
           <div className="flex min-h-0 flex-1 overflow-hidden">
             <aside className="w-[220px] shrink-0 border-r border-border/30 bg-background px-4 py-6">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-textMuted">Model type</p>

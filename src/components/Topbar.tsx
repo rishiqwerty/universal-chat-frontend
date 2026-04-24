@@ -94,6 +94,7 @@ type TopbarProps = {
   isTempMode?: boolean;
   onToggleTempMode?: () => void;
   isAuthenticated?: boolean;
+  hideIncognito?: boolean;
 };
 
 export default function Topbar({
@@ -102,7 +103,8 @@ export default function Topbar({
   onDeleteChat,
   isTempMode,
   onToggleTempMode,
-  isAuthenticated = true
+  isAuthenticated = true,
+  hideIncognito = false
 }: TopbarProps) {
   const navigate = useNavigate();
   const [editingTitle, setEditingTitle] = useState("");
@@ -282,29 +284,31 @@ export default function Topbar({
             <rect x="14" y="14" width="7" height="7" rx="1" />
           </svg>
         </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (!isAuthenticated) {
-              setShowSignupModal(true);
-            } else if (onToggleTempMode) {
-              onToggleTempMode();
-            }
-          }}
-          className={`flex h-9 items-center gap-2 rounded-input px-3 transition-all ${isTempMode
-            ? "border border-dashed border-primary/50 bg-primary/5 text-primary shadow-[0_0_12px_rgba(217,255,0,0.15)] hover:bg-primary/10"
-            : "text-textSecondary hover:bg-surface hover:text-textPrimary"
-            }`}
-          aria-label="Temporary Mode"
-          title={!isAuthenticated ? "Login to save chats" : (isTempMode ? "Exit Temporary Mode" : "Start Temporary Chat")}
-        >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11V7a4 4 0 118 0v4c0 1.28.192 2.515.547 3.672M12 11c1.744 2.772 2.753 6.054 2.753 9.571m-9.643-.513c-.322-.135-.351-.303-.351-.488V11a4 4 0 118 0v4c0 .185-.029.353-.351.488m-9.292-2.128a13.916 13.916 0 0113.111-9.444" />
-          </svg>
-          <span className="text-[10px] font-bold uppercase tracking-widest">
-            {!isAuthenticated ? "Guest Mode" : (isTempMode ? "Go Public" : "Incognito")}
-          </span>
-        </button>
+        {!hideIncognito && (
+          <button
+            type="button"
+            onClick={() => {
+              if (!isAuthenticated) {
+                setShowSignupModal(true);
+              } else if (onToggleTempMode) {
+                onToggleTempMode();
+              }
+            }}
+            className={`flex h-9 items-center gap-2 rounded-input px-3 transition-all ${isTempMode
+              ? "border border-dashed border-primary/50 bg-primary/5 text-primary shadow-[0_0_12px_rgba(217,255,0,0.15)] hover:bg-primary/10"
+              : "text-textSecondary hover:bg-surface hover:text-textPrimary"
+              }`}
+            aria-label="Temporary Mode"
+            title={!isAuthenticated ? "Login to save chats" : (isTempMode ? "Exit Temporary Mode" : "Start Temporary Chat")}
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11V7a4 4 0 118 0v4c0 1.28.192 2.515.547 3.672M12 11c1.744 2.772 2.753 6.054 2.753 9.571m-9.643-.513c-.322-.135-.351-.303-.351-.488V11a4 4 0 118 0v4c0 .185-.029.353-.351.488m-9.292-2.128a13.916 13.916 0 0113.111-9.444" />
+            </svg>
+            <span className="text-[10px] font-bold uppercase tracking-widest">
+              {!isAuthenticated ? "Guest Mode" : (isTempMode ? "Go Public" : "Incognito")}
+            </span>
+          </button>
+        )}
         {!isAuthenticated && (
           <motion.button
             type="button"

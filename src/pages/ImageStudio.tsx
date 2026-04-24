@@ -33,7 +33,7 @@ export default function ImageStudio() {
   const [showCreditSuggestion, setShowCreditSuggestion] = useState(false);
   const [showFullGallery, setShowFullGallery] = useState(false);
   const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
-  const [showFullGallery, setShowFullGallery] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(5);
 
   const [gallery, setGallery] = useState<GeneratedImage[]>([]);
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
@@ -48,32 +48,16 @@ export default function ImageStudio() {
         const providers = Object.keys(data);
         if (providers.length > 0) {
           setSelectedProvider(providers[0]);
-          setSelectedModel(data[providers[0]][0]);
+          const providerModels = data[providers[0]];
+          if (providerModels && providerModels.length > 0) {
+            setSelectedModel(providerModels[0]);
+          }
         }
       })
       .catch(() => { });
 
-    getQueueStatus().then(setQueueStatus).catch(() => {});
+    getQueueStatus().then(setQueueStatus).catch(() => { });
   }, []);
-
-  // Fetch gallery
-  const refreshGallery = useCallback(() => {
-    getStudioGallery()
-      .then((images) => {
-        setGallery(images);
-        // Resume polling for any pending/generating images
-        images.forEach((img) => {
-          if ((img.status === "pending" || img.status === "generating") && !pollingRef.current.has(img.id)) {
-            pollForCompletion(img.id);
-          }
-        });
-      })
-      .catch(() => { });
-  }, []);
-
-  useEffect(() => {
-    refreshGallery();
-  }, [refreshGallery]);
 
   // Poll for image completion
   const pollForCompletion = useCallback((imageId: string) => {
@@ -86,7 +70,6 @@ export default function ImageStudio() {
         if (updated.status === "completed" || updated.status === "failed") {
           clearInterval(interval);
           pollingRef.current.delete(imageId);
-          // Update the gallery entry in-place
           setGallery((prev) =>
             prev.map((img) => (img.id === imageId ? updated : img))
           );
@@ -95,8 +78,36 @@ export default function ImageStudio() {
         clearInterval(interval);
         pollingRef.current.delete(imageId);
       }
-    }, 2000);
+    }, 3000);
+
+    // Store interval globally to clear on unmount
+    (window as any)[`poll_${imageId}`] = interval;
   }, []);
+
+  // Cleanup intervals on unmount
+  useEffect(() => {
+    return () => {
+      pollingRef.current.forEach(id => {
+        const interval = (window as any)[`poll_${id}`];
+        if (interval) clearInterval(interval);
+      });
+    };
+  }, []);
+
+  // Fetch gallery
+  useEffect(() => {
+    getStudioGallery()
+      .then((images) => {
+        setGallery(images);
+        // Resume polling for any non-terminal images
+        images.forEach((img) => {
+          if ((img.status === "pending" || img.status === "generating" || img.status === "queued") && !pollingRef.current.has(img.id)) {
+            pollForCompletion(img.id);
+          }
+        });
+      })
+      .catch(() => { });
+  }, [pollForCompletion]);
 
   // Update model when provider changes
   const handleProviderChange = (provider: string) => {
@@ -128,14 +139,14 @@ export default function ImageStudio() {
       setGenerating(false);
 
       if (paymentMode === "free_queue") {
-        // Refresh queue status to show updated quota
-        getQueueStatus().then(setQueueStatus).catch(() => {});
-      } else {
-        // Start polling for this image if it's actually generating
-        pollForCompletion(pendingImage.id);
+        // Refresh queue status
+        getQueueStatus().then(setQueueStatus).catch(() => { });
       }
 
-      
+      // Always start polling for non-completed images
+      pollForCompletion(pendingImage.id);
+
+
       // Scroll to top to show new image
       galleryEndRef.current?.scrollIntoView({ behavior: "smooth" });
     } catch (err: any) {
@@ -183,8 +194,15 @@ export default function ImageStudio() {
 
   const providerKeys = Object.keys(models);
   const hasModels = providerKeys.length > 0;
-  const displayedGallery = showFullGallery ? gallery : gallery.slice(0, PREVIEW_COUNT);
-  const hasMore = gallery.length > PREVIEW_COUNT;
+  const displayedGallery = gallery.slice(0, visibleCount);
+  const hasMore = gallery.length > visibleCount;
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollLeft, scrollWidth, clientWidth } = e.currentTarget;
+    if (scrollWidth - (scrollLeft + clientWidth) < 100 && hasMore) {
+      setVisibleCount(prev => prev + 6);
+    }
+  };
 
   return (
     <PageTransition>
@@ -192,7 +210,7 @@ export default function ImageStudio() {
         <Sidebar activeNav="studio" isAuthenticated={true} />
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <Topbar />
+          <Topbar hideIncognito={true} />
 
           {/* Scrollable Gallery Area */}
           <div className="flex-1 overflow-y-auto px-8 py-6">
@@ -230,7 +248,10 @@ export default function ImageStudio() {
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                <div
+                  onScroll={handleScroll}
+                  className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
+                >
                   <AnimatePresence>
                     {displayedGallery.map((img) => (
                       <motion.div
@@ -239,13 +260,12 @@ export default function ImageStudio() {
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
-                        className={`group relative cursor-pointer overflow-hidden rounded-card border bg-surface transition-all ${
-                          img.status === "failed"
-                            ? "border-red-500/30"
-                            : img.status === "completed"
+                        className={`group relative w-[240px] flex-shrink-0 cursor-pointer overflow-hidden rounded-card border bg-surface transition-all snap-start ${img.status === "failed"
+                          ? "border-red-500/30"
+                          : img.status === "completed"
                             ? "border-border/30 hover:border-primary/30 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.06)]"
                             : "border-border/20"
-                        }`}
+                          }`}
                         onClick={() => img.status === "completed" && setLightboxImage(img)}
                       >
                         <div className="aspect-square overflow-hidden">
@@ -257,52 +277,232 @@ export default function ImageStudio() {
                               loading="lazy"
                             />
                           ) : img.status === "failed" ? (
-                            <div className="flex h-full w-full flex-col items-center justify-center bg-red-500/5 p-4">
-                              <svg className="h-8 w-8 text-red-400/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                <circle cx="12" cy="12" r="10" />
-                                <path d="M15 9l-6 6M9 9l6 6" />
-                              </svg>
-                              <p className="mt-2 text-[10px] text-red-400/80 text-center">
-                                {img.error_message?.slice(0, 60) || "Generation failed"}
+                            <div className="flex h-full w-full flex-col items-center justify-center bg-red-500/10 p-4 relative overflow-hidden">
+                              <motion.div
+                                animate={{
+                                  opacity: [0.05, 0.15, 0.05],
+                                  scale: [1, 1.05, 1]
+                                }}
+                                transition={{ duration: 3, repeat: Infinity }}
+                                className="absolute inset-0 bg-red-500/20"
+                              />
+                              <motion.div
+                                animate={{
+                                  x: [-1, 1, -1, 0],
+                                  filter: ["hue-rotate(0deg)", "hue-rotate(90deg)", "hue-rotate(0deg)"]
+                                }}
+                                transition={{ duration: 0.2, repeat: Infinity, repeatType: "mirror" }}
+                              >
+                                <svg className="h-10 w-10 text-red-500/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                  <circle cx="12" cy="12" r="10" />
+                                  <path d="M15 9l-6 6M9 9l6 6" />
+                                </svg>
+                              </motion.div>
+                              <p className="mt-3 text-[10px] font-bold text-red-400 text-center relative z-10 px-2 leading-relaxed">
+                                {img.error_message?.slice(0, 80) || "System Failure"}
                               </p>
-                              <button
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleRetry(img.id);
                                 }}
-                                className="mt-2 rounded-full bg-red-500 px-3 py-1 text-[9px] font-bold text-white transition-all hover:bg-red-600"
+                                className="mt-4 relative z-10 rounded-full bg-red-500 px-5 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-red-500/20 transition-all hover:bg-red-600"
                               >
-                                Retry
-                              </button>
+                                Try Again
+                              </motion.button>
                             </div>
                           ) : img.status === "queued" ? (
-                            /* queued — manual fulfillment */
-                            <div className="flex h-full w-full items-center justify-center bg-elevated/50">
-                              <div className="flex flex-col items-center gap-2">
-                                <svg className="h-6 w-6 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span className="text-[10px] font-semibold uppercase tracking-wider text-textMuted">
-                                  In Queue
-                                </span>
+                            /* queued — Waiting room animation */
+                            <div className="flex h-full w-full flex-col items-center justify-center bg-amber-500/[0.03] relative overflow-hidden">
+                              <div className="flex flex-col items-center gap-4 relative z-10 scale-75">
+                                {/* Mixing Animation (Scaled Down) */}
+                                <div className="relative h-16 w-20 flex items-center justify-center">
+                                  {/* Mixing Particles */}
+                                  {[...Array(4)].map((_, i) => (
+                                    <motion.div
+                                      key={i}
+                                      animate={{
+                                        y: [-10, -30],
+                                        x: [(Math.random() - 0.5) * 20, (Math.random() - 0.5) * 40],
+                                        opacity: [0, 0.8, 0],
+                                        scale: [0.4, 0.8]
+                                      }}
+                                      transition={{
+                                        duration: 1.5,
+                                        repeat: Infinity,
+                                        delay: i * 0.4
+                                      }}
+                                      className="absolute top-0 h-1.5 w-1.5 rounded-full bg-amber-500/20"
+                                    />
+                                  ))}
+
+                                  {/* The Bowl */}
+                                  <div className="absolute bottom-0 h-8 w-16 border-b-2 border-x-2 border-amber-900/20 rounded-b-full bg-amber-500/5 overflow-hidden">
+                                    {/* Noodles */}
+                                    <svg className="absolute inset-0 h-full w-full text-amber-500/20" viewBox="0 0 20 10">
+                                      {[...Array(6)].map((_, i) => (
+                                        <motion.path
+                                          key={i}
+                                          d={`M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${2 + (i % 2) * 3} ${8 + i * 2.5} 10`}
+                                          stroke="currentColor"
+                                          strokeWidth="1"
+                                          fill="none"
+                                          animate={{
+                                            d: [
+                                              `M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${2 + (i % 2) * 3} ${8 + i * 2.5} 10`,
+                                              `M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${6 - (i % 2) * 3} ${8 + i * 2.5} 10`,
+                                              `M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${2 + (i % 2) * 3} ${8 + i * 2.5} 10`,
+                                            ]
+                                          }}
+                                          transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 }}
+                                        />
+                                      ))}
+                                    </svg>
+                                  </div>
+
+                                  {/* Chopstick 1 */}
+                                  <motion.div
+                                    animate={{
+                                      rotate: [-15, -35, -15],
+                                      x: [-4, 4, -4],
+                                      y: [0, 4, 0]
+                                    }}
+                                    transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+                                    className="absolute bottom-3 left-5 h-12 w-0.5 bg-amber-900/30 rounded-full origin-bottom"
+                                    style={{ transform: "rotate(-25deg)" }}
+                                  />
+
+                                  {/* Chopstick 2 */}
+                                  <motion.div
+                                    animate={{
+                                      rotate: [15, 35, 15],
+                                      x: [4, -4, 4],
+                                      y: [0, 4, 0]
+                                    }}
+                                    transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.1 }}
+                                    className="absolute bottom-3 right-5 h-12 w-0.5 bg-amber-900/30 rounded-full origin-bottom"
+                                    style={{ transform: "rotate(25deg)" }}
+                                  />
+                                </div>
+
+                                <div className="flex flex-col items-center gap-2 px-6">
+                                  <span className="text-[12px] font-black uppercase tracking-[0.15em] text-amber-600/80 text-center leading-relaxed">
+                                    Hang tight — your image is cooking 🚀
+                                  </span>
+                                  <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-amber-600/40 text-center">
+                                    (This might take a couple of hours)
+                                  </span>
+                                  <motion.div
+                                    className="flex gap-1 mt-1"
+                                    animate={{ opacity: [0.3, 1, 0.3] }}
+                                    transition={{ duration: 1.5, repeat: Infinity }}
+                                  >
+                                    <div className="h-1 w-1 rounded-full bg-amber-500/30" />
+                                    <div className="h-1 w-1 rounded-full bg-amber-500/30" />
+                                    <div className="h-1 w-1 rounded-full bg-amber-500/30" />
+                                  </motion.div>
+                                </div>
                               </div>
                             </div>
                           ) : (
-                            /* pending / generating — spinner */
-                            <div className="flex h-full w-full items-center justify-center bg-elevated/50">
+                            /* pending / generating — High-Energy Plasma Forge */
+                            <div className="flex h-full w-full items-center justify-center bg-background relative overflow-hidden">
+                              {/* Background Plasma Morph */}
                               <motion.div
-                                animate={{ opacity: [0.3, 0.7, 0.3] }}
-                                transition={{ duration: 1.5, repeat: Infinity }}
-                                className="flex flex-col items-center gap-2"
-                              >
-                                <svg className="h-6 w-6 animate-spin text-primary/50" viewBox="0 0 24 24" fill="none">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                                </svg>
-                                <span className="text-[10px] font-semibold uppercase tracking-wider text-textMuted">
-                                  {img.status === "generating" ? "Generating…" : "Starting…"}
-                                </span>
-                              </motion.div>
+                                animate={{
+                                  scale: [1, 1.2, 1.1, 1.3, 1],
+                                  opacity: [0.1, 0.2, 0.15, 0.25, 0.1],
+                                  borderRadius: ["30% 70% 70% 30% / 30% 30% 70% 70%", "50% 50% 20% 80% / 25% 80% 20% 75%", "30% 70% 70% 30% / 30% 30% 70% 70%"]
+                                }}
+                                transition={{ duration: 10, repeat: Infinity }}
+                                className="absolute inset-4 bg-primary blur-3xl"
+                              />
+
+                              {/* Energy Scanline */}
+                              <motion.div
+                                animate={{ y: ["-100%", "400%"] }}
+                                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                                className="absolute top-0 left-0 w-full h-[30%] bg-gradient-to-b from-transparent via-primary/20 to-transparent z-10"
+                              />
+
+                              {/* Circular Orbiters */}
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                {[...Array(3)].map((_, i) => (
+                                  <motion.div
+                                    key={i}
+                                    animate={{ rotate: 360 }}
+                                    transition={{ duration: 3 + i, repeat: Infinity, ease: "linear" }}
+                                    className="absolute border border-primary/20 rounded-full"
+                                    style={{
+                                      width: 100 + i * 30,
+                                      height: 100 + i * 30,
+                                      borderDasharray: i === 1 ? "4 4" : "none"
+                                    }}
+                                  />
+                                ))}
+                              </div>
+
+                              <div className="flex flex-col items-center gap-4 relative z-20">
+                                <div className="relative">
+                                  {/* The Core */}
+                                  <motion.div
+                                    animate={{
+                                      scale: [1, 1.2, 1],
+                                      boxShadow: [
+                                        "0 0 20px rgba(var(--color-primary), 0.2)",
+                                        "0 0 40px rgba(var(--color-primary), 0.6)",
+                                        "0 0 20px rgba(var(--color-primary), 0.2)"
+                                      ]
+                                    }}
+                                    transition={{ duration: 1.5, repeat: Infinity }}
+                                    className="h-12 w-12 rounded-full bg-primary flex items-center justify-center relative z-10"
+                                  >
+                                    <svg className="h-6 w-6 text-background animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                  </motion.div>
+
+                                  {/* Spinning Particles */}
+                                  {[...Array(8)].map((_, i) => (
+                                    <motion.div
+                                      key={i}
+                                      animate={{
+                                        rotate: 360,
+                                        scale: [0.8, 1.2, 0.8]
+                                      }}
+                                      transition={{
+                                        rotate: { duration: 2 + i * 0.2, repeat: Infinity, ease: "linear" },
+                                        scale: { duration: 1, repeat: Infinity }
+                                      }}
+                                      className="absolute inset-0"
+                                    >
+                                      <div
+                                        className="h-1.5 w-1.5 rounded-full bg-primary"
+                                        style={{ transform: `translate(${25 + i * 2}px, 0)` }}
+                                      />
+                                    </motion.div>
+                                  ))}
+                                </div>
+
+                                <div className="flex flex-col items-center">
+                                  <motion.span
+                                    animate={{ opacity: [0.5, 1, 0.5] }}
+                                    transition={{ duration: 2, repeat: Infinity }}
+                                    className="text-[11px] font-black uppercase tracking-[0.3em] text-primary"
+                                  >
+                                    {img.status === "generating" ? "Forging" : "Materializing"}
+                                  </motion.span>
+                                  <div className="h-0.5 w-12 bg-surface-elevated mt-1.5 rounded-full overflow-hidden">
+                                    <motion.div
+                                      animate={{ x: ["-100%", "100%"] }}
+                                      transition={{ duration: 1, repeat: Infinity }}
+                                      className="h-full w-full bg-primary"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -468,15 +668,25 @@ export default function ImageStudio() {
                   <div className="flex h-9 items-center rounded-full border border-border/40 bg-surface/40 p-1">
                     <button
                       onClick={() => setPaymentMode("own_key")}
-                      className={`flex h-full items-center gap-2 rounded-full px-4 transition-all ${paymentMode === "own_key"
-                        ? "bg-elevated text-textPrimary shadow-sm"
+                      className={`relative flex h-full items-center gap-2 rounded-full px-4 transition-all ${paymentMode === "own_key"
+                        ? "text-textPrimary"
                         : "text-textMuted hover:text-textSecondary"
                         }`}
                     >
-                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                      </svg>
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Personal</span>
+                      {paymentMode === "own_key" && (
+                        <motion.div
+                          layoutId="pill-highlight"
+                          className="absolute inset-0 rounded-full bg-elevated shadow-sm ring-1 ring-border/20"
+                          initial={false}
+                          transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                        />
+                      )}
+                      <div className="relative z-10 flex items-center gap-2">
+                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                        </svg>
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Personal</span>
+                      </div>
                     </button>
 
                     <button
@@ -523,17 +733,27 @@ export default function ImageStudio() {
 
                     <button
                       onClick={() => setPaymentMode("free_queue")}
-                      className={`flex h-full items-center gap-2 rounded-full px-4 transition-all ${paymentMode === "free_queue"
-                        ? "bg-elevated text-textPrimary shadow-sm border border-border/50"
+                      className={`relative flex h-full items-center gap-2 rounded-full px-4 transition-all ${paymentMode === "free_queue"
+                        ? "text-textPrimary"
                         : "text-textMuted hover:text-textSecondary"
                         }`}
                     >
-                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span className="text-[10px] font-bold uppercase tracking-wider">
-                        Free {queueStatus ? `(${queueStatus.limit - queueStatus.used_today}/${queueStatus.limit})` : ""}
-                      </span>
+                      {paymentMode === "free_queue" && (
+                        <motion.div
+                          layoutId="pill-highlight"
+                          className="absolute inset-0 rounded-full bg-elevated shadow-sm ring-1 ring-border/20"
+                          initial={false}
+                          transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                        />
+                      )}
+                      <div className="relative z-10 flex items-center gap-2">
+                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-[10px] font-bold uppercase tracking-wider">
+                          Free {queueStatus ? `(${queueStatus.limit - queueStatus.used_today}/${queueStatus.limit})` : ""}
+                        </span>
+                      </div>
                     </button>
                   </div>
                 </div>
