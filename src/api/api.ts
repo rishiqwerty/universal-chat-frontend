@@ -354,7 +354,8 @@ export type GeneratedImage = {
   provider: string;
   model: string;
   used_credits: string;
-  status: string; // "pending" | "generating" | "completed" | "failed"
+  payment_mode: string;
+  status: string; // "pending" | "generating" | "completed" | "failed" | "queued"
   error_message: string | null;
   created_at: string;
 };
@@ -364,15 +365,25 @@ export async function generateStudioImage(
   provider: string,
   model: string,
   aspectRatio: string,
-  useCredits: boolean
+  paymentMode: string
 ): Promise<GeneratedImage> {
   const { data } = await client.post("/studio/generate", {
     prompt,
     provider,
     model,
     aspect_ratio: aspectRatio,
-    use_credits: useCredits,
+    payment_mode: paymentMode,
   });
+  return data;
+}
+
+export type QueueStatus = {
+  used_today: number;
+  limit: number;
+};
+
+export async function getQueueStatus(): Promise<QueueStatus> {
+  const { data } = await client.get("/studio/queue-status");
   return data;
 }
 

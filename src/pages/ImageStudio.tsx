@@ -12,8 +12,10 @@ import {
   retryStudioImage,
   deleteStudioImage,
   resolveImagePath,
+  getQueueStatus,
   type StudioModels,
   type GeneratedImage,
+  type QueueStatus,
 } from "../api/api";
 
 const ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3"];
@@ -25,10 +27,12 @@ export default function ImageStudio() {
   const [selectedModel, setSelectedModel] = useState("");
   const [prompt, setPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("1:1");
-  const [useCredits, setUseCredits] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<"own_key" | "credits" | "free_queue">("own_key");
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreditSuggestion, setShowCreditSuggestion] = useState(false);
+  const [showFullGallery, setShowFullGallery] = useState(false);
+  const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
   const [showFullGallery, setShowFullGallery] = useState(false);
 
   const [gallery, setGallery] = useState<GeneratedImage[]>([]);
@@ -36,7 +40,7 @@ export default function ImageStudio() {
   const galleryEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<Set<string>>(new Set());
 
-  // Fetch available image models
+  // Fetch available image models and queue status
   useEffect(() => {
     getStudioModels()
       .then((data) => {
@@ -48,6 +52,8 @@ export default function ImageStudio() {
         }
       })
       .catch(() => { });
+
+    getQueueStatus().then(setQueueStatus).catch(() => {});
   }, []);
 
   // Fetch gallery
@@ -101,27 +107,34 @@ export default function ImageStudio() {
   };
 
   const handleGenerate = async () => {
-    if (!prompt.trim() || !selectedProvider || !selectedModel) return;
+    // If free_queue, we don't need provider/model selected. Just prompt.
+    if (!prompt.trim() || (paymentMode !== "free_queue" && (!selectedProvider || !selectedModel))) return;
     setGenerating(true);
     setError(null);
 
     try {
-      // POST returns instantly with a pending record
+      // POST returns instantly with a pending/queued record
       const pendingImage = await generateStudioImage(
         prompt,
-        selectedProvider,
-        selectedModel,
+        paymentMode === "free_queue" ? "local" : selectedProvider,
+        paymentMode === "free_queue" ? "system_default" : selectedModel,
         aspectRatio,
-        useCredits
+        paymentMode
       );
-      // Add the pending record to the gallery immediately
+      // Add the pending/queued record to the gallery immediately
       setGallery((prev) => [pendingImage, ...prev]);
       setPrompt("");
       setShowCreditSuggestion(false);
       setGenerating(false);
 
-      // Start polling for this image
-      pollForCompletion(pendingImage.id);
+      if (paymentMode === "free_queue") {
+        // Refresh queue status to show updated quota
+        getQueueStatus().then(setQueueStatus).catch(() => {});
+      } else {
+        // Start polling for this image if it's actually generating
+        pollForCompletion(pendingImage.id);
+      }
+
       
       // Scroll to top to show new image
       galleryEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -129,7 +142,7 @@ export default function ImageStudio() {
       const detail = err?.response?.data?.detail || "";
       const status = err?.response?.status;
       // Detect API key related failures when using own key
-      const isKeyError = !useCredits && (
+      const isKeyError = paymentMode === "own_key" && (
         status === 400 || status === 502 ||
         /api.key|key.not|no.*key|unauthorized|invalid.*key|forbidden/i.test(detail)
       );
@@ -262,8 +275,20 @@ export default function ImageStudio() {
                                 Retry
                               </button>
                             </div>
+                          ) : img.status === "queued" ? (
+                            /* queued — manual fulfillment */
+                            <div className="flex h-full w-full items-center justify-center bg-elevated/50">
+                              <div className="flex flex-col items-center gap-2">
+                                <svg className="h-6 w-6 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span className="text-[10px] font-semibold uppercase tracking-wider text-textMuted">
+                                  In Queue
+                                </span>
+                              </div>
+                            </div>
                           ) : (
-                            /* pending / generating — skeleton */
+                            /* pending / generating — spinner */
                             <div className="flex h-full w-full items-center justify-center bg-elevated/50">
                               <motion.div
                                 animate={{ opacity: [0.3, 0.7, 0.3] }}
@@ -275,7 +300,7 @@ export default function ImageStudio() {
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                                 </svg>
                                 <span className="text-[10px] font-semibold uppercase tracking-wider text-textMuted">
-                                  {img.status === "generating" ? "Generating…" : "Queued…"}
+                                  {img.status === "generating" ? "Generating…" : "Starting…"}
                                 </span>
                               </motion.div>
                             </div>
@@ -380,40 +405,42 @@ export default function ImageStudio() {
               {/* Top row: controls */}
               <div className="flex flex-wrap items-end gap-3">
                 {/* Provider & Model */}
-                {hasModels ? (
-                  <>
-                    <div className="min-w-[120px]">
-                      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Provider</label>
-                      <select
-                        value={selectedProvider}
-                        onChange={(e) => handleProviderChange(e.target.value)}
-                        className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
-                      >
-                        {providerKeys.map((p) => (
-                          <option key={p} value={p}>
-                            {p.charAt(0).toUpperCase() + p.slice(1)}
-                          </option>
-                        ))}
-                      </select>
+                {paymentMode !== "free_queue" && (
+                  hasModels ? (
+                    <>
+                      <div className="min-w-[120px]">
+                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Provider</label>
+                        <select
+                          value={selectedProvider}
+                          onChange={(e) => handleProviderChange(e.target.value)}
+                          className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
+                        >
+                          {providerKeys.map((p) => (
+                            <option key={p} value={p}>
+                              {p.charAt(0).toUpperCase() + p.slice(1)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="min-w-[160px]">
+                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Model</label>
+                        <select
+                          value={selectedModel}
+                          onChange={(e) => setSelectedModel(e.target.value)}
+                          className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
+                        >
+                          {(models[selectedProvider] || []).map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="h-9 flex items-center rounded-input border border-border/40 bg-surface/50 px-3 text-xs text-textMuted">
+                      No image models found.{" "}
+                      <a href="/settings" className="ml-1 text-primary underline">Add a key</a>.
                     </div>
-                    <div className="min-w-[160px]">
-                      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Model</label>
-                      <select
-                        value={selectedModel}
-                        onChange={(e) => setSelectedModel(e.target.value)}
-                        className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
-                      >
-                        {(models[selectedProvider] || []).map((m) => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </>
-                ) : (
-                  <div className="h-9 flex items-center rounded-input border border-border/40 bg-surface/50 px-3 text-xs text-textMuted">
-                    No image models found.{" "}
-                    <a href="/settings" className="ml-1 text-primary underline">Add a key</a>.
-                  </div>
+                  )
                 )}
 
                 {/* Aspect Ratio */}
@@ -440,8 +467,8 @@ export default function ImageStudio() {
                   <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Payment</label>
                   <div className="flex h-9 items-center rounded-full border border-border/40 bg-surface/40 p-1">
                     <button
-                      onClick={() => setUseCredits(false)}
-                      className={`flex h-full items-center gap-2 rounded-full px-4 transition-all ${!useCredits
+                      onClick={() => setPaymentMode("own_key")}
+                      className={`flex h-full items-center gap-2 rounded-full px-4 transition-all ${paymentMode === "own_key"
                         ? "bg-elevated text-textPrimary shadow-sm"
                         : "text-textMuted hover:text-textSecondary"
                         }`}
@@ -453,13 +480,13 @@ export default function ImageStudio() {
                     </button>
 
                     <button
-                      onClick={() => setUseCredits(true)}
-                      className={`relative flex h-full items-center gap-2 rounded-full px-4 transition-all ${useCredits
+                      onClick={() => setPaymentMode("credits")}
+                      className={`relative flex h-full items-center gap-2 rounded-full px-4 transition-all ${paymentMode === "credits"
                         ? "bg-primary text-background shadow-[0_0_15px_rgba(var(--color-primary),0.4)]"
                         : "text-textMuted hover:text-textSecondary"
                         }`}
                     >
-                      {useCredits && (
+                      {paymentMode === "credits" && (
                         <motion.div
                           layoutId="pill-highlight"
                           className="absolute inset-0 rounded-full bg-primary ring-2 ring-primary ring-offset-2 ring-offset-background"
@@ -486,12 +513,27 @@ export default function ImageStudio() {
                             repeatDelay: Math.random() * 2 + 1,
                             times: [0, 0.1, 0.2, 0.3, 1]
                           }}
-                          className="h-3 w-3 text-[#FF00FF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                          className={`h-3 w-3 ${paymentMode === "credits" ? "text-[#FF00FF]" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
                         >
                           <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </motion.svg>
                         <span className="text-[10px] font-black uppercase tracking-wider">Use Credits</span>
                       </div>
+                    </button>
+
+                    <button
+                      onClick={() => setPaymentMode("free_queue")}
+                      className={`flex h-full items-center gap-2 rounded-full px-4 transition-all ${paymentMode === "free_queue"
+                        ? "bg-elevated text-textPrimary shadow-sm border border-border/50"
+                        : "text-textMuted hover:text-textSecondary"
+                        }`}
+                    >
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        Free {queueStatus ? `(${queueStatus.limit - queueStatus.used_today}/${queueStatus.limit})` : ""}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -509,12 +551,12 @@ export default function ImageStudio() {
                         handleGenerate();
                       }
                     }}
-                    placeholder="Describe the image you want to create..."
+                    placeholder={paymentMode === "free_queue" ? "Describe the image you want to request (fulfilled manually)..." : "Describe the image you want to create..."}
                     rows={1}
                     disabled={generating}
                     className="block min-h-[46px] w-full resize-none rounded-card border border-border/60 bg-surface px-4 py-[11px] text-sm text-textPrimary placeholder-textMuted outline-none focus:border-primary/50 focus:shadow-[0_0_0_3px_rgba(var(--color-primary),0.08)] transition-all disabled:opacity-50"
                   />
-                  {useCredits && !generating && (
+                  {paymentMode === "credits" && !generating && (
                     <motion.div
                       animate={{ opacity: [0.3, 0.6, 0.3] }}
                       transition={{ duration: 2, repeat: Infinity }}
@@ -527,8 +569,8 @@ export default function ImageStudio() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleGenerate}
-                  disabled={generating || !prompt.trim() || !hasModels}
-                  className={`relative h-[46px] shrink-0 overflow-hidden rounded-card px-8 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${useCredits
+                  disabled={generating || !prompt.trim() || (paymentMode !== "free_queue" && !hasModels)}
+                  className={`relative h-[46px] shrink-0 overflow-hidden rounded-card px-8 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${paymentMode === "credits"
                     ? "bg-primary text-background shadow-[0_0_20px_rgba(var(--color-primary),0.25)]"
                     : "bg-surface border border-border text-textPrimary hover:border-primary/50"
                     }`}
@@ -544,8 +586,8 @@ export default function ImageStudio() {
                       </>
                     ) : (
                       <>
-                        <span>Generate</span>
-                        {useCredits && (
+                        <span>{paymentMode === "free_queue" ? "Request Image" : "Generate"}</span>
+                        {paymentMode === "credits" && (
                           <div className="flex items-center gap-1 border-l border-background/20 pl-2">
                             <motion.svg
                               animate={{
