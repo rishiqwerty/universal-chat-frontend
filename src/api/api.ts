@@ -416,4 +416,19 @@ export async function deleteStudioImage(imageId: string): Promise<void> {
   await client.delete(`/studio/${imageId}`);
 }
 
+export type StudioPreset = {
+  id: string;
+  title: string;
+  version: string;
+  category: string;
+  prompt: string;
+  image_url: string;
+  description: string;
+};
+
+export async function getStudioPresets(): Promise<StudioPreset[]> {
+  const { data } = await client.get("/studio/presets");
+  return data;
+}
+
 export { client };

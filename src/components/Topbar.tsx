@@ -95,6 +95,7 @@ type TopbarProps = {
   onToggleTempMode?: () => void;
   isAuthenticated?: boolean;
   hideIncognito?: boolean;
+  leftContent?: React.ReactNode;
 };
 
 export default function Topbar({
@@ -104,7 +105,8 @@ export default function Topbar({
   isTempMode,
   onToggleTempMode,
   isAuthenticated = true,
-  hideIncognito = false
+  hideIncognito = false,
+  leftContent
 }: TopbarProps) {
   const navigate = useNavigate();
   const [editingTitle, setEditingTitle] = useState("");
@@ -162,6 +164,7 @@ export default function Topbar({
 
   return (
     <header className="flex h-[60px] shrink-0 items-center gap-4 border-b border-border/30 bg-background px-6">
+      {leftContent}
       <div className="relative min-w-0 flex-1 max-w-2xl">
         {activeChatTitle != null ? (
           <input
