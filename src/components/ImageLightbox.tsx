@@ -1,13 +1,18 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { resolveImagePath, type GeneratedImage } from "../api/api";
+import { resolveImagePath, type GeneratedImage, type StudioPreset } from "../api/api";
 
 type Props = {
-  image: GeneratedImage | null;
+  image: GeneratedImage | StudioPreset | null;
   onClose: () => void;
   onDelete?: (id: string) => void;
+  onRecreate?: (preset: StudioPreset) => void;
 };
 
-export default function ImageLightbox({ image, onClose, onDelete }: Props) {
+const isPreset = (img: any): img is StudioPreset => {
+  return img && "title" in img;
+};
+
+export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: Props) {
   if (!image || !image.image_url) return null;
 
   const handleDownload = async () => {
@@ -18,7 +23,10 @@ export default function ImageLightbox({ image, onClose, onDelete }: Props) {
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = blobUrl;
-      link.download = `studio-${image.id}.png`;
+      const downloadName = isPreset(image) 
+        ? `${image.title.toLowerCase().replace(/_/g, "-")}.png`
+        : `studio-${image.id}.png`;
+      link.download = downloadName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -44,41 +52,60 @@ export default function ImageLightbox({ image, onClose, onDelete }: Props) {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.92, opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="relative mx-4 max-h-[90vh] max-w-4xl overflow-hidden rounded-card border border-border/40 bg-surface shadow-2xl"
+            className="relative mx-4 w-full max-w-2xl overflow-hidden rounded-card border border-border/40 bg-surface shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Image */}
             <div className="flex items-center justify-center bg-background/50 p-2">
               <img
                 src={resolveImagePath(image.image_url)}
-                alt={image.prompt}
-                className="max-h-[70vh] rounded object-contain"
+                alt={isPreset(image) ? image.title : image.prompt}
+                className="max-h-[60vh] rounded object-contain"
               />
             </div>
 
             {/* Info Bar */}
-            <div className="flex items-start justify-between gap-4 border-t border-border/30 px-6 py-4">
+            <div className="flex flex-col gap-4 border-t border-border/30 px-6 py-4 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-textPrimary">{image.prompt}</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-elevated px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
-                    {image.provider}
-                  </span>
-                  <span className="rounded-full bg-elevated px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
-                    {image.model}
-                  </span>
-                  <span className="rounded-full bg-elevated px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
-                    {image.aspect_ratio}
-                  </span>
-                  {image.used_credits === "true" && (
-                    <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                      Credits
-                    </span>
-                  )}
-                </div>
+                {isPreset(image) ? (
+                  <>
+                    <h3 className="text-sm font-extrabold uppercase tracking-wide text-textPrimary" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                      {image.title} <span className="text-[10px] font-semibold text-textMuted lowercase ml-1">{image.version}</span>
+                    </h3>
+                    <p className="mt-1 text-[11px] leading-relaxed text-textSecondary">{image.description}</p>
+                    <p className="mt-2.5 rounded bg-elevated/40 border border-border/40 p-2.5 font-mono text-[10px] text-textMuted select-all leading-normal whitespace-pre-wrap max-h-[80px] overflow-y-auto">
+                      {image.prompt}
+                    </p>
+                    <div className="mt-2.5 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                        {image.category}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-textPrimary">{image.prompt}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-elevated px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
+                        {image.provider}
+                      </span>
+                      <span className="rounded-full bg-elevated px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
+                        {image.model}
+                      </span>
+                      <span className="rounded-full bg-elevated px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
+                        {image.aspect_ratio}
+                      </span>
+                      {image.used_credits === "true" && (
+                        <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                          Credits
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
-              <div className="flex shrink-0 gap-2">
+              <div className="flex shrink-0 gap-2 self-end md:self-start">
                 {/* Download */}
                 <button
                   onClick={handleDownload}
@@ -86,8 +113,20 @@ export default function ImageLightbox({ image, onClose, onDelete }: Props) {
                 >
                   Download
                 </button>
+                {/* Recreate Preset */}
+                {isPreset(image) && onRecreate && (
+                  <button
+                    onClick={() => {
+                      onRecreate(image);
+                      onClose();
+                    }}
+                    className="flex items-center gap-1 rounded-input border border-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary hover:bg-primary/10 transition-colors"
+                  >
+                    Recreate ⚡
+                  </button>
+                )}
                 {/* Delete */}
-                {onDelete && (
+                {!isPreset(image) && onDelete && (
                   <button
                     onClick={() => onDelete(image.id)}
                     className="rounded-input border border-red-500/30 px-4 py-2 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/10"

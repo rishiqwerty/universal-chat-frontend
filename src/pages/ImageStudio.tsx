@@ -13,9 +13,11 @@ import {
   deleteStudioImage,
   resolveImagePath,
   getQueueStatus,
+  getStudioPresets,
   type StudioModels,
   type GeneratedImage,
   type QueueStatus,
+  type StudioPreset,
 } from "../api/api";
 
 const ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3"];
@@ -36,10 +38,27 @@ export default function ImageStudio() {
   const [referenceImage, setReferenceImage] = useState<File | null>(null);
   const [referencePreview, setReferencePreview] = useState<string | null>(null);
 
+  const [presets, setPresets] = useState<StudioPreset[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [sortBy, setSortBy] = useState("Latest Deployed");
+  const [activeTab, setActiveTab] = useState<"generations" | "presets">("generations");
+
   const [gallery, setGallery] = useState<GeneratedImage[]>([]);
-  const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<GeneratedImage | StudioPreset | null>(null);
   const galleryEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<Set<string>>(new Set());
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+
+  // Auto-resize textarea height based on content
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = "auto";
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  }, [prompt]);
 
   // Fetch available image models and queue status
   useEffect(() => {
@@ -58,6 +77,7 @@ export default function ImageStudio() {
       .catch(() => { });
 
     getQueueStatus().then(setQueueStatus).catch(() => { });
+    getStudioPresets().then(setPresets).catch(() => { });
   }, []);
 
   // Poll for image completion
@@ -196,6 +216,310 @@ export default function ImageStudio() {
     }
   };
 
+  const handleRecreate = (preset: StudioPreset) => {
+    setPrompt(preset.prompt);
+    const textarea = document.querySelector("textarea");
+    if (textarea) {
+      textarea.scrollIntoView({ behavior: "smooth", block: "center" });
+      textarea.focus();
+    }
+  };
+
+  const renderGalleryCard = (img: GeneratedImage, isGridMode = false) => {
+    return (
+      <motion.div
+        key={img.id}
+        layout
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        className={`group relative cursor-pointer overflow-hidden rounded-card border bg-surface transition-all ${
+          isGridMode ? "w-full aspect-square" : "w-[240px] flex-shrink-0 snap-start"
+        } ${img.status === "failed"
+          ? "border-red-500/30"
+          : img.status === "completed"
+            ? "border-border/30 hover:border-primary/30 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.06)]"
+            : "border-border/20"
+        }`}
+        onClick={() => img.status === "completed" && setLightboxImage(img)}
+      >
+        {img.reference_image_url && (
+          <div
+            title="View reference image"
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightboxImage({
+                id: `${img.id}-ref`,
+                prompt: `[Reference Image] ${img.prompt}`,
+                image_url: img.reference_image_url,
+                reference_image_url: null,
+                aspect_ratio: img.aspect_ratio,
+                provider: img.provider,
+                model: img.model,
+                used_credits: "false",
+                payment_mode: img.payment_mode,
+                status: "completed",
+                error_message: null,
+                created_at: img.created_at
+              });
+            }}
+            className="absolute left-2 top-2 z-20 h-10 w-10 overflow-hidden rounded border border-border/40 bg-surface shadow-md hover:border-primary transition-all cursor-zoom-in"
+          >
+            <img
+              src={resolveImagePath(img.reference_image_url)}
+              alt="Reference"
+              className="h-full w-full object-cover"
+            />
+          </div>
+        )}
+        <div className="aspect-square overflow-hidden">
+          {img.status === "completed" && img.image_url ? (
+            <img
+              src={resolveImagePath(img.image_url)}
+              alt={img.prompt}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
+            />
+          ) : img.status === "failed" ? (
+            <div className="flex h-full w-full flex-col items-center justify-center bg-red-500/10 p-4 relative overflow-hidden">
+              <motion.div
+                animate={{
+                  opacity: [0.05, 0.15, 0.05],
+                  scale: [1, 1.05, 1]
+                }}
+                transition={{ duration: 3, repeat: Infinity }}
+                className="absolute inset-0 bg-red-500/20"
+              />
+              <motion.div
+                animate={{
+                  x: [-1, 1, -1, 0],
+                  filter: ["hue-rotate(0deg)", "hue-rotate(90deg)", "hue-rotate(0deg)"]
+                }}
+                transition={{ duration: 0.2, repeat: Infinity, repeatType: "mirror" }}
+              >
+                <svg className="h-10 w-10 text-red-500/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M15 9l-6 6M9 9l6 6" />
+                </svg>
+              </motion.div>
+              <p className="mt-3 text-[10px] font-bold text-red-400 text-center relative z-10 px-2 leading-relaxed">
+                {img.error_message?.slice(0, 80) || "System Failure"}
+              </p>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRetry(img.id);
+                }}
+                className="mt-4 relative z-10 rounded-full bg-red-500 px-5 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-red-500/20 transition-all hover:bg-red-600"
+              >
+                Try Again
+              </motion.button>
+            </div>
+          ) : img.status === "queued" ? (
+            <div className="flex h-full w-full flex-col items-center justify-center bg-amber-500/[0.03] relative overflow-hidden">
+              <div className="flex flex-col items-center gap-4 relative z-10 scale-75">
+                <div className="relative h-16 w-20 flex items-center justify-center">
+                  {[...Array(4)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      animate={{
+                        y: [-10, -30],
+                        x: [(Math.random() - 0.5) * 20, (Math.random() - 0.5) * 40],
+                        opacity: [0, 0.8, 0],
+                        scale: [0.4, 0.8]
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: Infinity,
+                        delay: i * 0.4
+                      }}
+                      className="absolute top-0 h-1.5 w-1.5 rounded-full bg-amber-500/20"
+                    />
+                  ))}
+
+                  <div className="absolute bottom-0 h-8 w-16 border-b-2 border-x-2 border-amber-900/20 rounded-b-full bg-amber-500/5 overflow-hidden">
+                    <svg className="absolute inset-0 h-full w-full text-amber-500/20" viewBox="0 0 20 10">
+                      {[...Array(6)].map((_, i) => (
+                        <motion.path
+                          key={i}
+                          d={`M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${2 + (i % 2) * 3} ${8 + i * 2.5} 10`}
+                          stroke="currentColor"
+                          strokeWidth="1"
+                          fill="none"
+                          animate={{
+                            d: [
+                              `M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${2 + (i % 2) * 3} ${8 + i * 2.5} 10`,
+                              `M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${6 - (i % 2) * 3} ${8 + i * 2.5} 10`,
+                              `M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${2 + (i % 2) * 3} ${8 + i * 2.5} 10`,
+                            ]
+                          }}
+                          transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 }}
+                        />
+                      ))}
+                    </svg>
+                  </div>
+
+                  <motion.div
+                    animate={{
+                      rotate: [-15, -35, -15],
+                      x: [-4, 4, -4],
+                      y: [0, 4, 0]
+                    }}
+                    transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute bottom-3 left-5 h-12 w-0.5 bg-amber-900/30 rounded-full origin-bottom"
+                    style={{ transform: "rotate(-25deg)" }}
+                  />
+
+                  <motion.div
+                    animate={{
+                      rotate: [15, 35, 15],
+                      x: [4, -4, 4],
+                      y: [0, 4, 0]
+                    }}
+                    transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.1 }}
+                    className="absolute bottom-3 right-5 h-12 w-0.5 bg-amber-900/30 rounded-full origin-bottom"
+                    style={{ transform: "rotate(25deg)" }}
+                  />
+                </div>
+
+                <div className="flex flex-col items-center gap-2 px-6">
+                  <span className="text-[12px] font-black uppercase tracking-[0.15em] text-amber-600/80 text-center leading-relaxed">
+                    Hang tight — your image is cooking 🚀
+                  </span>
+                  <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-amber-600/40 text-center">
+                    (This might take a couple of hours)
+                  </span>
+                  <motion.div
+                    className="flex gap-1 mt-1"
+                    animate={{ opacity: [0.3, 1, 0.3] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  >
+                    <div className="h-1 w-1 rounded-full bg-amber-500/30" />
+                    <div className="h-1 w-1 rounded-full bg-amber-500/30" />
+                    <div className="h-1 w-1 rounded-full bg-amber-500/30" />
+                  </motion.div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-background relative overflow-hidden">
+              <motion.div
+                animate={{
+                  scale: [1, 1.2, 1.1, 1.3, 1],
+                  opacity: [0.1, 0.2, 0.15, 0.25, 0.1],
+                  borderRadius: ["30% 70% 70% 30% / 30% 30% 70% 70%", "50% 50% 20% 80% / 25% 80% 20% 75%", "30% 70% 70% 30% / 30% 30% 70% 70%"]
+                }}
+                transition={{ duration: 10, repeat: Infinity }}
+                className="absolute inset-4 bg-primary blur-3xl"
+              />
+
+              <motion.div
+                animate={{ y: ["-100%", "400%"] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-0 left-0 w-full h-[30%] bg-gradient-to-b from-transparent via-primary/20 to-transparent z-10"
+              />
+
+              <div className="absolute inset-0 flex items-center justify-center">
+                {[...Array(3)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 3 + i, repeat: Infinity, ease: "linear" }}
+                    className="absolute border border-primary/20 rounded-full"
+                    style={{
+                      width: 100 + i * 30,
+                      height: 100 + i * 30,
+                      borderStyle: i === 1 ? "dashed" : "solid"
+                    }}
+                  />
+                ))}
+              </div>
+
+              <div className="flex flex-col items-center gap-4 relative z-20">
+                <div className="relative">
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.2, 1],
+                      boxShadow: [
+                        "0 0 20px rgba(var(--color-primary), 0.2)",
+                        "0 0 40px rgba(var(--color-primary), 0.6)",
+                        "0 0 20px rgba(var(--color-primary), 0.2)"
+                      ]
+                    }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                    className="h-12 w-12 rounded-full bg-primary flex items-center justify-center relative z-10"
+                  >
+                    <svg className="h-6 w-6 text-background animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </motion.div>
+
+                  {[...Array(8)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      animate={{
+                        rotate: 360,
+                        scale: [0.8, 1.2, 0.8]
+                      }}
+                      transition={{
+                        rotate: { duration: 2 + i * 0.2, repeat: Infinity, ease: "linear" },
+                        scale: { duration: 1, repeat: Infinity }
+                      }}
+                      className="absolute inset-0"
+                    >
+                      <div
+                        className="h-1.5 w-1.5 rounded-full bg-primary"
+                        style={{ transform: `translate(${25 + i * 2}px, 0)` }}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <motion.span
+                    animate={{ opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="text-[11px] font-black uppercase tracking-[0.3em] text-primary"
+                  >
+                    {img.status === "generating" ? "Forging" : "Materializing"}
+                  </motion.span>
+                  <div className="h-0.5 w-12 bg-surface-elevated mt-1.5 rounded-full overflow-hidden">
+                    <motion.div
+                      animate={{ x: ["-100%", "100%"] }}
+                      transition={{ duration: 1, repeat: Infinity }}
+                      className="h-full w-full bg-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="p-2.5">
+          <p className="truncate text-[11px] text-textSecondary">
+            {img.prompt}
+          </p>
+          <p className="mt-0.5 text-[9px] text-textMuted">
+            {new Date(img.created_at).toLocaleDateString()}
+          </p>
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDelete(img.id);
+          }}
+          className="absolute right-2 top-2 rounded-full bg-background/70 p-1.5 text-textMuted opacity-0 backdrop-blur-sm transition-all group-hover:opacity-100 hover:text-red-400"
+        >
+          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </motion.div>
+    );
+  };
+
   const providerKeys = Object.keys(models);
   const hasModels = providerKeys.length > 0;
   const displayedGallery = gallery.slice(0, visibleCount);
@@ -208,403 +532,296 @@ export default function ImageStudio() {
     }
   };
 
+  const filteredPresets = presets.filter((preset) => {
+    const matchesCategory =
+      selectedCategory === "All" ||
+      (selectedCategory === "UI Components" && (preset.category.toLowerCase() === "ui components" || preset.category.toLowerCase() === "ui layout")) ||
+      preset.category.toLowerCase() === selectedCategory.toLowerCase();
+
+    const matchesSearch =
+      preset.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      preset.prompt.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      preset.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesCategory && matchesSearch;
+  });
+
+  const sortedPresets = [...filteredPresets].sort((a, b) => {
+    if (sortBy === "A-Z") {
+      return a.title.localeCompare(b.title);
+    }
+    return 0;
+  });
+
   return (
     <PageTransition>
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar activeNav="studio" isAuthenticated={true} />
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <Topbar hideIncognito={true} />
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+          <Topbar
+            hideIncognito={true}
+            leftContent={
+              <div className="flex flex-col justify-center select-none shrink-0 pr-2">
+                <h1
+                  className="text-base font-bold text-textPrimary leading-none"
+                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                >
+                  Studio
+                </h1>
+                <p className="mt-1.5 text-[11px] text-textMuted leading-none">
+                  Generate images from text prompts
+                </p>
+              </div>
+            }
+          />
 
           {/* Scrollable Gallery Area */}
-          <div className="flex-1 overflow-y-auto px-8 py-6">
+          <div className="flex-1 overflow-y-auto px-8 pb-48 pt-0">
             <div ref={galleryEndRef} />
 
-            {/* Page Header */}
-            <div className="mb-6">
-              <h1
-                className="text-2xl font-bold text-textPrimary"
+            {/* Tabs Selector */}
+            <div className="sticky top-0 z-30 bg-background pt-6 pb-3 mb-6 flex border-b border-border/20">
+              <button
+                onClick={() => setActiveTab("generations")}
+                className={`relative pb-3 text-sm font-bold uppercase tracking-wider transition-colors ${
+                  activeTab === "generations" ? "text-primary" : "text-textMuted hover:text-textSecondary"
+                }`}
                 style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               >
-                Studio
-              </h1>
-              <p className="mt-1 text-sm text-textMuted">
-                Generate images from text prompts
-              </p>
+                Recent Generations
+                {activeTab === "generations" && (
+                  <motion.div
+                    layoutId="studio-active-tab"
+                    className="absolute bottom-0 left-0 h-[2px] w-full bg-primary"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab("presets")}
+                className={`relative ml-8 pb-3 text-sm font-bold uppercase tracking-wider transition-colors ${
+                  activeTab === "presets" ? "text-primary" : "text-textMuted hover:text-textSecondary"
+                }`}
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              >
+                Preset Libraries
+                {activeTab === "presets" && (
+                  <motion.div
+                    layoutId="studio-active-tab"
+                    className="absolute bottom-0 left-0 h-[2px] w-full bg-primary"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+              </button>
             </div>
 
-            {/* Gallery Grid */}
-            {gallery.length > 0 ? (
-              <div>
-                <div className="mb-4 flex items-center justify-between">
-                  <h2
-                    className="text-sm font-bold uppercase tracking-wider text-textSecondary"
-                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                  >
-                    Recent Generations
-                  </h2>
-                  {hasMore && (
-                    <button
-                      onClick={() => setShowFullGallery(!showFullGallery)}
-                      className="text-xs font-bold uppercase tracking-wider text-primary transition-colors hover:text-primaryHover"
-                    >
-                      {showFullGallery ? "Show Less" : `View All (${gallery.length})`}
-                    </button>
-                  )}
-                </div>
-                <div
-                  onScroll={handleScroll}
-                  className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
-                >
-                  <AnimatePresence>
-                    {displayedGallery.map((img) => (
-                      <motion.div
-                        key={img.id}
-                        layout
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        className={`group relative w-[240px] flex-shrink-0 cursor-pointer overflow-hidden rounded-card border bg-surface transition-all snap-start ${img.status === "failed"
-                          ? "border-red-500/30"
-                          : img.status === "completed"
-                            ? "border-border/30 hover:border-primary/30 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.06)]"
-                            : "border-border/20"
-                          }`}
-                        onClick={() => img.status === "completed" && setLightboxImage(img)}
-                      >
-                        {img.reference_image_url && (
-                          <div
-                            title="View reference image"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setLightboxImage({
-                                id: `${img.id}-ref`,
-                                prompt: `[Reference Image] ${img.prompt}`,
-                                image_url: img.reference_image_url,
-                                reference_image_url: null,
-                                aspect_ratio: img.aspect_ratio,
-                                provider: img.provider,
-                                model: img.model,
-                                used_credits: "false",
-                                payment_mode: img.payment_mode,
-                                status: "completed",
-                                error_message: null,
-                                created_at: img.created_at
-                              });
-                            }}
-                            className="absolute left-2 top-2 z-20 h-10 w-10 overflow-hidden rounded border border-border/40 bg-surface shadow-md hover:border-primary transition-all cursor-zoom-in"
-                          >
-                            <img
-                              src={resolveImagePath(img.reference_image_url)}
-                              alt="Reference"
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                        )}
-                        <div className="aspect-square overflow-hidden">
-                          {img.status === "completed" && img.image_url ? (
-                            <img
-                              src={resolveImagePath(img.image_url)}
-                              alt={img.prompt}
-                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                              loading="lazy"
-                            />
-                          ) : img.status === "failed" ? (
-                            <div className="flex h-full w-full flex-col items-center justify-center bg-red-500/10 p-4 relative overflow-hidden">
-                              <motion.div
-                                animate={{
-                                  opacity: [0.05, 0.15, 0.05],
-                                  scale: [1, 1.05, 1]
-                                }}
-                                transition={{ duration: 3, repeat: Infinity }}
-                                className="absolute inset-0 bg-red-500/20"
-                              />
-                              <motion.div
-                                animate={{
-                                  x: [-1, 1, -1, 0],
-                                  filter: ["hue-rotate(0deg)", "hue-rotate(90deg)", "hue-rotate(0deg)"]
-                                }}
-                                transition={{ duration: 0.2, repeat: Infinity, repeatType: "mirror" }}
-                              >
-                                <svg className="h-10 w-10 text-red-500/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                  <circle cx="12" cy="12" r="10" />
-                                  <path d="M15 9l-6 6M9 9l6 6" />
-                                </svg>
-                              </motion.div>
-                              <p className="mt-3 text-[10px] font-bold text-red-400 text-center relative z-10 px-2 leading-relaxed">
-                                {img.error_message?.slice(0, 80) || "System Failure"}
-                              </p>
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRetry(img.id);
-                                }}
-                                className="mt-4 relative z-10 rounded-full bg-red-500 px-5 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-red-500/20 transition-all hover:bg-red-600"
-                              >
-                                Try Again
-                              </motion.button>
-                            </div>
-                          ) : img.status === "queued" ? (
-                            /* queued — Waiting room animation */
-                            <div className="flex h-full w-full flex-col items-center justify-center bg-amber-500/[0.03] relative overflow-hidden">
-                              <div className="flex flex-col items-center gap-4 relative z-10 scale-75">
-                                {/* Mixing Animation (Scaled Down) */}
-                                <div className="relative h-16 w-20 flex items-center justify-center">
-                                  {/* Mixing Particles */}
-                                  {[...Array(4)].map((_, i) => (
-                                    <motion.div
-                                      key={i}
-                                      animate={{
-                                        y: [-10, -30],
-                                        x: [(Math.random() - 0.5) * 20, (Math.random() - 0.5) * 40],
-                                        opacity: [0, 0.8, 0],
-                                        scale: [0.4, 0.8]
-                                      }}
-                                      transition={{
-                                        duration: 1.5,
-                                        repeat: Infinity,
-                                        delay: i * 0.4
-                                      }}
-                                      className="absolute top-0 h-1.5 w-1.5 rounded-full bg-amber-500/20"
-                                    />
-                                  ))}
-
-                                  {/* The Bowl */}
-                                  <div className="absolute bottom-0 h-8 w-16 border-b-2 border-x-2 border-amber-900/20 rounded-b-full bg-amber-500/5 overflow-hidden">
-                                    {/* Noodles */}
-                                    <svg className="absolute inset-0 h-full w-full text-amber-500/20" viewBox="0 0 20 10">
-                                      {[...Array(6)].map((_, i) => (
-                                        <motion.path
-                                          key={i}
-                                          d={`M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${2 + (i % 2) * 3} ${8 + i * 2.5} 10`}
-                                          stroke="currentColor"
-                                          strokeWidth="1"
-                                          fill="none"
-                                          animate={{
-                                            d: [
-                                              `M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${2 + (i % 2) * 3} ${8 + i * 2.5} 10`,
-                                              `M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${6 - (i % 2) * 3} ${8 + i * 2.5} 10`,
-                                              `M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${2 + (i % 2) * 3} ${8 + i * 2.5} 10`,
-                                            ]
-                                          }}
-                                          transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 }}
-                                        />
-                                      ))}
-                                    </svg>
-                                  </div>
-
-                                  {/* Chopstick 1 */}
-                                  <motion.div
-                                    animate={{
-                                      rotate: [-15, -35, -15],
-                                      x: [-4, 4, -4],
-                                      y: [0, 4, 0]
-                                    }}
-                                    transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
-                                    className="absolute bottom-3 left-5 h-12 w-0.5 bg-amber-900/30 rounded-full origin-bottom"
-                                    style={{ transform: "rotate(-25deg)" }}
-                                  />
-
-                                  {/* Chopstick 2 */}
-                                  <motion.div
-                                    animate={{
-                                      rotate: [15, 35, 15],
-                                      x: [4, -4, 4],
-                                      y: [0, 4, 0]
-                                    }}
-                                    transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.1 }}
-                                    className="absolute bottom-3 right-5 h-12 w-0.5 bg-amber-900/30 rounded-full origin-bottom"
-                                    style={{ transform: "rotate(25deg)" }}
-                                  />
-                                </div>
-
-                                <div className="flex flex-col items-center gap-2 px-6">
-                                  <span className="text-[12px] font-black uppercase tracking-[0.15em] text-amber-600/80 text-center leading-relaxed">
-                                    Hang tight — your image is cooking 🚀
-                                  </span>
-                                  <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-amber-600/40 text-center">
-                                    (This might take a couple of hours)
-                                  </span>
-                                  <motion.div
-                                    className="flex gap-1 mt-1"
-                                    animate={{ opacity: [0.3, 1, 0.3] }}
-                                    transition={{ duration: 1.5, repeat: Infinity }}
-                                  >
-                                    <div className="h-1 w-1 rounded-full bg-amber-500/30" />
-                                    <div className="h-1 w-1 rounded-full bg-amber-500/30" />
-                                    <div className="h-1 w-1 rounded-full bg-amber-500/30" />
-                                  </motion.div>
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            /* pending / generating — High-Energy Plasma Forge */
-                            <div className="flex h-full w-full items-center justify-center bg-background relative overflow-hidden">
-                              {/* Background Plasma Morph */}
-                              <motion.div
-                                animate={{
-                                  scale: [1, 1.2, 1.1, 1.3, 1],
-                                  opacity: [0.1, 0.2, 0.15, 0.25, 0.1],
-                                  borderRadius: ["30% 70% 70% 30% / 30% 30% 70% 70%", "50% 50% 20% 80% / 25% 80% 20% 75%", "30% 70% 70% 30% / 30% 30% 70% 70%"]
-                                }}
-                                transition={{ duration: 10, repeat: Infinity }}
-                                className="absolute inset-4 bg-primary blur-3xl"
-                              />
-
-                              {/* Energy Scanline */}
-                              <motion.div
-                                animate={{ y: ["-100%", "400%"] }}
-                                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                                className="absolute top-0 left-0 w-full h-[30%] bg-gradient-to-b from-transparent via-primary/20 to-transparent z-10"
-                              />
-
-                              {/* Circular Orbiters */}
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                {[...Array(3)].map((_, i) => (
-                                  <motion.div
-                                    key={i}
-                                    animate={{ rotate: 360 }}
-                                    transition={{ duration: 3 + i, repeat: Infinity, ease: "linear" }}
-                                    className="absolute border border-primary/20 rounded-full"
-                                    style={{
-                                      width: 100 + i * 30,
-                                      height: 100 + i * 30,
-                                      borderStyle: i === 1 ? "dashed" : "solid"
-                                    }}
-                                  />
-                                ))}
-                              </div>
-
-                              <div className="flex flex-col items-center gap-4 relative z-20">
-                                <div className="relative">
-                                  {/* The Core */}
-                                  <motion.div
-                                    animate={{
-                                      scale: [1, 1.2, 1],
-                                      boxShadow: [
-                                        "0 0 20px rgba(var(--color-primary), 0.2)",
-                                        "0 0 40px rgba(var(--color-primary), 0.6)",
-                                        "0 0 20px rgba(var(--color-primary), 0.2)"
-                                      ]
-                                    }}
-                                    transition={{ duration: 1.5, repeat: Infinity }}
-                                    className="h-12 w-12 rounded-full bg-primary flex items-center justify-center relative z-10"
-                                  >
-                                    <svg className="h-6 w-6 text-background animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                    </svg>
-                                  </motion.div>
-
-                                  {/* Spinning Particles */}
-                                  {[...Array(8)].map((_, i) => (
-                                    <motion.div
-                                      key={i}
-                                      animate={{
-                                        rotate: 360,
-                                        scale: [0.8, 1.2, 0.8]
-                                      }}
-                                      transition={{
-                                        rotate: { duration: 2 + i * 0.2, repeat: Infinity, ease: "linear" },
-                                        scale: { duration: 1, repeat: Infinity }
-                                      }}
-                                      className="absolute inset-0"
-                                    >
-                                      <div
-                                        className="h-1.5 w-1.5 rounded-full bg-primary"
-                                        style={{ transform: `translate(${25 + i * 2}px, 0)` }}
-                                      />
-                                    </motion.div>
-                                  ))}
-                                </div>
-
-                                <div className="flex flex-col items-center">
-                                  <motion.span
-                                    animate={{ opacity: [0.5, 1, 0.5] }}
-                                    transition={{ duration: 2, repeat: Infinity }}
-                                    className="text-[11px] font-black uppercase tracking-[0.3em] text-primary"
-                                  >
-                                    {img.status === "generating" ? "Forging" : "Materializing"}
-                                  </motion.span>
-                                  <div className="h-0.5 w-12 bg-surface-elevated mt-1.5 rounded-full overflow-hidden">
-                                    <motion.div
-                                      animate={{ x: ["-100%", "100%"] }}
-                                      transition={{ duration: 1, repeat: Infinity }}
-                                      className="h-full w-full bg-primary"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-2.5">
-                          <p className="truncate text-[11px] text-textSecondary">
-                            {img.prompt}
-                          </p>
-                          <p className="mt-0.5 text-[9px] text-textMuted">
-                            {new Date(img.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        {/* Delete button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(img.id);
-                          }}
-                          className="absolute right-2 top-2 rounded-full bg-background/70 p-1.5 text-textMuted opacity-0 backdrop-blur-sm transition-all group-hover:opacity-100 hover:text-red-400"
-                        >
-                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </div>
-              </div>
-            ) : (
-              /* Empty State */
-              !generating && (
-                <div className="flex flex-1 flex-col items-center justify-center py-20 text-center">
-                  <div className="mb-4 rounded-full bg-surface p-5">
-                    <svg className="h-10 w-10 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <path d="m21 15-5-5L5 21" />
-                    </svg>
-                  </div>
-                  <p className="text-sm text-textMuted">
-                    Your generated images will appear here
-                  </p>
-                  <p className="mt-1 text-xs text-textMuted/50">
-                    Describe something in the prompt below to get started
-                  </p>
-                </div>
-              )
-            )}
-
-            {/* Generating skeleton */}
-            {generating && (
-              <div className="mt-6 flex justify-center">
+            {/* Tab Contents */}
+            <AnimatePresence mode="wait">
+              {activeTab === "generations" ? (
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex items-center gap-3 rounded-card border border-primary/20 bg-primary/5 px-5 py-3"
+                  key="generations-tab"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
                 >
-                  <svg className="h-5 w-5 animate-spin text-primary" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                  </svg>
-                  <span className="text-sm font-medium text-primary">Generating your image…</span>
+                  {/* Generating skeleton */}
+                  {generating && (
+                    <div className="mb-6 flex justify-center">
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex items-center gap-3 rounded-card border border-primary/20 bg-primary/5 px-5 py-3"
+                      >
+                        <svg className="h-5 w-5 animate-spin text-primary" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                        </svg>
+                        <span className="text-sm font-medium text-primary">Generating your image…</span>
+                      </motion.div>
+                    </div>
+                  )}
+
+                  {gallery.length > 0 ? (
+                    <div>
+                      <div className="mb-4 flex items-center justify-between">
+                        <h2
+                          className="text-sm font-bold uppercase tracking-wider text-textSecondary"
+                          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                        >
+                          Recent Generations
+                        </h2>
+                        {hasMore && (
+                          <button
+                            onClick={() => setShowFullGallery(!showFullGallery)}
+                            className="text-xs font-bold uppercase tracking-wider text-primary transition-colors hover:text-primaryHover"
+                          >
+                            {showFullGallery ? "Show Slider" : `View All (${gallery.length})`}
+                          </button>
+                        )}
+                      </div>
+
+                      {showFullGallery ? (
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-4">
+                          <AnimatePresence>
+                            {gallery.map((img) => renderGalleryCard(img, true))}
+                          </AnimatePresence>
+                        </div>
+                      ) : (
+                        <div
+                          onScroll={handleScroll}
+                          className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
+                        >
+                          <AnimatePresence>
+                            {displayedGallery.map((img) => renderGalleryCard(img, false))}
+                          </AnimatePresence>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Empty State */
+                    !generating && (
+                      <div className="flex flex-col items-center justify-center py-20 text-center">
+                        <div className="mb-4 rounded-full bg-surface p-5">
+                          <svg className="h-10 w-10 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <circle cx="8.5" cy="8.5" r="1.5" />
+                            <path d="m21 15-5-5L5 21" />
+                          </svg>
+                        </div>
+                        <p className="text-sm text-textMuted">
+                          Your generated images will appear here
+                        </p>
+                        <p className="mt-1 text-xs text-textMuted/50">
+                          Describe something in the prompt below to get started
+                        </p>
+                      </div>
+                    )
+                  )}
                 </motion.div>
-              </div>
-            )}
+              ) : (
+                <motion.div
+                  key="presets-tab"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="pb-8"
+                >
+                  {/* Preset Libraries */}
+                  <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                    <div>
+                      <h2
+                        className="text-2xl font-black uppercase tracking-tight text-textPrimary"
+                        style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                      >
+                        Preset <span className="text-primary">Libraries</span>
+                      </h2>
+                      <p className="mt-2 text-xs text-textMuted max-w-xl leading-relaxed">
+                        High-fidelity neural weights and prompt matrices ready for recreation. Inject these parameters into your active workspace.
+                      </p>
+                    </div>
+
+                    {/* Search input */}
+                    <div className="relative w-full max-w-xs">
+                      <svg className="absolute left-3 top-2.5 h-4 w-4 text-textMuted" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <circle cx="11" cy="11" r="8" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35" />
+                      </svg>
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search presets..."
+                        className="h-9 w-full rounded-input border border-border/60 bg-surface pl-9 pr-4 text-xs text-textPrimary placeholder-textMuted outline-none focus:border-primary/50 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Filters & Sorting */}
+                  <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex flex-wrap gap-2">
+                      {["All", "Architecture", "Portrait", "Abstract", "Landscape", "UI Components", "Industrial", "Texture"].map((cat) => {
+                        const isActive = selectedCategory === cat;
+                        return (
+                          <button
+                            key={cat}
+                            onClick={() => setSelectedCategory(cat)}
+                            className={`rounded-full px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                              isActive
+                                ? "bg-primary text-background shadow-md shadow-primary/10"
+                                : "bg-surface-elevated border border-border/40 text-textMuted hover:text-textSecondary hover:bg-surface"
+                            }`}
+                          >
+                            {cat}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-textMuted">
+                      <span>Sort:</span>
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="bg-transparent text-textPrimary cursor-pointer outline-none hover:text-primary transition-colors border-none py-1 pl-1 pr-4"
+                      >
+                        <option value="Latest Deployed" className="bg-surface text-textPrimary">Latest Deployed</option>
+                        <option value="A-Z" className="bg-surface text-textPrimary">A-Z</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Grid */}
+                  {sortedPresets.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                      {sortedPresets.map((preset) => (
+                        <div
+                          key={preset.id}
+                          onClick={() => setLightboxImage(preset)}
+                          className="group relative aspect-square cursor-pointer rounded-card border border-border/30 bg-surface overflow-hidden hover:border-primary/20 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.04)] transition-all"
+                        >
+                          <img
+                            src={resolveImagePath(preset.image_url)}
+                            alt={preset.title}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                          <div className="absolute left-3 top-3 rounded bg-background/80 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary border border-primary/20 backdrop-blur-sm z-10">
+                            {preset.category}
+                          </div>
+
+                          {/* Hover Overlay with Recreate option */}
+                          <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-4 px-4">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRecreate(preset);
+                              }}
+                              className="w-full rounded-input bg-primary py-2 text-[10px] font-black uppercase tracking-wider text-background shadow-lg shadow-primary/20 transition-all hover:bg-primaryHover active:scale-[0.98]"
+                            >
+                              Recreate ⚡
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                      <svg className="mb-3 h-8 w-8 text-textMuted" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-xs text-textMuted">No presets found matching your filters.</p>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
-          {/* Bottom Input Bar — pinned */}
-          <div className="shrink-0 border-t border-border/40 bg-sidebar/80 backdrop-blur-xl px-6 py-4">
+          {/* Bottom Input Bar — floating glass window */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] max-w-4xl z-20 rounded-2xl border border-white/10 bg-sidebar/40 backdrop-blur-xl px-6 py-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
             {/* Error */}
             <AnimatePresence>
               {error && (
@@ -633,7 +850,7 @@ export default function ImageStudio() {
               )}
             </AnimatePresence>
 
-            <div className="mx-auto flex w-full max-w-4xl flex-col gap-3">
+            <div className="flex w-full flex-col gap-3">
               {/* Top row: controls */}
               <div className="flex flex-wrap items-end gap-3">
                 {/* Provider & Model */}
@@ -849,6 +1066,7 @@ export default function ImageStudio() {
 
                 <div className="relative flex-1">
                   <textarea
+                    ref={textareaRef}
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     onKeyDown={(e) => {
@@ -860,7 +1078,7 @@ export default function ImageStudio() {
                     placeholder={paymentMode === "free_queue" ? "Describe the image you want to request (fulfilled manually)..." : "Describe the image you want to create..."}
                     rows={1}
                     disabled={generating}
-                    className="block min-h-[46px] w-full resize-none rounded-card border border-border/60 bg-surface px-4 py-[11px] text-sm text-textPrimary placeholder-textMuted outline-none focus:border-primary/50 focus:shadow-[0_0_0_3px_rgba(var(--color-primary),0.08)] transition-all disabled:opacity-50"
+                    className="block min-h-[46px] max-h-[160px] overflow-y-auto w-full resize-none rounded-card border border-border/60 bg-surface px-4 py-[11px] text-sm text-textPrimary placeholder-textMuted outline-none focus:border-primary/50 focus:shadow-[0_0_0_3px_rgba(var(--color-primary),0.08)] transition-all disabled:opacity-50"
                   />
                   {paymentMode === "credits" && !generating && (
                     <motion.div
@@ -943,10 +1161,11 @@ export default function ImageStudio() {
         <ImageLightbox
           image={lightboxImage}
           onClose={() => setLightboxImage(null)}
-          onDelete={lightboxImage?.id.endsWith("-ref") ? undefined : (id) => {
+          onDelete={lightboxImage?.id?.endsWith("-ref") ? undefined : (id) => {
             handleDelete(id);
             setLightboxImage(null);
           }}
+          onRecreate={handleRecreate}
         />
       </div>
     </PageTransition>
