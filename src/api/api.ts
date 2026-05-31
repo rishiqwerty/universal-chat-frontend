@@ -331,7 +331,7 @@ export async function toggleApiKey(id: string): Promise<ApiKey> {
 
 export function resolveImagePath(path: string): string {
   if (!path) return "";
-  if (path.startsWith("http")) return path;
+  if (path.startsWith("http") || path.startsWith("blob:") || path.startsWith("data:")) return path;
   const base = getApiBaseUrl().replace(/\/+$/, "");
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return `${base}${cleanPath}`;
@@ -350,6 +350,7 @@ export type GeneratedImage = {
   id: string;
   prompt: string;
   image_url: string | null;
+  reference_image_url: string | null;
   aspect_ratio: string;
   provider: string;
   model: string;
@@ -365,14 +366,23 @@ export async function generateStudioImage(
   provider: string,
   model: string,
   aspectRatio: string,
-  paymentMode: string
+  paymentMode: string,
+  referenceImage: File | null = null
 ): Promise<GeneratedImage> {
-  const { data } = await client.post("/studio/generate", {
-    prompt,
-    provider,
-    model,
-    aspect_ratio: aspectRatio,
-    payment_mode: paymentMode,
+  const formData = new FormData();
+  formData.append("prompt", prompt);
+  formData.append("provider", provider);
+  formData.append("model", model);
+  formData.append("aspect_ratio", aspectRatio);
+  formData.append("payment_mode", paymentMode);
+  if (referenceImage) {
+    formData.append("reference_image", referenceImage);
+  }
+
+  const { data } = await client.post("/studio/generate", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
   });
   return data;
 }

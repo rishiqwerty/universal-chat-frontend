@@ -33,6 +33,8 @@ export default function ImageStudio() {
   const [showFullGallery, setShowFullGallery] = useState(false);
   const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
   const [visibleCount, setVisibleCount] = useState(5);
+  const [referenceImage, setReferenceImage] = useState<File | null>(null);
+  const [referencePreview, setReferencePreview] = useState<string | null>(null);
 
   const [gallery, setGallery] = useState<GeneratedImage[]>([]);
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
@@ -129,11 +131,14 @@ export default function ImageStudio() {
         paymentMode === "free_queue" ? "local" : selectedProvider,
         paymentMode === "free_queue" ? "system_default" : selectedModel,
         aspectRatio,
-        paymentMode
+        paymentMode,
+        referenceImage
       );
       // Add the pending/queued record to the gallery immediately
       setGallery((prev) => [pendingImage, ...prev]);
       setPrompt("");
+      setReferenceImage(null);
+      setReferencePreview(null);
       setShowCreditSuggestion(false);
       setGenerating(false);
 
@@ -267,6 +272,35 @@ export default function ImageStudio() {
                           }`}
                         onClick={() => img.status === "completed" && setLightboxImage(img)}
                       >
+                        {img.reference_image_url && (
+                          <div
+                            title="View reference image"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLightboxImage({
+                                id: `${img.id}-ref`,
+                                prompt: `[Reference Image] ${img.prompt}`,
+                                image_url: img.reference_image_url,
+                                reference_image_url: null,
+                                aspect_ratio: img.aspect_ratio,
+                                provider: img.provider,
+                                model: img.model,
+                                used_credits: "false",
+                                payment_mode: img.payment_mode,
+                                status: "completed",
+                                error_message: null,
+                                created_at: img.created_at
+                              });
+                            }}
+                            className="absolute left-2 top-2 z-20 h-10 w-10 overflow-hidden rounded border border-border/40 bg-surface shadow-md hover:border-primary transition-all cursor-zoom-in"
+                          >
+                            <img
+                              src={resolveImagePath(img.reference_image_url)}
+                              alt="Reference"
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        )}
                         <div className="aspect-square overflow-hidden">
                           {img.status === "completed" && img.image_url ? (
                             <img
@@ -751,8 +785,68 @@ export default function ImageStudio() {
                 </div>
               </div>
 
+              {/* Reference Image Preview */}
+              {referencePreview && (
+                <div
+                  title="View uploaded image"
+                  onClick={() => {
+                    setLightboxImage({
+                      id: "input-ref",
+                      prompt: "Uploaded Reference Image",
+                      image_url: referencePreview,
+                      reference_image_url: null,
+                      aspect_ratio: aspectRatio,
+                      provider: selectedProvider || "Local",
+                      model: selectedModel || "File",
+                      used_credits: "false",
+                      payment_mode: paymentMode,
+                      status: "completed",
+                      error_message: null,
+                      created_at: new Date().toISOString()
+                    });
+                  }}
+                  className="relative h-16 w-16 cursor-pointer rounded-card border border-border/60 overflow-hidden bg-surface shadow-sm hover:border-primary/50 transition-colors group"
+                >
+                  <img src={referencePreview} alt="Reference Preview" className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setReferenceImage(null);
+                      setReferencePreview(null);
+                    }}
+                    className="absolute right-1 top-1 rounded-full bg-background/80 p-0.5 text-textMuted hover:text-red-500 shadow-md backdrop-blur-sm transition-all"
+                  >
+                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+
               {/* Prompt + Generate */}
               <div className="flex items-end gap-3">
+                <label
+                  title="Upload image"
+                  className="flex h-[46px] w-[46px] shrink-0 cursor-pointer items-center justify-center rounded-card border border-border/60 bg-surface text-textMuted hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50"
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={generating}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setReferenceImage(file);
+                        setReferencePreview(URL.createObjectURL(file));
+                      }
+                    }}
+                  />
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                  </svg>
+                </label>
+
                 <div className="relative flex-1">
                   <textarea
                     value={prompt}
@@ -849,7 +943,7 @@ export default function ImageStudio() {
         <ImageLightbox
           image={lightboxImage}
           onClose={() => setLightboxImage(null)}
-          onDelete={(id) => {
+          onDelete={lightboxImage?.id.endsWith("-ref") ? undefined : (id) => {
             handleDelete(id);
             setLightboxImage(null);
           }}
