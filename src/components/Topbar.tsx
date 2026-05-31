@@ -117,6 +117,26 @@ export default function Topbar({
   const [showFuelTooltip, setShowFuelTooltip] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const [showHamburger, setShowHamburger] = useState(true);
+
+  useEffect(() => {
+    const checkState = () => {
+      const isMobile = window.innerWidth < 768;
+      const isCollapsed = localStorage.getItem("sidebar_collapsed") === "true";
+      setShowHamburger(isMobile || isCollapsed);
+    };
+    checkState();
+    window.addEventListener("sidebar-toggle", checkState);
+    window.addEventListener("sidebar-open", checkState);
+    window.addEventListener("sidebar-close", checkState);
+    window.addEventListener("resize", checkState);
+    return () => {
+      window.removeEventListener("sidebar-toggle", checkState);
+      window.removeEventListener("sidebar-open", checkState);
+      window.removeEventListener("sidebar-close", checkState);
+      window.removeEventListener("resize", checkState);
+    };
+  }, []);
 
   const fetchBalance = useCallback(async () => {
     if (isAuthenticated && !isTempMode) {
@@ -164,8 +184,19 @@ export default function Topbar({
 
   return (
     <header className="flex h-[60px] shrink-0 items-center gap-4 border-b border-border/30 bg-background px-6">
+      {showHamburger && (
+        <button
+          onClick={() => window.dispatchEvent(new Event("sidebar-toggle"))}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-input text-textSecondary hover:bg-surface hover:text-textPrimary transition-colors"
+          title="Open Sidebar"
+        >
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      )}
       {leftContent}
-      <div className="relative min-w-0 flex-1 max-w-2xl">
+      <div className={`relative min-w-0 flex-1 max-w-2xl ${leftContent ? "hidden md:block" : ""}`}>
         {activeChatTitle != null ? (
           <input
             type="text"

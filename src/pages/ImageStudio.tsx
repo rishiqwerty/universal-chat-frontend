@@ -43,6 +43,7 @@ export default function ImageStudio() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [sortBy, setSortBy] = useState("Latest Deployed");
   const [activeTab, setActiveTab] = useState<"generations" | "presets">("generations");
+  const [showOptions, setShowOptions] = useState(false);
 
   const [gallery, setGallery] = useState<GeneratedImage[]>([]);
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | StudioPreset | null>(null);
@@ -569,7 +570,7 @@ export default function ImageStudio() {
                 >
                   Studio
                 </h1>
-                <p className="mt-1.5 text-[11px] text-textMuted leading-none">
+                <p className="hidden sm:block mt-1.5 text-[11px] text-textMuted leading-none">
                   Generate images from text prompts
                 </p>
               </div>
@@ -577,11 +578,11 @@ export default function ImageStudio() {
           />
 
           {/* Scrollable Gallery Area */}
-          <div className="flex-1 overflow-y-auto px-8 pb-48 pt-0">
+          <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-36 md:pb-48 pt-0">
             <div ref={galleryEndRef} />
 
             {/* Tabs Selector */}
-            <div className="sticky top-0 z-30 bg-background pt-6 pb-3 mb-6 flex border-b border-border/20">
+            <div className="sticky top-0 z-30 bg-background pt-6 pb-3 mb-6 flex gap-6 md:gap-8 border-b border-border/20">
               <button
                 onClick={() => setActiveTab("generations")}
                 className={`relative pb-3 text-sm font-bold uppercase tracking-wider transition-colors ${
@@ -600,7 +601,7 @@ export default function ImageStudio() {
               </button>
               <button
                 onClick={() => setActiveTab("presets")}
-                className={`relative ml-8 pb-3 text-sm font-bold uppercase tracking-wider transition-colors ${
+                className={`relative pb-3 text-sm font-bold uppercase tracking-wider transition-colors ${
                   activeTab === "presets" ? "text-primary" : "text-textMuted hover:text-textSecondary"
                 }`}
                 style={{ fontFamily: "'Space Grotesk', sans-serif" }}
@@ -852,12 +853,12 @@ export default function ImageStudio() {
 
             <div className="flex w-full flex-col gap-3">
               {/* Top row: controls */}
-              <div className="flex flex-wrap items-end gap-3">
+              <div className={`flex-wrap items-end gap-3 ${showOptions ? "flex" : "hidden md:flex"}`}>
                 {/* Provider & Model */}
                 {paymentMode !== "free_queue" && (
                   hasModels ? (
                     <>
-                      <div className="min-w-[120px]">
+                      <div className="w-full sm:w-auto min-w-[120px] flex-1 sm:flex-initial">
                         <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Provider</label>
                         <select
                           value={selectedProvider}
@@ -871,7 +872,7 @@ export default function ImageStudio() {
                           ))}
                         </select>
                       </div>
-                      <div className="min-w-[160px]">
+                      <div className="w-full sm:w-auto min-w-[160px] flex-1 sm:flex-initial">
                         <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Model</label>
                         <select
                           value={selectedModel}
@@ -885,14 +886,14 @@ export default function ImageStudio() {
                       </div>
                     </>
                   ) : (
-                    <div className="h-9 flex items-center rounded-input border border-border/40 bg-surface/50 px-3 text-xs text-textMuted">
+                    <div className="h-9 flex items-center rounded-input border border-border/40 bg-surface/50 px-3 text-xs text-textMuted w-full sm:w-auto">
                       No image models found.{" "}
                       <a href="/settings" className="ml-1 text-primary underline">Add a key</a>.
                     </div>
                   )
                 )}
 
-                <div className="min-w-[110px]">
+                <div className="w-full sm:w-auto min-w-[110px] flex-1 sm:flex-initial">
                   <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Aspect Ratio</label>
                   <select
                     value={aspectRatio}
@@ -906,12 +907,12 @@ export default function ImageStudio() {
                 </div>
 
                 {/* Pill Shaped Switcher */}
-                <div>
+                <div className="w-full sm:w-auto flex-1 sm:flex-initial">
                   <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Payment</label>
-                  <div className="flex h-9 items-center rounded-full border border-border/40 bg-surface/40 p-1">
+                  <div className="flex h-9 w-full sm:w-auto items-center rounded-full border border-border/40 bg-surface/40 p-1">
                     <button
                       onClick={() => setPaymentMode("own_key")}
-                      className={`relative flex h-full items-center gap-2 rounded-full px-4 transition-all ${paymentMode === "own_key"
+                      className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-2 rounded-full px-4 transition-all ${paymentMode === "own_key"
                         ? "text-textPrimary"
                         : "text-textMuted hover:text-textSecondary"
                         }`}
@@ -934,7 +935,7 @@ export default function ImageStudio() {
 
                     <button
                       onClick={() => setPaymentMode("credits")}
-                      className={`relative flex h-full items-center gap-2 rounded-full px-4 transition-all ${paymentMode === "credits"
+                      className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-2 rounded-full px-4 transition-all ${paymentMode === "credits"
                         ? "bg-primary text-background shadow-[0_0_15px_rgba(var(--color-primary),0.4)]"
                         : "text-textMuted hover:text-textSecondary"
                         }`}
@@ -976,7 +977,7 @@ export default function ImageStudio() {
 
                     <button
                       onClick={() => setPaymentMode("free_queue")}
-                      className={`relative flex h-full items-center gap-2 rounded-full px-4 transition-all ${paymentMode === "free_queue"
+                      className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-2 rounded-full px-4 transition-all ${paymentMode === "free_queue"
                         ? "text-textPrimary"
                         : "text-textMuted hover:text-textSecondary"
                         }`}
@@ -1002,69 +1003,50 @@ export default function ImageStudio() {
                 </div>
               </div>
 
-              {/* Reference Image Preview */}
-              {referencePreview && (
-                <div
-                  title="View uploaded image"
-                  onClick={() => {
-                    setLightboxImage({
-                      id: "input-ref",
-                      prompt: "Uploaded Reference Image",
-                      image_url: referencePreview,
-                      reference_image_url: null,
-                      aspect_ratio: aspectRatio,
-                      provider: selectedProvider || "Local",
-                      model: selectedModel || "File",
-                      used_credits: "false",
-                      payment_mode: paymentMode,
-                      status: "completed",
-                      error_message: null,
-                      created_at: new Date().toISOString()
-                    });
-                  }}
-                  className="relative h-16 w-16 cursor-pointer rounded-card border border-border/60 overflow-hidden bg-surface shadow-sm hover:border-primary/50 transition-colors group"
-                >
-                  <img src={referencePreview} alt="Reference Preview" className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setReferenceImage(null);
-                      setReferencePreview(null);
-                    }}
-                    className="absolute right-1 top-1 rounded-full bg-background/80 p-0.5 text-textMuted hover:text-red-500 shadow-md backdrop-blur-sm transition-all"
-                  >
-                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              )}
+              {/* Prompt Input Card Container (Mobile Friendly) */}
+              <div className="flex w-full flex-col rounded-xl border border-border/60 bg-surface focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_rgba(var(--color-primary),0.08)] transition-all overflow-hidden p-2">
+                {/* Reference Image Preview inside the box */}
+                {referencePreview && (
+                  <div className="px-3 pt-2">
+                    <div
+                      title="View uploaded image"
+                      onClick={() => {
+                        setLightboxImage({
+                          id: "input-ref",
+                          prompt: "Uploaded Reference Image",
+                          image_url: referencePreview,
+                          reference_image_url: null,
+                          aspect_ratio: aspectRatio,
+                          provider: selectedProvider || "Local",
+                          model: selectedModel || "File",
+                          used_credits: "false",
+                          payment_mode: paymentMode,
+                          status: "completed",
+                          error_message: null,
+                          created_at: new Date().toISOString()
+                        });
+                      }}
+                      className="relative h-14 w-14 cursor-pointer rounded-lg border border-border/40 overflow-hidden bg-surface hover:border-primary/50 transition-colors group"
+                    >
+                      <img src={referencePreview} alt="Reference Preview" className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReferenceImage(null);
+                          setReferencePreview(null);
+                        }}
+                        className="absolute right-1 top-1 rounded-full bg-background/80 p-0.5 text-textMuted hover:text-red-500 shadow-md backdrop-blur-sm transition-all"
+                      >
+                        <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-              {/* Prompt + Generate */}
-              <div className="flex items-end gap-3">
-                <label
-                  title="Upload image"
-                  className="flex h-[46px] w-[46px] shrink-0 cursor-pointer items-center justify-center rounded-card border border-border/60 bg-surface text-textMuted hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50"
-                >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={generating}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        setReferenceImage(file);
-                        setReferencePreview(URL.createObjectURL(file));
-                      }
-                    }}
-                  />
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-                  </svg>
-                </label>
-
-                <div className="relative flex-1">
+                {/* Textarea Row */}
+                <div className="relative w-full">
                   <textarea
                     ref={textareaRef}
                     value={prompt}
@@ -1075,83 +1057,97 @@ export default function ImageStudio() {
                         handleGenerate();
                       }
                     }}
-                    placeholder={paymentMode === "free_queue" ? "Describe the image you want to request (fulfilled manually)..." : "Describe the image you want to create..."}
+                    placeholder={paymentMode === "free_queue" ? "Describe the image you want to request..." : "Describe the image you want to create..."}
                     rows={1}
                     disabled={generating}
-                    className="block min-h-[46px] max-h-[160px] overflow-y-auto w-full resize-none rounded-card border border-border/60 bg-surface px-4 py-[11px] text-sm text-textPrimary placeholder-textMuted outline-none focus:border-primary/50 focus:shadow-[0_0_0_3px_rgba(var(--color-primary),0.08)] transition-all disabled:opacity-50"
+                    className="block min-h-[46px] max-h-[160px] overflow-y-auto w-full resize-none bg-transparent px-3 py-2.5 text-sm text-textPrimary placeholder-textMuted outline-none disabled:opacity-50"
                   />
-                  {paymentMode === "credits" && !generating && (
-                    <motion.div
-                      animate={{ opacity: [0.3, 0.6, 0.3] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                      className="absolute bottom-0 left-0 h-[2px] bg-primary/30 w-full rounded-full"
-                    />
-                  )}
                 </div>
 
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleGenerate}
-                  disabled={generating || !prompt.trim() || (paymentMode !== "free_queue" && !hasModels)}
-                  className={`relative h-[46px] shrink-0 overflow-hidden rounded-card px-8 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${paymentMode === "credits"
-                    ? "bg-primary text-background shadow-[0_0_20px_rgba(var(--color-primary),0.25)]"
-                    : "bg-surface border border-border text-textPrimary hover:border-primary/50"
-                    }`}
-                >
-                  <div className="relative z-10 flex items-center gap-2">
-                    {generating ? (
-                      <>
-                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                        </svg>
-                        <span>Architecting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>{paymentMode === "free_queue" ? "Request Image" : "Generate"}</span>
-                        {paymentMode === "credits" && (
-                          <div className="flex items-center gap-1 border-l border-background/20 pl-2">
-                            <motion.svg
-                              animate={{
-                                opacity: [1, 0.4, 1, 0.2, 1],
-                                filter: [
-                                  "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 2px rgba(255, 0, 255, 0))",
-                                  "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 10px rgba(255, 0, 255, 1))",
-                                  "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 4px rgba(255, 0, 255, 0.5))",
-                                  "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 12px rgba(255, 0, 255, 1))",
-                                  "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 2px rgba(255, 0, 255, 0))"
-                                ],
-                                scale: [1, 1.2, 0.8, 1.4, 1],
-                              }}
-                              transition={{
-                                duration: 0.3,
-                                repeat: Infinity,
-                                repeatDelay: Math.random() * 3 + 0.5,
-                                times: [0, 0.1, 0.15, 0.25, 1]
-                              }}
-                              className="h-2.5 w-2.5 text-[#FF00FF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </motion.svg>
-                            <span className="text-[10px] font-black uppercase tracking-tighter">5 Credits</span>
-                          </div>
-                        )}
-                      </>
+                {/* Toolbar Row */}
+                <div className="flex items-center justify-between border-t border-border/20 pt-2 px-1">
+                  <div className="flex items-center gap-1.5">
+                    {/* Mobile settings toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setShowOptions(!showOptions)}
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors md:hidden ${
+                        showOptions
+                          ? "border-primary/50 text-primary bg-primary/10"
+                          : "border-border/30 bg-surface-elevated text-textMuted hover:text-primary hover:border-primary/50"
+                      }`}
+                      title="Toggle Options"
+                    >
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </button>
+
+                    {/* Upload Image Label */}
+                    <label
+                      title="Upload image"
+                      className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border/30 bg-surface-elevated text-textMuted hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50"
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={generating}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setReferenceImage(file);
+                            setReferencePreview(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                      </svg>
+                    </label>
+
+                    {/* Credits Counter or Details in toolbar */}
+                    {paymentMode === "credits" && !generating && (
+                      <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-black uppercase text-primary/80 bg-primary/5 px-2 py-0.5 rounded border border-primary/10">
+                        ⚡ 5 Credits
+                      </span>
                     )}
                   </div>
 
-                  {/* Shine effect */}
-                  {!generating && (
-                    <motion.div
-                      className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                      initial={{ x: "-100%" }}
-                      whileHover={{ x: "100%" }}
-                      transition={{ duration: 0.6 }}
-                    />
-                  )}
-                </motion.button>
+                  {/* Generate Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleGenerate}
+                    disabled={generating || !prompt.trim() || (paymentMode !== "free_queue" && !hasModels)}
+                    className={`relative h-8 overflow-hidden rounded-lg px-4 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${paymentMode === "credits"
+                      ? "bg-primary text-background shadow-[0_0_12px_rgba(var(--color-primary),0.2)]"
+                      : "bg-surface-elevated border border-border/40 text-textPrimary hover:border-primary/50"
+                      }`}
+                  >
+                    <div className="relative z-10 flex items-center gap-1.5">
+                      {generating ? (
+                        <>
+                          <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                          </svg>
+                          <span>Architecting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{paymentMode === "free_queue" ? "Request" : "Generate"}</span>
+                          {paymentMode === "credits" && (
+                            <span className="flex items-center gap-0.5 pl-1 ml-1 border-l border-background/20 sm:hidden">
+                              <span className="text-[9px] font-black">5</span>
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </motion.button>
+                </div>
               </div>
             </div>
           </div>
