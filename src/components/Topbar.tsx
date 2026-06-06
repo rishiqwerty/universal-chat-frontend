@@ -5,6 +5,7 @@ import ConfirmModal from "./ConfirmModal";
 import SignupModal from "./SignupModal";
 import TopupModal from "./TopupModal";
 import { getCreditBalance } from "../api/api";
+import { getBalanceCheckInterval } from "../config";
 
 function FuelGauge({ credits }: { credits: number | null }) {
   const percentage = credits !== null ? Math.min(Math.max(credits, 0), 100) : 0;
@@ -151,8 +152,8 @@ export default function Topbar({
 
   useEffect(() => {
     fetchBalance();
-    // Poll every 30 seconds for balance updates (e.g. from chat deductions)
-    const interval = setInterval(fetchBalance, 30000);
+    // Poll for balance updates (e.g. from chat deductions)
+    const interval = setInterval(fetchBalance, getBalanceCheckInterval() * 1000);
     return () => clearInterval(interval);
   }, [fetchBalance]);
 
