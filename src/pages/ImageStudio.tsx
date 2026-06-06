@@ -4,6 +4,7 @@ import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import ImageLightbox from "../components/ImageLightbox";
 import PageTransition from "../components/PageTransition";
+import { getStudioPollingInterval } from "../config";
 import {
   getStudioModels,
   generateStudioImage,
@@ -100,7 +101,7 @@ export default function ImageStudio() {
         clearInterval(interval);
         pollingRef.current.delete(imageId);
       }
-    }, 3000);
+    }, getStudioPollingInterval() * 1000);
 
     // Store interval globally to clear on unmount
     (window as any)[`poll_${imageId}`] = interval;
