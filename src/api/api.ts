@@ -279,6 +279,20 @@ export type CheckoutResponse = {
   checkout_url: string;
 };
 
+export type CreditPlan = {
+  id: string;
+  amount: number;
+  price: number;
+  currency: string;
+  label: string;
+  description: string;
+};
+
+export async function fetchCreditPlans(): Promise<CreditPlan[]> {
+  const { data } = await client.get("/credits/plans");
+  return data;
+}
+
 export async function topupCredits(amount: number, redirectUrl?: string): Promise<CheckoutResponse> {
   const { data } = await client.post("/credits/topup", { amount, redirect_url: redirectUrl });
   return data;
