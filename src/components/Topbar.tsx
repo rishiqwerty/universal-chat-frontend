@@ -525,7 +525,6 @@ export default function Topbar({
       <TopupModal
         isOpen={showTopupModal}
         onClose={() => setShowTopupModal(false)}
-        onSuccess={(newBalance) => setCredits(newBalance)}
       />
     </header>
   );

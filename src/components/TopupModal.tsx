@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { topupCredits } from "../api/api";
+import { getApiBaseUrl } from "../config";
 
 type TopupModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (newBalance: number) => void;
 };
 
 const OPTIONS = [
@@ -14,15 +14,18 @@ const OPTIONS = [
   { amount: 100, price: "$0.00", label: "Elite Core", description: "Maximum fuel for massive image generation projects." },
 ];
 
-export default function TopupModal({ isOpen, onClose, onSuccess }: TopupModalProps) {
+export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
   const [loading, setLoading] = useState<number | null>(null);
 
   async function handleTopup(amount: number) {
     setLoading(amount);
     try {
-      const data = await topupCredits(amount);
-      onSuccess(data.balance);
-      onClose();
+      const data = await topupCredits(amount, window.location.origin);
+      if (data.checkout_url) {
+        const baseUrl = getApiBaseUrl().replace(/\/+$/, "");
+        const relativeUrl = data.checkout_url.startsWith("/") ? data.checkout_url : `/${data.checkout_url}`;
+        window.location.href = `${baseUrl}${relativeUrl}`;
+      }
     } catch (error) {
       console.error("Topup failed", error);
     } finally {

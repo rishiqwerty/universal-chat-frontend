@@ -275,8 +275,12 @@ export async function getCreditBalance(): Promise<CreditBalance> {
   return data;
 }
 
-export async function topupCredits(amount: number): Promise<CreditBalance> {
-  const { data } = await client.post("/credits/topup", { amount });
+export type CheckoutResponse = {
+  checkout_url: string;
+};
+
+export async function topupCredits(amount: number, redirectUrl?: string): Promise<CheckoutResponse> {
+  const { data } = await client.post("/credits/topup", { amount, redirect_url: redirectUrl });
   return data;
 }
 
