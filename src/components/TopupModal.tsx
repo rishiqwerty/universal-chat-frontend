@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { topupCredits } from "../api/api";
+import { topupCredits, fetchCreditPlans, CreditPlan } from "../api/api";
 import { getApiBaseUrl } from "../config";
 
 type TopupModalProps = {
@@ -8,23 +8,30 @@ type TopupModalProps = {
   onClose: () => void;
 };
 
-const OPTIONS = [
-  { amount: 5, price: "FREE", label: "Trial Refill", description: "Get 5 credits to continue your creative journey." },
-  { amount: 20, price: "$0.00", label: "Pro Pack", description: "Standard bundle for power users." },
-  { amount: 100, price: "$0.00", label: "Elite Core", description: "Maximum fuel for massive image generation projects." },
-];
-
 export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
+  const [plans, setPlans] = useState<CreditPlan[]>([]);
   const [loading, setLoading] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchCreditPlans()
+        .then((data) => setPlans(data))
+        .catch((err) => console.error("Failed to load plans", err));
+    }
+  }, [isOpen]);
 
   async function handleTopup(amount: number) {
     setLoading(amount);
     try {
       const data = await topupCredits(amount, window.location.origin);
       if (data.checkout_url) {
-        const baseUrl = getApiBaseUrl().replace(/\/+$/, "");
-        const relativeUrl = data.checkout_url.startsWith("/") ? data.checkout_url : `/${data.checkout_url}`;
-        window.location.href = `${baseUrl}${relativeUrl}`;
+        if (/^https?:\/\//i.test(data.checkout_url)) {
+          window.location.href = data.checkout_url;
+        } else {
+          const baseUrl = getApiBaseUrl().replace(/\/+$/, "");
+          const relativeUrl = data.checkout_url.startsWith("/") ? data.checkout_url : `/${data.checkout_url}`;
+          window.location.href = `${baseUrl}${relativeUrl}`;
+        }
       }
     } catch (error) {
       console.error("Topup failed", error);
@@ -63,28 +70,44 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
             </div>
 
             <div className="space-y-3">
-              {OPTIONS.map((opt) => (
-                <button
-                  key={opt.amount}
-                  disabled={loading !== null}
-                  onClick={() => handleTopup(opt.amount)}
-                  className="group relative flex w-full items-center gap-4 rounded-2xl border border-border/40 bg-surface/50 p-4 transition-all hover:border-primary/50 hover:bg-surface disabled:opacity-50"
-                >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-elevated font-headline text-lg font-bold text-primary group-hover:scale-110 transition-transform">
-                    {opt.amount}
-                  </div>
-                  <div className="flex-1 text-left">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-textPrimary">{opt.label}</span>
-                      <span className="text-xs font-bold text-primary uppercase tracking-widest">{opt.price}</span>
-                    </div>
-                    <p className="text-xs text-textMuted">{opt.description}</p>
-                  </div>
-                  {loading === opt.amount && (
-                    <div className="ml-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                  )}
-                </button>
-              ))}
+              {plans.length === 0 ? (
+                <div className="py-8 text-center text-sm text-textMuted">
+                  Loading credit plans...
+                </div>
+              ) : (
+                plans.map((opt) => {
+                  let priceLabel = "";
+                  if (Number(opt.price) === 0) {
+                    priceLabel = "FREE";
+                  } else {
+                    const symbol = opt.currency === "USD" ? "$" : opt.currency === "INR" ? "₹" : `${opt.currency} `;
+                    priceLabel = `${symbol}${Number(opt.price).toFixed(2)}`;
+                  }
+
+                  return (
+                    <button
+                      key={opt.id}
+                      disabled={loading !== null}
+                      onClick={() => handleTopup(opt.amount)}
+                      className="group relative flex w-full items-center gap-4 rounded-2xl border border-border/40 bg-surface/50 p-4 transition-all hover:border-primary/50 hover:bg-surface disabled:opacity-50"
+                    >
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-elevated font-headline text-lg font-bold text-primary group-hover:scale-110 transition-transform">
+                        {opt.amount}
+                      </div>
+                      <div className="flex-1 text-left">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-textPrimary">{opt.label}</span>
+                          <span className="text-xs font-bold text-primary uppercase tracking-widest">{priceLabel}</span>
+                        </div>
+                        <p className="text-xs text-textMuted">{opt.description}</p>
+                      </div>
+                      {loading === opt.amount && (
+                        <div className="ml-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      )}
+                    </button>
+                  );
+                })
+              )}
             </div>
 
             <button
