@@ -32,29 +32,29 @@ function FuelGauge({ credits }: { credits: number | null }) {
           animate={{ height: `${percentage}%` }}
           transition={{ type: "spring", stiffness: 40, damping: 12, mass: 1 }}
           className="w-full relative"
-          style={{ 
+          style={{
             backgroundColor: color,
           }}
         >
           {/* Internal Glowing Pulse */}
           <motion.div
             className="absolute inset-0 z-0"
-            animate={{ 
+            animate={{
               boxShadow: [
                 `0 0 4px ${color}aa`,
                 `0 0 12px ${color}ff`,
                 `0 0 4px ${color}aa`
               ]
             }}
-            transition={{ 
-              duration: 2, 
-              repeat: Infinity, 
-              ease: "easeInOut" 
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
             }}
           />
 
           {/* Animated Liquid Wave/Surface */}
-          <motion.div 
+          <motion.div
             className="absolute -top-1 left-[-150%] w-[400%] h-1.5 opacity-40 mix-blend-screen"
             style={{
               background: `radial-gradient(circle at center, white 0%, transparent 70%)`,
@@ -117,6 +117,19 @@ export default function Topbar({
   const [showTopupModal, setShowTopupModal] = useState(false);
   const [showFuelTooltip, setShowFuelTooltip] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
+  const [animateTrigger, setAnimateTrigger] = useState(false);
+  const prevCreditsRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (credits !== null && credits !== prevCreditsRef.current) {
+      setAnimateTrigger(true);
+      const timer = setTimeout(() => setAnimateTrigger(false), 1000);
+      prevCreditsRef.current = credits;
+      return () => clearTimeout(timer);
+    }
+    prevCreditsRef.current = credits;
+  }, [credits]);
+
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [showHamburger, setShowHamburger] = useState(true);
 
@@ -183,6 +196,12 @@ export default function Topbar({
     }
   }
 
+  const neonColor = credits !== null && credits < 10 
+    ? "#ef4444" 
+    : credits !== null && credits < 30 
+      ? "#fbbf24" 
+      : "#D9FF00";
+
   return (
     <header className="flex h-[60px] shrink-0 items-center gap-4 border-b border-border/30 bg-background px-6">
       {showHamburger && (
@@ -241,39 +260,96 @@ export default function Topbar({
         )}
         {isAuthenticated && !isTempMode && (
           <div className="flex items-center gap-1.5 px-2 relative group">
-            <button
+            <motion.button
               onClick={() => setShowTopupModal(true)}
               onMouseEnter={() => setShowFuelTooltip(true)}
               onMouseLeave={() => setShowFuelTooltip(false)}
-              className={`group flex h-9 items-center gap-2 rounded-input bg-elevated/50 pl-2.5 pr-3.5 border transition-all hover:bg-elevated hover:scale-[1.02] active:scale-[0.98] ${credits !== null && credits < 10
-                ? "border-red-500/50 hover:border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
-                : credits !== null && credits < 30
-                  ? "border-amber-500/50 hover:border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.1)]"
-                  : "border-border/30 hover:border-primary/30"
-                }`}
+              animate={animateTrigger ? {
+                scale: [1, 1.08, 1],
+                borderColor: [
+                  credits !== null && credits < 10 ? "#ef4444" : credits !== null && credits < 30 ? "#fbbf24" : "#D9FF00",
+                  credits !== null && credits < 10 ? "#ef4444" : credits !== null && credits < 30 ? "#fbbf24" : "#D9FF00"
+                ],
+                boxShadow: [
+                  "0 0 0px rgba(0,0,0,0)",
+                  credits !== null && credits < 10 
+                    ? "0 0 25px rgba(239, 68, 68, 0.8)" 
+                    : credits !== null && credits < 30 
+                      ? "0 0 25px rgba(251, 191, 36, 0.8)" 
+                      : "0 0 25px rgba(217, 255, 0, 0.8)",
+                  "0 0 0px rgba(0,0,0,0)"
+                ],
+                transition: { duration: 0.8, ease: "easeInOut" }
+              } : {
+                scale: 1,
+                borderColor: "rgba(42, 42, 45, 0.3)",
+                boxShadow: "0 0 0px rgba(0,0,0,0)"
+              }}
+              whileHover={{
+                scale: 1.02,
+                borderColor: 
+                  credits !== null && credits < 10 
+                    ? "rgba(239, 68, 68, 0.3)" 
+                    : credits !== null && credits < 30 
+                      ? "rgba(251, 191, 36, 0.3)" 
+                      : "rgba(217, 255, 0, 0.2)",
+                boxShadow: 
+                  credits !== null && credits < 10 
+                    ? "0 0 12px rgba(239, 68, 68, 0.05)" 
+                    : credits !== null && credits < 30 
+                      ? "0 0 12px rgba(251, 191, 36, 0.05)" 
+                      : "0 0 12px rgba(217, 255, 0, 0.04)"
+              }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 400, damping: 15 }}
+              className="group framer-btn flex h-9 items-center gap-2 rounded-input bg-elevated/50 pl-2.5 pr-3.5 border border-border/30 hover:bg-elevated"
             >
               <div className="flex h-6 w-5 items-center justify-center">
                 <FuelGauge credits={credits} />
               </div>
               <div className="flex flex-col items-start -space-y-0.5">
-                <span className={`text-[10px] font-bold uppercase tracking-tight transition-colors ${credits !== null && credits < 10
-                  ? "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+                <span className={`text-[10px] font-bold uppercase tracking-tight transition-colors text-textPrimary ${credits !== null && credits < 10
+                  ? "group-hover:text-red-500 group-hover:drop-shadow-[0_0_8px_rgba(239,68,68,0.4)]"
                   : credits !== null && credits < 30
-                    ? "text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.4)]"
-                    : "text-textPrimary"
+                    ? "group-hover:text-amber-400 group-hover:drop-shadow-[0_0_8px_rgba(245,158,11,0.4)]"
+                    : ""
                   }`}>
                   {credits !== null ? credits : "--"} CREDITS
                 </span>
-                <span className={`text-[8px] font-bold uppercase tracking-widest opacity-80 group-hover:opacity-100 italic transition-colors ${credits !== null && credits < 10
-                  ? "text-red-400"
-                  : credits !== null && credits < 30
-                    ? "text-amber-400"
-                    : "text-primary"
-                  }`}>
+                <motion.span
+                  animate={{
+                    opacity: [0.75, 0.4, 0.85, 0.3, 0.85, 0.5, 0.85],
+                    textShadow: [
+                      `0 0 2px ${neonColor}33`,
+                      `0 0 1px ${neonColor}11`,
+                      `0 0 5px ${neonColor}99`,
+                      `0 0 2px ${neonColor}33`,
+                      `0 0 8px ${neonColor}cc`,
+                      `0 0 3px ${neonColor}66`,
+                      `0 0 8px ${neonColor}cc`
+                    ]
+                  }}
+                  whileHover={{
+                    opacity: 1,
+                    textShadow: `0 0 10px ${neonColor}`
+                  }}
+                  transition={{
+                    duration: 3.5,
+                    repeat: Infinity,
+                    ease: "linear",
+                    times: [0, 0.04, 0.06, 0.08, 0.1, 0.13, 1]
+                  }}
+                  className={`text-[8px] font-bold uppercase tracking-widest italic transition-colors text-primary ${credits !== null && credits < 10
+                    ? "group-hover:text-red-400"
+                    : credits !== null && credits < 30
+                      ? "group-hover:text-amber-400"
+                      : ""
+                    }`}
+                >
                   Refuel
-                </span>
+                </motion.span>
               </div>
-            </button>
+            </motion.button>
 
             {/* Custom Tooltip */}
             <AnimatePresence>
@@ -356,12 +432,13 @@ export default function Topbar({
               ],
               scale: [1, 1.02, 1]
             }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
             transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: "easeInOut"
+              scale: { type: "spring", stiffness: 400, damping: 15 },
+              default: { duration: 2, repeat: Infinity, ease: "easeInOut" }
             }}
-            className="flex h-9 items-center gap-2 rounded-input bg-primary px-4 text-xs font-bold uppercase tracking-wider text-background transition-all hover:bg-primaryHover active:scale-[0.98]"
+            className="framer-btn flex h-9 items-center gap-2 rounded-input bg-primary px-4 text-xs font-bold uppercase tracking-wider text-background hover:bg-primaryHover"
           >
             Join / Sign In
           </motion.button>

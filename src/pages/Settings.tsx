@@ -173,7 +173,7 @@ export default function Settings() {
               <button
                 type="submit"
                 disabled={loading || !apiKeyParam.trim() || !label.trim()}
-                className="mt-6 w-full rounded-input bg-primary py-2.5 text-sm font-bold text-background shadow-[0_0_16px_rgba(217,255,0,0.2)] transition-colors hover:bg-primaryHover disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:px-8"
+                className="mt-6 w-full rounded-input bg-primary py-2.5 text-sm font-bold text-background shadow-[0_0_16px_rgba(217,255,0,0.2)] transition-all hover:scale-[1.02] hover:bg-primaryHover disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:px-8"
               >
                 {loading ? "Adding..." : "Securely Add Key"}
               </button>
@@ -250,7 +250,7 @@ export default function Settings() {
                           <button
                             type="button"
                             onClick={() => handleActivate(k.id)}
-                            className="rounded-input bg-elevated px-3 py-1.5 text-xs font-bold text-primary transition-all hover:bg-primary/20 hover:text-primary ring-1 ring-primary/20"
+                            className="rounded-input bg-elevated px-3 py-1.5 text-xs font-bold text-primary transition-all hover:scale-[1.05] hover:bg-primary/20 hover:text-primary ring-1 ring-primary/20"
                           >
                             Activate
                           </button>
@@ -258,7 +258,7 @@ export default function Settings() {
                           <button
                             type="button"
                             onClick={() => handleToggle(k.id)}
-                            className="rounded-input bg-background/50 px-3 py-1.5 text-xs font-bold text-textSecondary transition-all hover:bg-elevated hover:text-textPrimary border border-border/50"
+                            className="rounded-input bg-background/50 px-3 py-1.5 text-xs font-bold text-textSecondary transition-all hover:scale-[1.05] hover:bg-elevated hover:text-textPrimary border border-border/50"
                           >
                             Disable
                           </button>
@@ -267,7 +267,7 @@ export default function Settings() {
                         <button
                           type="button"
                           onClick={() => handleRemove(k.id)}
-                          className="flex h-8 w-8 items-center justify-center rounded-input text-textMuted transition-all hover:bg-elevated hover:text-error"
+                          className="flex h-8 w-8 items-center justify-center rounded-input text-textMuted transition-all hover:scale-[1.1] hover:bg-elevated hover:text-error"
                           title="Delete Key"
                         >
                           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

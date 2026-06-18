@@ -61,7 +61,7 @@ export default function ConfirmModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-input px-4 py-2 text-sm font-semibold text-textMuted transition-colors hover:text-textPrimary"
+                  className="rounded-input px-4 py-2 text-sm font-semibold text-textMuted transition-all hover:scale-[1.02] hover:text-textPrimary"
                 >
                   Cancel
                 </button>
@@ -71,7 +71,7 @@ export default function ConfirmModal({
                     onConfirm();
                     onClose();
                   }}
-                  className={`rounded-input px-6 py-2 text-sm font-bold text-background shadow-[0_0_12px_rgba(217,255,0,0.2)] transition-colors ${
+                  className={`rounded-input px-6 py-2 text-sm font-bold text-background shadow-[0_0_12px_rgba(217,255,0,0.2)] transition-all hover:scale-[1.02] ${
                     confirmVariant === "danger" 
                       ? "bg-red-500 hover:bg-red-600 shadow-red-500/20" 
                       : "bg-primary hover:bg-primaryHover shadow-primary/20"

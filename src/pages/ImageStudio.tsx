@@ -1119,10 +1119,11 @@ export default function ImageStudio() {
                   {/* Generate Button */}
                   <motion.button
                     whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 15 }}
                     onClick={handleGenerate}
                     disabled={generating || !prompt.trim() || (paymentMode !== "free_queue" && !hasModels)}
-                    className={`relative h-8 overflow-hidden rounded-lg px-4 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${paymentMode === "credits"
+                    className={`relative h-8 overflow-hidden rounded-lg px-4 text-xs font-bold framer-btn disabled:opacity-40 disabled:cursor-not-allowed ${paymentMode === "credits"
                       ? "bg-primary text-background shadow-[0_0_12px_rgba(var(--color-primary),0.2)]"
                       : "bg-surface-elevated border border-border/40 text-textPrimary hover:border-primary/50"
                       }`}
