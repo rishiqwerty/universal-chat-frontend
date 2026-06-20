@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { resolveImagePath, type GeneratedImage, type StudioPreset } from "../api/api";
+import { resolveImagePath, getProxyDownloadUrl, type GeneratedImage, type StudioPreset } from "../api/api";
 
 type Props = {
   image: GeneratedImage | StudioPreset | null;
@@ -17,8 +17,13 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
 
   const handleDownload = async () => {
     try {
-      const url = resolveImagePath(image.image_url || "");
-      const response = await fetch(url);
+      const url = getProxyDownloadUrl(image.image_url || "");
+      const token = localStorage.getItem("access_token");
+      const response = await fetch(url, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -32,8 +37,8 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch {
-      // fallback
-      window.open(resolveImagePath(image.image_url || ""), "_blank");
+      // fallback to proxy download to force attachment download
+      window.open(getProxyDownloadUrl(image.image_url || ""), "_blank");
     }
   };
 

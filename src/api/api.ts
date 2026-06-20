@@ -355,6 +355,12 @@ export function resolveImagePath(path: string): string {
   return `${base}${cleanPath}`;
 }
 
+export function getProxyDownloadUrl(path: string): string {
+  if (!path) return "";
+  const base = getApiBaseUrl().replace(/\/+$/, "");
+  return `${base}/api/v1/studio/download?path=${encodeURIComponent(path)}`;
+}
+
 // --- Image Studio ---
 
 export type StudioModels = Record<string, string[]>;
