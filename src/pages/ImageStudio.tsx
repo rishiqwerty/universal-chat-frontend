@@ -254,7 +254,9 @@ export default function ImageStudio() {
                 id: `${img.id}-ref`,
                 prompt: `[Reference Image] ${img.prompt}`,
                 image_url: img.reference_image_url,
+                thumbnail_url: img.reference_image_thumbnail_url || img.reference_image_url,
                 reference_image_url: null,
+                reference_image_thumbnail_url: null,
                 aspect_ratio: img.aspect_ratio,
                 provider: img.provider,
                 model: img.model,
@@ -268,7 +270,7 @@ export default function ImageStudio() {
             className="absolute left-2 top-2 z-20 h-10 w-10 overflow-hidden rounded border border-border/40 bg-surface shadow-md hover:border-primary transition-all cursor-zoom-in"
           >
             <img
-              src={resolveImagePath(img.reference_image_url)}
+              src={resolveImagePath(img.reference_image_thumbnail_url || img.reference_image_url)}
               alt="Reference"
               className="h-full w-full object-cover"
             />
@@ -277,7 +279,7 @@ export default function ImageStudio() {
         <div className="aspect-square overflow-hidden">
           {img.status === "completed" && img.image_url ? (
             <img
-              src={resolveImagePath(img.image_url)}
+              src={resolveImagePath(img.thumbnail_url || img.image_url)}
               alt={img.prompt}
               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
               loading="lazy"
@@ -785,7 +787,7 @@ export default function ImageStudio() {
                           className="group relative aspect-square cursor-pointer rounded-card border border-border/30 bg-surface overflow-hidden hover:border-primary/20 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.04)] transition-all"
                         >
                           <img
-                            src={resolveImagePath(preset.image_url)}
+                            src={resolveImagePath(preset.thumbnail_url || preset.image_url)}
                             alt={preset.title}
                             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                             loading="lazy"
@@ -1119,10 +1121,11 @@ export default function ImageStudio() {
                   {/* Generate Button */}
                   <motion.button
                     whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 15 }}
                     onClick={handleGenerate}
                     disabled={generating || !prompt.trim() || (paymentMode !== "free_queue" && !hasModels)}
-                    className={`relative h-8 overflow-hidden rounded-lg px-4 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${paymentMode === "credits"
+                    className={`relative h-8 overflow-hidden rounded-lg px-4 text-xs font-bold framer-btn disabled:opacity-40 disabled:cursor-not-allowed ${paymentMode === "credits"
                       ? "bg-primary text-background shadow-[0_0_12px_rgba(var(--color-primary),0.2)]"
                       : "bg-surface-elevated border border-border/40 text-textPrimary hover:border-primary/50"
                       }`}

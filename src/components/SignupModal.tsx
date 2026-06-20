@@ -45,7 +45,7 @@ export default function SignupModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-full p-1.5 text-textMuted transition-colors hover:bg-surface hover:text-textPrimary"
+                  className="rounded-full p-1.5 text-textMuted transition-all hover:scale-[1.1] hover:bg-surface hover:text-textPrimary"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

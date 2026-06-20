@@ -89,7 +89,7 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
                       key={opt.id}
                       disabled={loading !== null}
                       onClick={() => handleTopup(opt.amount)}
-                      className="group relative flex w-full items-center gap-4 rounded-2xl border border-border/40 bg-surface/50 p-4 transition-all hover:border-primary/50 hover:bg-surface disabled:opacity-50"
+                      className="group relative flex w-full items-center gap-4 rounded-2xl border border-border/40 bg-surface/50 p-4 transition-all hover:scale-[1.02] hover:border-primary/50 hover:bg-surface disabled:opacity-50"
                     >
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-elevated font-headline text-lg font-bold text-primary group-hover:scale-110 transition-transform">
                         {opt.amount}
@@ -109,10 +109,10 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
                 })
               )}
             </div>
-
+ 
             <button
               onClick={onClose}
-              className="mt-8 w-full py-3 text-sm font-medium text-textMuted hover:text-textPrimary transition-colors"
+              className="mt-8 w-full py-3 text-sm font-medium text-textMuted hover:text-textPrimary hover:scale-[1.02] transition-all"
             >
               Maybe later
             </button>

@@ -268,7 +268,7 @@ export default function Sidebar({
 
             <nav className="mt-8 flex flex-col gap-1">
               {isAuthenticated && item("studio", "Studio", "/studio")}
-              {isAuthenticated && item("models", "Models", "/library")}
+              {/* {isAuthenticated && item("models", "Models", "/library")} */}
               {isAuthenticated && item("settings", "Settings", "/settings")}
             </nav>
 
