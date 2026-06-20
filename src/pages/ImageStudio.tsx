@@ -254,7 +254,9 @@ export default function ImageStudio() {
                 id: `${img.id}-ref`,
                 prompt: `[Reference Image] ${img.prompt}`,
                 image_url: img.reference_image_url,
+                thumbnail_url: img.reference_image_thumbnail_url || img.reference_image_url,
                 reference_image_url: null,
+                reference_image_thumbnail_url: null,
                 aspect_ratio: img.aspect_ratio,
                 provider: img.provider,
                 model: img.model,
@@ -268,7 +270,7 @@ export default function ImageStudio() {
             className="absolute left-2 top-2 z-20 h-10 w-10 overflow-hidden rounded border border-border/40 bg-surface shadow-md hover:border-primary transition-all cursor-zoom-in"
           >
             <img
-              src={resolveImagePath(img.reference_image_url)}
+              src={resolveImagePath(img.reference_image_thumbnail_url || img.reference_image_url)}
               alt="Reference"
               className="h-full w-full object-cover"
             />
@@ -277,7 +279,7 @@ export default function ImageStudio() {
         <div className="aspect-square overflow-hidden">
           {img.status === "completed" && img.image_url ? (
             <img
-              src={resolveImagePath(img.image_url)}
+              src={resolveImagePath(img.thumbnail_url || img.image_url)}
               alt={img.prompt}
               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
               loading="lazy"
@@ -785,7 +787,7 @@ export default function ImageStudio() {
                           className="group relative aspect-square cursor-pointer rounded-card border border-border/30 bg-surface overflow-hidden hover:border-primary/20 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.04)] transition-all"
                         >
                           <img
-                            src={resolveImagePath(preset.image_url)}
+                            src={resolveImagePath(preset.thumbnail_url || preset.image_url)}
                             alt={preset.title}
                             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                             loading="lazy"

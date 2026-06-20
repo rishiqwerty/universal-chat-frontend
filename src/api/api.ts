@@ -368,7 +368,9 @@ export type GeneratedImage = {
   id: string;
   prompt: string;
   image_url: string | null;
+  thumbnail_url?: string | null;
   reference_image_url: string | null;
+  reference_image_thumbnail_url?: string | null;
   aspect_ratio: string;
   provider: string;
   model: string;
@@ -441,6 +443,7 @@ export type StudioPreset = {
   category: string;
   prompt: string;
   image_url: string;
+  thumbnail_url?: string | null;
   description: string;
 };
 

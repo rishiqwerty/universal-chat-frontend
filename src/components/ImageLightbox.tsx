@@ -58,7 +58,7 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
             {/* Image */}
             <div className="flex items-center justify-center bg-background/50 p-2">
               <img
-                src={resolveImagePath(image.image_url)}
+                src={resolveImagePath(image.thumbnail_url || image.image_url)}
                 alt={isPreset(image) ? image.title : image.prompt}
                 className="max-h-[60vh] rounded object-contain"
               />
