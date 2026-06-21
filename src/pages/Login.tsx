@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { loginAccount, clearChatCache } from "../api/api";
 import PageTransition from "../components/PageTransition";
+import { useDocumentSEO } from "../hooks/useDocumentSEO";
 
 function LogoMark() {
   return (
@@ -14,6 +15,11 @@ function LogoMark() {
 }
 
 export default function Login() {
+  useDocumentSEO({
+    title: "Login",
+    description: "Sign in to access your secure AI chat and image generation workspace.",
+  });
+
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
