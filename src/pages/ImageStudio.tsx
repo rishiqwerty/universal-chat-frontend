@@ -1004,13 +1004,47 @@ export default function ImageStudio() {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <span className="text-[10px] font-bold uppercase tracking-wider">
-                          Free {queueStatus ? `(${queueStatus.limit - queueStatus.used_today}/${queueStatus.limit})` : ""}
+                          Free {queueStatus ? `(${Math.max(0, queueStatus.limit - queueStatus.used_today)}/${queueStatus.limit})` : ""}
                         </span>
                       </div>
                     </button>
                   </div>
                 </div>
               </div>
+
+              {/* Dynamic Payment Mode Info/Description */}
+              <div className="mb-3 text-[11px] leading-relaxed text-textSecondary bg-surface/30 rounded-lg p-3 border border-border/20 flex flex-col gap-1.5">
+                {paymentMode === "own_key" && (
+                  <div>
+                    <span className="font-semibold text-textPrimary">Personal API Key:</span> Generates images instantly using your own configured keys in Settings. No credits consumed.
+                  </div>
+                )}
+                {paymentMode === "credits" && (
+                  <div>
+                    <span className="font-semibold text-primary">⚡ Instant Generation (5 Credits):</span> High-priority, premium generation with dedicated resources. Images start synthesizing immediately without queue delays.
+                  </div>
+                )}
+                {paymentMode === "free_queue" && (
+                  <div className="flex flex-col gap-1">
+                    <div>
+                      <span className="font-semibold text-textPrimary">⏳ Standard Queue (Free / 2 Credits):</span> Background-priority queue generation. Images are queued and processed using system default models.
+                    </div>
+                    <div className="text-[10px] text-textMuted border-t border-border/10 pt-1 mt-1">
+                      Free for first <strong className="text-textPrimary">{queueStatus?.limit || 3} generations/week</strong>, then costs <strong className="text-textPrimary">2 credits</strong> per generation.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {paymentMode === "free_queue" && queueStatus && queueStatus.used_today >= queueStatus.limit && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-2 text-[10px] text-amber-500/90 leading-normal px-1"
+                >
+                  ⚠️ Weekly free limit reached ({queueStatus.used_today}/{queueStatus.limit}). Want immediate processing? <button type="button" onClick={() => setPaymentMode("credits")} className="font-bold underline text-amber-400 hover:text-amber-300 transition-colors">Switch to Instant Generation</button> (⚡ 5 Credits).
+                </motion.div>
+              )}
 
               {/* Prompt Input Card Container (Mobile Friendly) */}
               <div className="flex w-full flex-col rounded-xl border border-border/60 bg-surface focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_rgba(var(--color-primary),0.08)] transition-all overflow-hidden p-2">
@@ -1122,6 +1156,11 @@ export default function ImageStudio() {
                         ⚡ 5 Credits
                       </span>
                     )}
+                    {paymentMode === "free_queue" && queueStatus && queueStatus.used_today >= queueStatus.limit && !generating && (
+                      <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-500 bg-amber-500/5 px-2 py-0.5 rounded border border-amber-500/20">
+                        ⚡ 2 Credits Charge
+                      </span>
+                    )}
                   </div>
 
                   {/* Generate Button */}
@@ -1151,6 +1190,11 @@ export default function ImageStudio() {
                           {paymentMode === "credits" && (
                             <span className="flex items-center gap-0.5 pl-1 ml-1 border-l border-background/20 sm:hidden">
                               <span className="text-[9px] font-black">5</span>
+                            </span>
+                          )}
+                          {paymentMode === "free_queue" && queueStatus && queueStatus.used_today >= queueStatus.limit && (
+                            <span className="flex items-center gap-0.5 pl-1 ml-1 border-l border-border/20">
+                              <span className="text-[9px] font-bold text-amber-500">⚡ 2</span>
                             </span>
                           )}
                         </>
