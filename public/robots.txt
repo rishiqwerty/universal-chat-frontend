@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Allow: /studio
+Allow: /login
+Allow: /signup
+Disallow: /chat/*
+Disallow: /settings
+
+Sitemap: /sitemap.xml

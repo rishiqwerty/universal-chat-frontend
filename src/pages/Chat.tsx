@@ -12,10 +12,16 @@ import ConfirmModal from "../components/ConfirmModal";
 import SignupModal from "../components/SignupModal";
 import PageTransition from "../components/PageTransition";
 import UpgradeFlyer from "../components/UpgradeFlyer";
+import { useDocumentSEO } from "../hooks/useDocumentSEO";
 
 const initialMessages: ChatMessage[] = [];
 
 export default function Chat() {
+  useDocumentSEO({
+    title: "Chat",
+    description: "Communicate with advanced language models and direct neural processes.",
+  });
+
   const location = useLocation();
   const navigate = useNavigate();
 

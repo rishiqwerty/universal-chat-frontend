@@ -20,10 +20,16 @@ import {
   type QueueStatus,
   type StudioPreset,
 } from "../api/api";
+import { useDocumentSEO } from "../hooks/useDocumentSEO";
 
 const ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3"];
 
 export default function ImageStudio() {
+  useDocumentSEO({
+    title: "Studio",
+    description: "Generate high-fidelity artistic renders and presets using neural models.",
+  });
+
   const [models, setModels] = useState<StudioModels>({});
   const [selectedProvider, setSelectedProvider] = useState("");
   const [selectedModel, setSelectedModel] = useState("");

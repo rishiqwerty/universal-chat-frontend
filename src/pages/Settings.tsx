@@ -11,8 +11,14 @@ import {
 } from "../api/api";
 import PageTransition from "../components/PageTransition";
 import { useTheme } from "../hooks/useTheme";
+import { useDocumentSEO } from "../hooks/useDocumentSEO";
 
 export default function Settings() {
+  useDocumentSEO({
+    title: "Settings",
+    description: "Configure model weights, customize themes, and manage API keys.",
+  });
+
   const { accentColor, setAccentColor, availableColors } = useTheme();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [provider, setProvider] = useState("openai");

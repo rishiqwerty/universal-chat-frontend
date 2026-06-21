@@ -1,7 +1,13 @@
 import SignupForm from "../components/SignupForm";
 import PageTransition from "../components/PageTransition";
+import { useDocumentSEO } from "../hooks/useDocumentSEO";
 
 export default function Signup() {
+  useDocumentSEO({
+    title: "Sign Up",
+    description: "Initialize your operative account and get access to the AI interface.",
+  });
+
   return (
     <PageTransition>
       <div className="relative flex min-h-screen flex-col items-center justify-center bg-background px-4 py-16">
