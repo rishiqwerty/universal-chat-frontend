@@ -78,9 +78,11 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
                       {image.title} <span className="text-[10px] font-semibold text-textMuted lowercase ml-1">{image.version}</span>
                     </h3>
                     <p className="mt-1 text-[11px] leading-relaxed text-textSecondary">{image.description}</p>
-                    <p className="mt-2.5 rounded bg-elevated/40 border border-border/40 p-2.5 font-mono text-[10px] text-textMuted select-all leading-normal whitespace-pre-wrap max-h-[80px] overflow-y-auto">
-                      {image.prompt}
-                    </p>
+                    {image.prompt && (
+                      <p className="mt-2.5 rounded bg-elevated/40 border border-border/40 p-2.5 font-mono text-[10px] text-textMuted select-all leading-normal whitespace-pre-wrap max-h-[80px] overflow-y-auto">
+                        {image.prompt}
+                      </p>
+                    )}
                     <div className="mt-2.5 flex flex-wrap gap-2">
                       <span className="rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
                         {image.category}
