@@ -165,9 +165,17 @@ export default function Topbar({
 
   useEffect(() => {
     fetchBalance();
+    
+    // Listen for manual balance update requests
+    window.addEventListener("balance-update", fetchBalance);
+
     // Poll for balance updates (e.g. from chat deductions)
     const interval = setInterval(fetchBalance, getBalanceCheckInterval() * 1000);
-    return () => clearInterval(interval);
+    
+    return () => {
+      window.removeEventListener("balance-update", fetchBalance);
+      clearInterval(interval);
+    };
   }, [fetchBalance]);
 
   useEffect(() => {

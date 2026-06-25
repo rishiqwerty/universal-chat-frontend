@@ -50,7 +50,7 @@ export default function ImageStudio() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [sortBy, setSortBy] = useState("Latest Deployed");
   const [activeTab, setActiveTab] = useState<"generations" | "presets">("generations");
-  const [showOptions, setShowOptions] = useState(false);
+  const [showOptions, setShowOptions] = useState(true);
 
   const [gallery, setGallery] = useState<GeneratedImage[]>([]);
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | StudioPreset | null>(null);
@@ -102,6 +102,7 @@ export default function ImageStudio() {
           setGallery((prev) =>
             prev.map((img) => (img.id === imageId ? updated : img))
           );
+          window.dispatchEvent(new Event("balance-update"));
         }
       } catch {
         clearInterval(interval);
@@ -178,6 +179,8 @@ export default function ImageStudio() {
       // Always start polling for non-completed images
       pollForCompletion(pendingImage.id);
 
+      // Dispatch balance update
+      window.dispatchEvent(new Event("balance-update"));
 
       // Scroll to top to show new image
       galleryEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -209,6 +212,8 @@ export default function ImageStudio() {
       );
       // Resume polling
       pollForCompletion(imageId);
+      // Dispatch balance update
+      window.dispatchEvent(new Event("balance-update"));
     } catch (err: any) {
       setError(err?.response?.data?.detail || "Failed to retry generation.");
     }
@@ -862,7 +867,7 @@ export default function ImageStudio() {
 
             <div className="flex w-full flex-col gap-3">
               {/* Top row: controls */}
-              <div className={`flex-wrap items-end gap-3 ${showOptions ? "flex" : "hidden md:flex"}`}>
+              <div className={`flex-wrap items-end gap-3 ${showOptions ? "flex" : "hidden"}`}>
                 {/* Provider & Model */}
                 {paymentMode !== "free_queue" && (
                   hasModels ? (
@@ -1110,11 +1115,11 @@ export default function ImageStudio() {
                 {/* Toolbar Row */}
                 <div className="flex items-center justify-between border-t border-border/20 pt-2 px-1">
                   <div className="flex items-center gap-1.5">
-                    {/* Mobile settings toggle */}
+                    {/* Settings toggle */}
                     <button
                       type="button"
                       onClick={() => setShowOptions(!showOptions)}
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors md:hidden ${
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
                         showOptions
                           ? "border-primary/50 text-primary bg-primary/10"
                           : "border-border/30 bg-surface-elevated text-textMuted hover:text-primary hover:border-primary/50"
@@ -1149,14 +1154,27 @@ export default function ImageStudio() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
                       </svg>
                     </label>
+                    
+                    {/* Selected payment indicator when options are minimized */}
+                    {!showOptions && !generating && (
+                      <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-textSecondary bg-surface-elevated px-2.5 h-8 rounded-lg border border-border/30">
+                        {paymentMode === "own_key" && "🔑 Personal"}
+                        {paymentMode === "credits" && "⚡ Credits (5c)"}
+                        {paymentMode === "free_queue" && (
+                          queueStatus && queueStatus.used_today >= queueStatus.limit
+                            ? "⏳ Queue (2c)"
+                            : "⏳ Free Queue"
+                        )}
+                      </span>
+                    )}
 
                     {/* Credits Counter or Details in toolbar */}
-                    {paymentMode === "credits" && !generating && (
+                    {paymentMode === "credits" && !generating && showOptions && (
                       <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-black uppercase text-primary/80 bg-primary/5 px-2 py-0.5 rounded border border-primary/10">
                         ⚡ 5 Credits
                       </span>
                     )}
-                    {paymentMode === "free_queue" && queueStatus && queueStatus.used_today >= queueStatus.limit && !generating && (
+                    {paymentMode === "free_queue" && queueStatus && queueStatus.used_today >= queueStatus.limit && !generating && showOptions && (
                       <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-500 bg-amber-500/5 px-2 py-0.5 rounded border border-amber-500/20">
                         ⚡ 2 Credits Charge
                       </span>
@@ -1188,8 +1206,8 @@ export default function ImageStudio() {
                         <>
                           <span>{paymentMode === "free_queue" ? "Request" : "Generate"}</span>
                           {paymentMode === "credits" && (
-                            <span className="flex items-center gap-0.5 pl-1 ml-1 border-l border-background/20 sm:hidden">
-                              <span className="text-[9px] font-black">5</span>
+                            <span className="flex items-center gap-0.5 pl-1 ml-1 border-l border-background/20">
+                              <span className="text-[9px] font-black">⚡ 5</span>
                             </span>
                           )}
                           {paymentMode === "free_queue" && queueStatus && queueStatus.used_today >= queueStatus.limit && (
