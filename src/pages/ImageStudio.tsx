@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "../components/Sidebar";
+import ConfirmModal from "../components/ConfirmModal";
 import Topbar from "../components/Topbar";
 import ImageLightbox from "../components/ImageLightbox";
 import PageTransition from "../components/PageTransition";
@@ -53,6 +54,9 @@ export default function ImageStudio() {
   const [sortBy, setSortBy] = useState("Latest Deployed");
   const [activeTab, setActiveTab] = useState<"generations" | "presets">("generations");
   const [showOptions, setShowOptions] = useState(true);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [imageIdToDelete, setImageIdToDelete] = useState<string | null>(null);
+  const [deleteConfirmMessage, setDeleteConfirmMessage] = useState("");
   const [loadingGallery, setLoadingGallery] = useState(true);
   const [loadingPresets, setLoadingPresets] = useState(true);
 
@@ -62,7 +66,7 @@ export default function ImageStudio() {
   const pollingRef = useRef<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoCloseTimerRef = useRef<any>(null);
 
   useEffect(() => {
     // Automatically close options panel after 3.5 seconds only on first load
@@ -268,6 +272,30 @@ export default function ImageStudio() {
   };
 
   const handleDelete = async (imageId: string) => {
+    const targetImage = gallery.find((img) => img.id === imageId);
+    if (targetImage && ["queued", "pending", "generating"].includes(targetImage.status)) {
+      if (targetImage.payment_mode === "credits") {
+        setDeleteConfirmMessage(
+          "This is a premium credits-based generation in progress. If you cancel it, the 5 credits charged will NOT be refunded. Are you sure you want to delete and cancel this generation?"
+        );
+        setImageIdToDelete(imageId);
+        setDeleteConfirmOpen(true);
+        return;
+      }
+      if (targetImage.payment_mode === "own_key") {
+        setDeleteConfirmMessage(
+          "This is a personal API key generation in progress. Cancelling this request may not stop external billing charges already in progress with your API provider. Are you sure you want to delete and cancel this generation?"
+        );
+        setImageIdToDelete(imageId);
+        setDeleteConfirmOpen(true);
+        return;
+      }
+    }
+
+    performDelete(imageId);
+  };
+
+  const performDelete = async (imageId: string) => {
     try {
       await deleteStudioImage(imageId);
       setGallery((prev) => prev.filter((img) => img.id !== imageId));
@@ -1486,6 +1514,22 @@ export default function ImageStudio() {
             setLightboxImage(null);
           }}
           onRecreate={handleRecreate}
+        />
+
+        <ConfirmModal
+          isOpen={deleteConfirmOpen}
+          onClose={() => {
+            setDeleteConfirmOpen(false);
+            setImageIdToDelete(null);
+          }}
+          onConfirm={() => {
+            if (imageIdToDelete) {
+              performDelete(imageIdToDelete);
+            }
+          }}
+          title="Cancel Generation"
+          message={deleteConfirmMessage}
+          confirmText="Yes, Cancel"
         />
       </div>
     </PageTransition>
