@@ -62,6 +62,20 @@ export default function ImageStudio() {
   const pollingRef = useRef<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    // Automatically close options panel after 3.5 seconds only on first load
+    autoCloseTimerRef.current = setTimeout(() => {
+      setShowOptions(false);
+    }, 3500);
+
+    return () => {
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current);
+      }
+    };
+  }, []);
 
 
   // Auto-resize textarea height based on content
@@ -1016,8 +1030,20 @@ export default function ImageStudio() {
             </AnimatePresence>
 
             <div className="flex w-full flex-col gap-3">
-              {/* Top row: controls */}
-              <div className={`flex-wrap items-end gap-3 ${showOptions ? "flex" : "hidden"}`}>
+              {/* Settings Drawer (Animated Height & Opacity) */}
+              <AnimatePresence initial={false}>
+                {showOptions && (
+                  <motion.div
+                    key="settings-options-drawer"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex flex-col gap-3 pb-2">
+                      {/* Top row: controls */}
+                      <div className="flex flex-wrap items-end gap-3">
                 {/* Provider & Model */}
                 {paymentMode !== "free_queue" && (
                   hasModels ? (
@@ -1200,6 +1226,10 @@ export default function ImageStudio() {
                   ⚠️ Weekly free limit reached ({queueStatus.used_today}/{queueStatus.limit}). Want immediate processing? <button type="button" onClick={() => setPaymentMode("credits")} className="font-bold underline text-amber-400 hover:text-amber-300 transition-colors">Switch to Instant Generation</button> (⚡ 5 Credits).
                 </motion.div>
               )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Prompt Input Card Container (Mobile Friendly) */}
               <div className="flex w-full flex-col rounded-xl border border-border/60 bg-surface focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_rgba(var(--color-primary),0.08)] transition-all overflow-hidden p-2">
@@ -1309,7 +1339,13 @@ export default function ImageStudio() {
                     {/* Settings toggle */}
                     <button
                       type="button"
-                      onClick={() => setShowOptions(!showOptions)}
+                      onClick={() => {
+                        if (autoCloseTimerRef.current) {
+                          clearTimeout(autoCloseTimerRef.current);
+                          autoCloseTimerRef.current = null;
+                        }
+                        setShowOptions(!showOptions);
+                      }}
                       className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
                         showOptions
                           ? "border-primary/50 text-primary bg-primary/10"
