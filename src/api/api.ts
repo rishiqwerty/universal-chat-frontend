@@ -432,8 +432,9 @@ export async function getImageStatus(imageId: string): Promise<GeneratedImage> {
   return data;
 }
 
-export async function retryStudioImage(imageId: string): Promise<GeneratedImage> {
-  const { data } = await client.post(`/studio/retry/${imageId}`);
+export async function retryStudioImage(imageId: string, paymentMode?: string): Promise<GeneratedImage> {
+  const params = paymentMode ? { payment_mode: paymentMode } : {};
+  const { data } = await client.post(`/studio/retry/${imageId}`, null, { params });
   return data;
 }
 

@@ -237,9 +237,9 @@ export default function ImageStudio() {
     }
   };
 
-  const handleRetry = async (imageId: string) => {
+  const handleRetry = async (imageId: string, paymentMode?: string) => {
     try {
-      const updated = await retryStudioImage(imageId);
+      const updated = await retryStudioImage(imageId, paymentMode);
       // Update gallery state to 'pending' immediately
       setGallery((prev) =>
         prev.map((img) => (img.id === imageId ? updated : img))
@@ -355,17 +355,41 @@ export default function ImageStudio() {
               <p className="mt-3 text-[10px] font-bold text-red-400 text-center relative z-10 px-2 leading-relaxed">
                 {img.error_message?.slice(0, 80) || "System Failure"}
               </p>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRetry(img.id);
-                }}
-                className="mt-4 relative z-10 rounded-full bg-red-500 px-5 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-red-500/20 transition-all hover:bg-red-600"
-              >
-                Try Again
-              </motion.button>
+              <div className="mt-3 flex flex-col gap-1.5 w-full items-center px-2 relative z-10">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRetry(img.id);
+                  }}
+                  className="rounded-full bg-red-500/85 hover:bg-red-500 px-4 py-1 text-[9px] font-bold uppercase tracking-widest text-white transition-all w-full"
+                >
+                  Try Again
+                </motion.button>
+                
+                {img.payment_mode === "credits" ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRetry(img.id, "free_queue");
+                    }}
+                    className="text-[9px] font-bold text-red-300 hover:text-white transition-colors underline decoration-dotted mt-0.5"
+                  >
+                    Retry Free/Queue
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRetry(img.id, "credits");
+                    }}
+                    className="text-[9px] font-bold text-primary hover:text-primaryHover transition-colors uppercase tracking-wider flex items-center justify-center gap-0.5 bg-primary/10 border border-primary/20 rounded-md py-0.5 w-full"
+                  >
+                    ⚡ Credits Retry (5c)
+                  </button>
+                )}
+              </div>
             </div>
           ) : img.status === "queued" ? (
             <div className="flex h-full w-full flex-col items-center justify-center bg-amber-500/[0.03] relative overflow-hidden">
