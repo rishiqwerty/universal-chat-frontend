@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { getRecentConversations, type Conversation } from "../api/api";
 
 type NavKey = "chat" | "studio" | "models" | "settings";
@@ -12,6 +13,7 @@ type SidebarProps = {
   recentChats?: Conversation[];
   activeChatId?: string | null;
   isAuthenticated?: boolean;
+  isLoadingRecent?: boolean;
 };
 
 function LogoMark() {
@@ -68,10 +70,12 @@ export default function Sidebar({
   onDeleteChat, 
   recentChats: propsRecentChats, 
   activeChatId,
-  isAuthenticated = true
+  isAuthenticated = true,
+  isLoadingRecent
 }: SidebarProps) {
   const navigate = useNavigate();
   const [internalRecentChats, setInternalRecentChats] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(isAuthenticated);
   const [isOpen, setIsOpen] = useState(() => {
     const isMobile = window.innerWidth < 768;
     if (isMobile) return false;
@@ -79,11 +83,16 @@ export default function Sidebar({
   });
 
   useEffect(() => {
-    // Only fetch if not managed by parent or to keep it synchronized if parent is null
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     getRecentConversations()
       .then((data) => setInternalRecentChats(data))
-      .catch(() => { });
-  }, []);
+      .catch(() => { })
+      .finally(() => setLoading(false));
+  }, [isAuthenticated]);
 
   useEffect(() => {
     function handleToggle() {
@@ -124,6 +133,35 @@ export default function Sidebar({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  const isRecentLoading = isLoadingRecent !== undefined ? isLoadingRecent : loading;
+
+  const renderRecentSkeleton = () => {
+    const skeletonWidths = ["70%", "55%", "80%", "60%"];
+    return (
+      <div className="flex flex-col gap-1.5 px-3 animate-fade-in">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
+          Recent
+        </p>
+        {skeletonWidths.map((width, idx) => (
+          <div
+            key={`recent-skeleton-${idx}`}
+            className="relative overflow-hidden h-9 w-full rounded-input bg-surface/30 border border-border/10 backdrop-blur-md"
+          >
+            <motion.div
+              animate={{ x: ["-100%", "100%"] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut", delay: idx * 0.15 }}
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+            />
+            <div 
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-3 rounded bg-elevated/40" 
+              style={{ width }} 
+            />
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const displayedRecentChats = propsRecentChats || internalRecentChats;
   const item = (key: NavKey, label: string, to: string) => {
@@ -228,42 +266,46 @@ export default function Sidebar({
 
           {/* Scrollable middle section */}
           <div className="mt-4 flex-1 overflow-y-auto pr-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden hover:[scrollbar-width:thin] hover:[&::-webkit-scrollbar]:block [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-track]:bg-transparent">
-            {isAuthenticated && displayedRecentChats && displayedRecentChats.length > 0 && (
-              <div className="flex flex-col gap-1">
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-textMuted px-3">
-                  Recent
-                </p>
-                {displayedRecentChats.map((chat) => (
-                  <div key={chat.id} className="group relative">
-                    <button
-                      onClick={() => {
-                        if (chat.id === activeChatId) return;
-                        if (onSelectChat) {
-                          onSelectChat(chat.id);
-                        } else {
-                          navigate("/chat", { state: { chatId: chat.id } });
-                        }
-                      }}
-                      className={`w-full flex items-center justify-between rounded-input px-3 py-2 text-left text-sm transition-colors pr-8 ${chat.id === activeChatId
-                        ? "bg-surface text-primary"
-                        : "text-textSecondary hover:bg-surface/80 hover:text-textPrimary"
-                        }`}
-                    >
-                      <span className="truncate">{chat.title}</span>
-                    </button>
+            {isAuthenticated && (
+              isRecentLoading ? (
+                renderRecentSkeleton()
+              ) : displayedRecentChats && displayedRecentChats.length > 0 ? (
+                <div className="flex flex-col gap-1">
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-textMuted px-3">
+                    Recent
+                  </p>
+                  {displayedRecentChats.map((chat) => (
+                    <div key={chat.id} className="group relative">
+                      <button
+                        onClick={() => {
+                          if (chat.id === activeChatId) return;
+                          if (onSelectChat) {
+                            onSelectChat(chat.id);
+                          } else {
+                            navigate("/chat", { state: { chatId: chat.id } });
+                          }
+                        }}
+                        className={`w-full flex items-center justify-between rounded-input px-3 py-2 text-left text-sm transition-colors pr-8 ${chat.id === activeChatId
+                          ? "bg-surface text-primary"
+                          : "text-textSecondary hover:bg-surface/80 hover:text-textPrimary"
+                          }`}
+                      >
+                        <span className="truncate">{chat.title}</span>
+                      </button>
 
-                    <button
-                      onClick={(e) => { e.stopPropagation(); if (onDeleteChat) onDeleteChat(chat.id); }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-textMuted opacity-0 group-hover:opacity-100 transition-all hover:text-red-500"
-                      title="Delete conversation"
-                    >
-                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); if (onDeleteChat) onDeleteChat(chat.id); }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-textMuted opacity-0 group-hover:opacity-100 transition-all hover:text-red-500"
+                        title="Delete conversation"
+                      >
+                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null
             )}
 
             <nav className="mt-8 flex flex-col gap-1">

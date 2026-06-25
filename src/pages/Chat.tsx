@@ -30,6 +30,7 @@ export default function Chat() {
   const [pending, setPending] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
   const [lastFailedText, setLastFailedText] = useState<string | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const [activeChatId, setActiveChatId] = useState<string | null>(
     () => localStorage.getItem("activeChatId")
@@ -46,6 +47,7 @@ export default function Chat() {
   });
   const [tempMessages, setTempMessages] = useState<ChatMessage[]>([]);
   const isAuthenticated = useMemo(() => localStorage.getItem("isAuthenticated") === "true", []);
+  const [loadingRecentChats, setLoadingRecentChats] = useState(isAuthenticated);
 
   const streamControllerRef = useRef<AbortController | null>(null);
   const messageInputRef = useRef<MessageInputHandle>(null);
@@ -108,6 +110,7 @@ export default function Chat() {
     setIsTempMode(false);
     setPending(false);
     setStreamError(null);
+    setLoadingHistory(true);
     try {
       const [details, msgs] = await Promise.all([
         getConversationDetails(id),
@@ -170,8 +173,10 @@ export default function Chat() {
       }
     } catch {
       console.error("Failed to load chat history");
+    } finally {
+      setLoadingHistory(false);
     }
-  }, [cancelActiveStream, activeChatId, messages.length]);
+  }, [cancelActiveStream, activeChatId, messages.length, availableModels]);
 
   const syncMessages = useCallback(async (id: string) => {
     try {
@@ -546,9 +551,11 @@ export default function Chat() {
 
   useEffect(() => {
     if (isAuthenticated) {
+      setLoadingRecentChats(true);
       getRecentConversations(true)
         .then((chats) => setRecentChats(chats))
-        .catch(() => { });
+        .catch(() => { })
+        .finally(() => setLoadingRecentChats(false));
     }
 
     getAvailableModels()
@@ -587,6 +594,81 @@ export default function Chat() {
       .catch(() => { });
   }, []);
 
+  const renderChatHistorySkeleton = () => {
+    return (
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
+        <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-hide">
+          <div className="mx-auto flex max-w-4xl flex-col gap-6">
+            {/* Skeleton bubble 1: User message (Right-aligned) */}
+            <div className="flex w-full justify-end">
+              <div className="relative overflow-hidden w-2/5 h-10 rounded-card bg-userBubble border border-primary/10">
+                <motion.div
+                  animate={{ x: ["-100%", "100%"] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Skeleton bubble 2: Assistant message (Left-aligned) */}
+            <div className="flex w-full justify-start">
+              <div className="relative overflow-hidden w-3/5 rounded-card p-4 bg-surface/30 border border-border/10 backdrop-blur-md">
+                <motion.div
+                  animate={{ x: ["-100%", "100%"] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                />
+                {/* Horizontal skeleton lines */}
+                <div className="space-y-2.5">
+                  <div className="h-4 w-11/12 rounded bg-elevated/40" />
+                  <div className="h-4 w-4/5 rounded bg-elevated/40" />
+                  <div className="h-4 w-2/3 rounded bg-elevated/40" />
+                </div>
+                {/* Avatar/model metadata skeleton indicator */}
+                <div className="mt-4 flex items-center gap-2 border-t border-border/10 pt-3">
+                  <div className="h-3 w-16 rounded bg-elevated/30" />
+                  <div className="h-3 w-24 rounded bg-elevated/30" />
+                </div>
+              </div>
+            </div>
+
+            {/* Skeleton bubble 3: User message (Right-aligned) */}
+            <div className="flex w-full justify-end">
+              <div className="relative overflow-hidden w-1/3 h-10 rounded-card bg-userBubble border border-primary/10">
+                <motion.div
+                  animate={{ x: ["-100%", "100%"] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Skeleton bubble 4: Assistant message (Left-aligned) */}
+            <div className="flex w-full justify-start">
+              <div className="relative overflow-hidden w-4/5 rounded-card p-4 bg-surface/30 border border-border/10 backdrop-blur-md">
+                <motion.div
+                  animate={{ x: ["-100%", "100%"] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                />
+                <div className="space-y-2.5">
+                  <div className="h-4 w-full rounded bg-elevated/40" />
+                  <div className="h-4 w-5/6 rounded bg-elevated/40" />
+                  <div className="h-4 w-3/4 rounded bg-elevated/40" />
+                  <div className="h-4 w-1/2 rounded bg-elevated/40" />
+                </div>
+                <div className="mt-4 flex items-center gap-2 border-t border-border/10 pt-3">
+                  <div className="h-3 w-16 rounded bg-elevated/30" />
+                  <div className="h-3 w-24 rounded bg-elevated/30" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const displayedMessages = isTempMode ? tempMessages : messages;
   const isEmpty = displayedMessages.length === 0;
 
@@ -601,6 +683,7 @@ export default function Chat() {
           recentChats={recentChats}
           activeChatId={isTempMode ? null : activeChatId}
           isAuthenticated={isAuthenticated}
+          isLoadingRecent={loadingRecentChats}
         />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <Topbar
@@ -613,11 +696,44 @@ export default function Chat() {
               handleNewChat();
             }}
             isAuthenticated={isAuthenticated}
-            hideIncognito={!isEmpty}
+            hideIncognito={!isEmpty || loadingHistory}
           />
 
           <AnimatePresence mode="wait">
-            {isEmpty ? (
+            {loadingHistory ? (
+              /* Shimmering loading skeleton chat screen */
+              <motion.div
+                key="loading-history-screen"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="flex min-h-0 flex-1 flex-col"
+              >
+                {renderChatHistorySkeleton()}
+                <motion.div
+                  layoutId="chat-input-container"
+                  transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                  className="w-full"
+                >
+                  <div className="mx-auto w-full max-w-4xl px-6 pb-6 pt-2">
+                    <MessageInput
+                      ref={messageInputRef}
+                      value={draft}
+                      onChange={setDraft}
+                      onSend={send}
+                      disabled={true}
+                      isStreaming={false}
+                      availableModels={availableModels}
+                      selectedProvider={selectedProvider}
+                      selectedModel={selectedModel}
+                      onModelChange={handleModelChange}
+                      isTempMode={isTempMode}
+                    />
+                  </div>
+                </motion.div>
+              </motion.div>
+            ) : isEmpty ? (
               /* Welcome layout — everything centered as one block */
               <motion.div
                 key="welcome-screen"

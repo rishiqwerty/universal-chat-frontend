@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "../components/Sidebar";
+import ConfirmModal from "../components/ConfirmModal";
 import Topbar from "../components/Topbar";
 import ImageLightbox from "../components/ImageLightbox";
 import PageTransition from "../components/PageTransition";
@@ -53,6 +54,9 @@ export default function ImageStudio() {
   const [sortBy, setSortBy] = useState("Latest Deployed");
   const [activeTab, setActiveTab] = useState<"generations" | "presets">("generations");
   const [showOptions, setShowOptions] = useState(true);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [imageIdToDelete, setImageIdToDelete] = useState<string | null>(null);
+  const [deleteConfirmMessage, setDeleteConfirmMessage] = useState("");
   const [loadingGallery, setLoadingGallery] = useState(true);
   const [loadingPresets, setLoadingPresets] = useState(true);
 
@@ -62,6 +66,20 @@ export default function ImageStudio() {
   const pollingRef = useRef<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const autoCloseTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    // Automatically close options panel after 3.5 seconds only on first load
+    autoCloseTimerRef.current = setTimeout(() => {
+      setShowOptions(false);
+    }, 3500);
+
+    return () => {
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current);
+      }
+    };
+  }, []);
 
 
   // Auto-resize textarea height based on content
@@ -254,6 +272,30 @@ export default function ImageStudio() {
   };
 
   const handleDelete = async (imageId: string) => {
+    const targetImage = gallery.find((img) => img.id === imageId);
+    if (targetImage && ["queued", "pending", "generating"].includes(targetImage.status)) {
+      if (targetImage.payment_mode === "credits") {
+        setDeleteConfirmMessage(
+          "This is a premium credits-based generation in progress. If you cancel it, the 5 credits charged will NOT be refunded. Are you sure you want to delete and cancel this generation?"
+        );
+        setImageIdToDelete(imageId);
+        setDeleteConfirmOpen(true);
+        return;
+      }
+      if (targetImage.payment_mode === "own_key") {
+        setDeleteConfirmMessage(
+          "This is a personal API key generation in progress. Cancelling this request may not stop external billing charges already in progress with your API provider. Are you sure you want to delete and cancel this generation?"
+        );
+        setImageIdToDelete(imageId);
+        setDeleteConfirmOpen(true);
+        return;
+      }
+    }
+
+    performDelete(imageId);
+  };
+
+  const performDelete = async (imageId: string) => {
     try {
       await deleteStudioImage(imageId);
       setGallery((prev) => prev.filter((img) => img.id !== imageId));
@@ -1016,8 +1058,20 @@ export default function ImageStudio() {
             </AnimatePresence>
 
             <div className="flex w-full flex-col gap-3">
-              {/* Top row: controls */}
-              <div className={`flex-wrap items-end gap-3 ${showOptions ? "flex" : "hidden"}`}>
+              {/* Settings Drawer (Animated Height & Opacity) */}
+              <AnimatePresence initial={false}>
+                {showOptions && (
+                  <motion.div
+                    key="settings-options-drawer"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex flex-col gap-3 pb-2">
+                      {/* Top row: controls */}
+                      <div className="flex flex-wrap items-end gap-3">
                 {/* Provider & Model */}
                 {paymentMode !== "free_queue" && (
                   hasModels ? (
@@ -1200,6 +1254,10 @@ export default function ImageStudio() {
                   ⚠️ Weekly free limit reached ({queueStatus.used_today}/{queueStatus.limit}). Want immediate processing? <button type="button" onClick={() => setPaymentMode("credits")} className="font-bold underline text-amber-400 hover:text-amber-300 transition-colors">Switch to Instant Generation</button> (⚡ 5 Credits).
                 </motion.div>
               )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Prompt Input Card Container (Mobile Friendly) */}
               <div className="flex w-full flex-col rounded-xl border border-border/60 bg-surface focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_rgba(var(--color-primary),0.08)] transition-all overflow-hidden p-2">
@@ -1309,7 +1367,13 @@ export default function ImageStudio() {
                     {/* Settings toggle */}
                     <button
                       type="button"
-                      onClick={() => setShowOptions(!showOptions)}
+                      onClick={() => {
+                        if (autoCloseTimerRef.current) {
+                          clearTimeout(autoCloseTimerRef.current);
+                          autoCloseTimerRef.current = null;
+                        }
+                        setShowOptions(!showOptions);
+                      }}
                       className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
                         showOptions
                           ? "border-primary/50 text-primary bg-primary/10"
@@ -1450,6 +1514,22 @@ export default function ImageStudio() {
             setLightboxImage(null);
           }}
           onRecreate={handleRecreate}
+        />
+
+        <ConfirmModal
+          isOpen={deleteConfirmOpen}
+          onClose={() => {
+            setDeleteConfirmOpen(false);
+            setImageIdToDelete(null);
+          }}
+          onConfirm={() => {
+            if (imageIdToDelete) {
+              performDelete(imageIdToDelete);
+            }
+          }}
+          title="Cancel Generation"
+          message={deleteConfirmMessage}
+          confirmText="Yes, Cancel"
         />
       </div>
     </PageTransition>
