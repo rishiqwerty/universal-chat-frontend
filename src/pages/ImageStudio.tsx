@@ -44,6 +44,8 @@ export default function ImageStudio() {
   const [visibleCount, setVisibleCount] = useState(5);
   const [referenceImage, setReferenceImage] = useState<File | null>(null);
   const [referencePreview, setReferencePreview] = useState<string | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<StudioPreset | null>(null);
+  const [dismissedPresetPrompt, setDismissedPresetPrompt] = useState(false);
 
   const [presets, setPresets] = useState<StudioPreset[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -51,12 +53,15 @@ export default function ImageStudio() {
   const [sortBy, setSortBy] = useState("Latest Deployed");
   const [activeTab, setActiveTab] = useState<"generations" | "presets">("generations");
   const [showOptions, setShowOptions] = useState(true);
+  const [loadingGallery, setLoadingGallery] = useState(true);
+  const [loadingPresets, setLoadingPresets] = useState(true);
 
   const [gallery, setGallery] = useState<GeneratedImage[]>([]);
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | StudioPreset | null>(null);
   const galleryEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
 
   // Auto-resize textarea height based on content
@@ -67,6 +72,29 @@ export default function ImageStudio() {
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
   }, [prompt]);
+
+  // Reset dismissed prompt state when selected preset changes
+  useEffect(() => {
+    setDismissedPresetPrompt(false);
+  }, [selectedPreset]);
+
+  // Listen for clicks anywhere on the screen to dismiss the preset reference image prompt
+  useEffect(() => {
+    if (selectedPreset && !referenceImage && !dismissedPresetPrompt) {
+      const handleOutsideClick = () => {
+        setDismissedPresetPrompt(true);
+      };
+
+      const timer = setTimeout(() => {
+        document.addEventListener("click", handleOutsideClick);
+      }, 50);
+
+      return () => {
+        clearTimeout(timer);
+        document.removeEventListener("click", handleOutsideClick);
+      };
+    }
+  }, [selectedPreset, referenceImage, dismissedPresetPrompt]);
 
   // Fetch available image models and queue status
   useEffect(() => {
@@ -85,7 +113,10 @@ export default function ImageStudio() {
       .catch(() => { });
 
     getQueueStatus().then(setQueueStatus).catch(() => { });
-    getStudioPresets().then(setPresets).catch(() => { });
+    getStudioPresets()
+      .then(setPresets)
+      .catch(() => { })
+      .finally(() => setLoadingPresets(false));
   }, []);
 
   // Poll for image completion
@@ -136,7 +167,8 @@ export default function ImageStudio() {
           }
         });
       })
-      .catch(() => { });
+      .catch(() => { })
+      .finally(() => setLoadingGallery(false));
   }, [pollForCompletion]);
 
   // Update model when provider changes
@@ -148,8 +180,8 @@ export default function ImageStudio() {
   };
 
   const handleGenerate = async () => {
-    // If free_queue, we don't need provider/model selected. Just prompt.
-    if (!prompt.trim() || (paymentMode !== "free_queue" && (!selectedProvider || !selectedModel))) return;
+    const hasPrompt = prompt.trim() || selectedPreset;
+    if (!hasPrompt || (paymentMode !== "free_queue" && (!selectedProvider || !selectedModel))) return;
     setGenerating(true);
     setError(null);
 
@@ -161,11 +193,13 @@ export default function ImageStudio() {
         paymentMode === "free_queue" ? "system_default" : selectedModel,
         aspectRatio,
         paymentMode,
-        referenceImage
+        referenceImage,
+        selectedPreset?.id || null
       );
       // Add the pending/queued record to the gallery immediately
       setGallery((prev) => [pendingImage, ...prev]);
       setPrompt("");
+      setSelectedPreset(null);
       setReferenceImage(null);
       setReferencePreview(null);
       setShowCreditSuggestion(false);
@@ -203,9 +237,9 @@ export default function ImageStudio() {
     }
   };
 
-  const handleRetry = async (imageId: string) => {
+  const handleRetry = async (imageId: string, paymentMode?: string) => {
     try {
-      const updated = await retryStudioImage(imageId);
+      const updated = await retryStudioImage(imageId, paymentMode);
       // Update gallery state to 'pending' immediately
       setGallery((prev) =>
         prev.map((img) => (img.id === imageId ? updated : img))
@@ -230,7 +264,8 @@ export default function ImageStudio() {
   };
 
   const handleRecreate = (preset: StudioPreset) => {
-    setPrompt(preset.prompt);
+    setSelectedPreset(preset);
+    setPrompt("");
     const textarea = document.querySelector("textarea");
     if (textarea) {
       textarea.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -320,17 +355,41 @@ export default function ImageStudio() {
               <p className="mt-3 text-[10px] font-bold text-red-400 text-center relative z-10 px-2 leading-relaxed">
                 {img.error_message?.slice(0, 80) || "System Failure"}
               </p>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRetry(img.id);
-                }}
-                className="mt-4 relative z-10 rounded-full bg-red-500 px-5 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-red-500/20 transition-all hover:bg-red-600"
-              >
-                Try Again
-              </motion.button>
+              <div className="mt-3 flex flex-col gap-1.5 w-full items-center px-2 relative z-10">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRetry(img.id);
+                  }}
+                  className="rounded-full bg-red-500/85 hover:bg-red-500 px-4 py-1 text-[9px] font-bold uppercase tracking-widest text-white transition-all w-full"
+                >
+                  Try Again
+                </motion.button>
+                
+                {img.payment_mode === "credits" ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRetry(img.id, "free_queue");
+                    }}
+                    className="text-[9px] font-bold text-red-300 hover:text-white transition-colors underline decoration-dotted mt-0.5"
+                  >
+                    Retry Free/Queue
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRetry(img.id, "credits");
+                    }}
+                    className="text-[9px] font-bold text-primary hover:text-primaryHover transition-colors uppercase tracking-wider flex items-center justify-center gap-0.5 bg-primary/10 border border-primary/20 rounded-md py-0.5 w-full"
+                  >
+                    ⚡ Credits Retry (5c)
+                  </button>
+                )}
+              </div>
             </div>
           ) : img.status === "queued" ? (
             <div className="flex h-full w-full flex-col items-center justify-center bg-amber-500/[0.03] relative overflow-hidden">
@@ -535,6 +594,58 @@ export default function ImageStudio() {
     );
   };
 
+  const renderSkeletonGrid = (count = 5, isGrid = false) => {
+    const items = Array.from({ length: count });
+    return (
+      <div className={isGrid 
+        ? "grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-4" 
+        : "flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
+      }>
+        {items.map((_, i) => (
+          <div
+            key={`skeleton-${i}`}
+            className={`relative overflow-hidden rounded-card border border-border/20 bg-surface/40 p-1 flex-shrink-0 ${
+              isGrid ? "w-full aspect-square" : "w-[240px] h-[240px]"
+            }`}
+          >
+            <div className="relative h-full w-full rounded-[10px] overflow-hidden bg-elevated/40 flex items-center justify-center">
+              {/* Shimmer animation */}
+              <motion.div
+                animate={{
+                  x: ["-100%", "100%"]
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent z-10"
+              />
+              {/* Glowing loader */}
+              <div className="flex flex-col items-center gap-2 relative z-20">
+                <motion.div
+                  animate={{
+                    scale: [1, 1.15, 1],
+                    opacity: [0.3, 0.7, 0.3],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                  className="h-8 w-8 rounded-full border border-primary/20 bg-primary/5 flex items-center justify-center"
+                >
+                  <div className="h-2 w-2 rounded-full bg-primary" />
+                </motion.div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted/50 animate-pulse">Syncing...</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const providerKeys = Object.keys(models);
   const hasModels = providerKeys.length > 0;
   const displayedGallery = gallery.slice(0, visibleCount);
@@ -555,7 +666,7 @@ export default function ImageStudio() {
 
     const matchesSearch =
       preset.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      preset.prompt.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (preset.prompt ? preset.prompt.toLowerCase().includes(searchQuery.toLowerCase()) : false) ||
       preset.description.toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesCategory && matchesSearch;
@@ -658,7 +769,19 @@ export default function ImageStudio() {
                     </div>
                   )}
 
-                  {gallery.length > 0 ? (
+                  {loadingGallery ? (
+                    <div>
+                      <div className="mb-4 flex items-center justify-between">
+                        <h2
+                          className="text-sm font-bold uppercase tracking-wider text-textSecondary"
+                          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                        >
+                          Recent Generations
+                        </h2>
+                      </div>
+                      {renderSkeletonGrid(5, showFullGallery)}
+                    </div>
+                  ) : gallery.length > 0 ? (
                     <div>
                       <div className="mb-4 flex items-center justify-between">
                         <h2
@@ -789,7 +912,34 @@ export default function ImageStudio() {
                   </div>
 
                   {/* Grid */}
-                  {sortedPresets.length > 0 ? (
+                  {loadingPresets ? (
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <div
+                          key={`preset-skeleton-${i}`}
+                          className="relative aspect-square overflow-hidden rounded-card border border-border/20 bg-surface/40 p-1"
+                        >
+                          <div className="relative h-full w-full rounded-[10px] overflow-hidden bg-elevated/40 flex items-center justify-center">
+                            <motion.div
+                              animate={{ x: ["-100%", "100%"] }}
+                              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent z-10"
+                            />
+                            <div className="flex flex-col items-center gap-2 relative z-20">
+                              <motion.div
+                                animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.7, 0.3] }}
+                                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                className="h-8 w-8 rounded-full border border-primary/20 bg-primary/5 flex items-center justify-center"
+                              >
+                                <div className="h-2 w-2 rounded-full bg-primary" />
+                              </motion.div>
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted/50 animate-pulse">Syncing...</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : sortedPresets.length > 0 ? (
                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                       {sortedPresets.map((preset) => (
                         <div
@@ -1093,19 +1243,60 @@ export default function ImageStudio() {
                   </div>
                 )}
 
+                {/* Selected Preset Badge */}
+                {selectedPreset && (
+                  <div className="px-3 pt-2 pb-1 flex flex-col border-b border-border/10 mb-2 gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded animate-pulse">
+                          Preset Active
+                        </span>
+                        <span className="text-xs font-semibold text-textPrimary">
+                          {selectedPreset.title}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedPreset(null);
+                        }}
+                        className="text-textMuted hover:text-red-400 transition-colors"
+                        title="Clear preset selection"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    {!referenceImage && !dismissedPresetPrompt && (
+                      <div className="text-[10px] text-primary/95 flex items-center gap-1.5 animate-pulse font-medium pb-1">
+                        <span>📸 Optionally upload a reference image below to customize this preset style.</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Textarea Row */}
                 <div className="relative w-full">
                   <textarea
                     ref={textareaRef}
                     value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
+                    onChange={(e) => {
+                      setPrompt(e.target.value);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey && !generating) {
                         e.preventDefault();
                         handleGenerate();
                       }
                     }}
-                    placeholder={paymentMode === "free_queue" ? "Describe the image you want to request..." : "Describe the image you want to create..."}
+                    placeholder={
+                      selectedPreset
+                        ? "Type additional instructions to customize this preset style..."
+                        : paymentMode === "free_queue"
+                        ? "Describe the image you want to request..."
+                        : "Describe the image you want to create..."
+                    }
                     rows={1}
                     disabled={generating}
                     className="block min-h-[46px] max-h-[160px] overflow-y-auto w-full resize-none bg-transparent px-3 py-2.5 text-sm text-textPrimary placeholder-textMuted outline-none disabled:opacity-50"
@@ -1132,28 +1323,53 @@ export default function ImageStudio() {
                       </svg>
                     </button>
 
-                    {/* Upload Image Label */}
-                    <label
-                      title="Upload image"
-                      className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border/30 bg-surface-elevated text-textMuted hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50"
-                    >
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        disabled={generating}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setReferenceImage(file);
-                            setReferencePreview(URL.createObjectURL(file));
-                          }
-                        }}
-                      />
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-                      </svg>
-                    </label>
+                    {/* Upload Image Button with Tooltip guide */}
+                    <div className="relative">
+                      <label
+                        title="Upload image"
+                        className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition-all disabled:opacity-50 ${
+                          selectedPreset && !referenceImage && !dismissedPresetPrompt
+                            ? "border-primary text-primary bg-primary/5 shadow-[0_0_12px_rgba(var(--color-primary),0.25)] ring-1 ring-primary animate-pulse"
+                            : "border-border/30 bg-surface-elevated text-textMuted hover:border-primary/50 hover:text-primary"
+                        }`}
+                      >
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={generating}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setReferenceImage(file);
+                              setReferencePreview(URL.createObjectURL(file));
+                            }
+                          }}
+                        />
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                        </svg>
+                      </label>
+
+                      {/* Floating Tooltip */}
+                      <AnimatePresence>
+                        {selectedPreset && !referenceImage && !dismissedPresetPrompt && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-30 w-52 p-2.5 rounded-xl border border-primary/20 bg-[#0d0d0f]/95 text-[11px] text-textSecondary text-center shadow-[0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-md pointer-events-none"
+                          >
+                            <span className="font-bold text-primary block mb-0.5">📸 Style Preset Active</span>
+                            Optionally upload a reference image to transfer this style.
+                            {/* Tooltip arrow */}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-primary/20" />
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-[#0d0d0f]" style={{ marginTop: '-1px' }} />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                     
                     {/* Selected payment indicator when options are minimized */}
                     {!showOptions && !generating && (
@@ -1187,7 +1403,7 @@ export default function ImageStudio() {
                     whileTap={{ scale: 0.95 }}
                     transition={{ type: "spring", stiffness: 400, damping: 15 }}
                     onClick={handleGenerate}
-                    disabled={generating || !prompt.trim() || (paymentMode !== "free_queue" && !hasModels)}
+                    disabled={generating || (!prompt.trim() && !selectedPreset) || (paymentMode !== "free_queue" && !hasModels)}
                     className={`relative h-8 overflow-hidden rounded-lg px-4 text-xs font-bold framer-btn disabled:opacity-40 disabled:cursor-not-allowed ${paymentMode === "credits"
                       ? "bg-primary text-background shadow-[0_0_12px_rgba(var(--color-primary),0.2)]"
                       : "bg-surface-elevated border border-border/40 text-textPrimary hover:border-primary/50"

@@ -393,7 +393,8 @@ export async function generateStudioImage(
   model: string,
   aspectRatio: string,
   paymentMode: string,
-  referenceImage: File | null = null
+  referenceImage: File | null = null,
+  presetId: string | null = null
 ): Promise<GeneratedImage> {
   const formData = new FormData();
   formData.append("prompt", prompt);
@@ -403,6 +404,9 @@ export async function generateStudioImage(
   formData.append("payment_mode", paymentMode);
   if (referenceImage) {
     formData.append("reference_image", referenceImage);
+  }
+  if (presetId) {
+    formData.append("preset_id", presetId);
   }
 
   const { data } = await client.post("/studio/generate", formData, {
@@ -428,8 +432,9 @@ export async function getImageStatus(imageId: string): Promise<GeneratedImage> {
   return data;
 }
 
-export async function retryStudioImage(imageId: string): Promise<GeneratedImage> {
-  const { data } = await client.post(`/studio/retry/${imageId}`);
+export async function retryStudioImage(imageId: string, paymentMode?: string): Promise<GeneratedImage> {
+  const params = paymentMode ? { payment_mode: paymentMode } : {};
+  const { data } = await client.post(`/studio/retry/${imageId}`, null, { params });
   return data;
 }
 
@@ -447,7 +452,7 @@ export type StudioPreset = {
   title: string;
   version: string;
   category: string;
-  prompt: string;
+  prompt?: string;
   image_url: string;
   thumbnail_url?: string | null;
   description: string;
