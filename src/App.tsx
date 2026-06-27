@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Settings from "./pages/Settings";
 import ImageStudio from "./pages/ImageStudio";
+import Documentation from "./pages/Documentation";
 import { useTheme } from "./hooks/useTheme";
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
@@ -37,6 +38,9 @@ export default function App() {
         {/* <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} /> */}
         <Route path="/studio" element={<ProtectedRoute><ImageStudio /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        
+        {/* Public static guides */}
+        <Route path="/docs" element={<Documentation />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

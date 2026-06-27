@@ -344,15 +344,15 @@ export default function Sidebar({
               </svg>
               Help
             </button>
-            <button
-              type="button"
+            <Link
+              to="/docs"
               className="flex items-center gap-2 text-sm text-textMuted transition-colors hover:text-textSecondary"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M4 6h16M4 12h10M4 18h14" />
               </svg>
               Documentation
-            </button>
+            </Link>
           </div>
         </div>
       </aside>
