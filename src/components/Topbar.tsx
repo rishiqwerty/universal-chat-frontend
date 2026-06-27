@@ -6,6 +6,7 @@ import SignupModal from "./SignupModal";
 import TopupModal from "./TopupModal";
 import { getCreditBalance } from "../api/api";
 import { getBalanceCheckInterval } from "../config";
+import { useAuth } from "../context/AuthContext";
 
 function FuelGauge({ credits }: { credits: number | null }) {
   const percentage = credits !== null ? Math.min(Math.max(credits, 0), 100) : 0;
@@ -110,6 +111,7 @@ export default function Topbar({
   leftContent
 }: TopbarProps) {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [editingTitle, setEditingTitle] = useState("");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -593,7 +595,7 @@ export default function Topbar({
         isOpen={showLogoutConfirm}
         onClose={() => setShowLogoutConfirm(false)}
         onConfirm={() => {
-          localStorage.clear();
+          logout();
           navigate("/login");
         }}
         title="Account Logout"

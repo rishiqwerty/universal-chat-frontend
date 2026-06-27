@@ -8,15 +8,16 @@ import Settings from "./pages/Settings";
 import ImageStudio from "./pages/ImageStudio";
 import Documentation from "./pages/Documentation";
 import { useTheme } from "./hooks/useTheme";
+import { useAuth } from "./context/AuthContext";
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
-  const isAuth = localStorage.getItem("isAuthenticated") === "true";
-  return isAuth ? children : <Navigate to="/login" replace />;
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
 }
 
 function GuestRoute({ children }: { children: JSX.Element }) {
-  const isAuth = localStorage.getItem("isAuthenticated") === "true";
-  return isAuth ? <Navigate to="/chat" replace /> : children;
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <Navigate to="/chat" replace /> : children;
 }
 
 export default function App() {
@@ -47,4 +48,3 @@ export default function App() {
     </AnimatePresence>
   );
 }
-
