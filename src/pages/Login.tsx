@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { loginAccount, clearChatCache } from "../api/api";
 import PageTransition from "../components/PageTransition";
 import { useDocumentSEO } from "../hooks/useDocumentSEO";
+import { useAuth } from "../context/AuthContext";
 
 function LogoMark() {
   return (
@@ -21,6 +22,7 @@ export default function Login() {
   });
 
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -38,8 +40,7 @@ export default function Login() {
       localStorage.clear();
       clearChatCache();
       
-      localStorage.setItem("access_token", token);
-      localStorage.setItem("isAuthenticated", "true");
+      login(token);
       navigate("/chat");
     } catch (err: any) {
       setError(err.response?.data?.message || err.response?.data?.detail || "Invalid credentials. Access denied.");

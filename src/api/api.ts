@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getApiBaseUrl } from "../config";
+import { forceLogout } from "../context/AuthContext";
 
 const apiRoot = `${getApiBaseUrl().replace(/\/+$/, "")}/api/v1`;
 
@@ -21,8 +22,7 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 || error.response?.status === 403) {
-      localStorage.removeItem("isAuthenticated");
-      localStorage.removeItem("access_token");
+      forceLogout();
       clearChatCache();
     }
     return Promise.reject(error);
@@ -138,8 +138,7 @@ export async function sendMessageStream(
 
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      localStorage.removeItem("isAuthenticated");
-      localStorage.removeItem("access_token");
+      forceLogout();
       clearChatCache();
       throw new Error("Session expired. Please login again.");
     }
