@@ -466,6 +466,7 @@ export type McpInfo = {
   sse_url: string;
   python_path: string;
   server_script_path: string;
+  api_key: string;
 };
 
 export type McpTool = {
