@@ -463,4 +463,43 @@ export async function getStudioPresets(): Promise<StudioPreset[]> {
   return data;
 }
 
+export type McpInfo = {
+  sse_url: string;
+  python_path: string;
+  server_script_path: string;
+};
+
+export type McpTool = {
+  name: string;
+  description: string;
+  schema: {
+    type: string;
+    properties?: Record<string, any>;
+    required?: string[];
+  };
+};
+
+export type McpToolTestResponse = {
+  success: boolean;
+  result?: any;
+  error?: string;
+};
+
+export async function getMcpInfo(): Promise<McpInfo> {
+  const { data } = await client.get("/mcp-config/info");
+  return data;
+}
+
+export async function getMcpTools(): Promise<McpTool[]> {
+  const { data } = await client.get("/mcp-config/tools");
+  return data;
+}
+
+export async function testMcpTool(toolName: string, args: Record<string, any>): Promise<McpToolTestResponse> {
+  const { data } = await client.post(`/mcp-config/tools/${toolName}/test`, {
+    arguments: args,
+  });
+  return data;
+}
+
 export { client };
