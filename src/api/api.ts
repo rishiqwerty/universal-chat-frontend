@@ -502,4 +502,27 @@ export async function testMcpTool(toolName: string, args: Record<string, any>): 
   return data;
 }
 
+export type DocMetadata = {
+  id: string;
+  title: string;
+  description: string;
+};
+
+export type DocDetail = {
+  id: string;
+  title: string;
+  description: string;
+  content_markdown: string;
+};
+
+export async function getDocumentsList(): Promise<DocMetadata[]> {
+  const { data } = await client.get("/docs");
+  return data;
+}
+
+export async function getDocumentDetails(id: string): Promise<DocDetail> {
+  const { data } = await client.get(`/docs/${id}`);
+  return data;
+}
+
 export { client };
