@@ -56,6 +56,23 @@ export default function Chat() {
   const [chatIdToDelete, setChatIdToDelete] = useState<string | null>(null);
   const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
   const [showUpgradeFlyer, setShowUpgradeFlyer] = useState(false);
+  const [showMcpNotification, setShowMcpNotification] = useState(false);
+
+  useEffect(() => {
+    // Detect first-load and pop open notification after delay
+    const hasSeen = localStorage.getItem("hasSeenMcpNotification") === "true";
+    if (!hasSeen) {
+      const timer = setTimeout(() => {
+        setShowMcpNotification(true);
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const dismissMcpNotification = () => {
+    localStorage.setItem("hasSeenMcpNotification", "true");
+    setShowMcpNotification(false);
+  };
 
   const cancelActiveStream = useCallback(() => {
     if (streamControllerRef.current) {
@@ -878,6 +895,57 @@ export default function Chat() {
             localStorage.setItem("lastSeenUpgradeFlyer", Date.now().toString());
           }}
         />
+
+        {/* MCP Support Notification Banner */}
+        <AnimatePresence>
+          {showMcpNotification && (
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="fixed bottom-6 right-6 z-50 max-w-sm w-[calc(100vw-3rem)] rounded-card bg-surface/95 backdrop-blur-md p-5 shadow-2xl border border-primary/30 ring-1 ring-black/5"
+            >
+              <div className="flex gap-3">
+                {/* Pulsating notification badge */}
+                <div className="relative shrink-0 flex h-9 w-9 items-center justify-center rounded-input bg-primary/10 border border-primary/30 text-primary">
+                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary animate-ping" />
+                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary" />
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                  </svg>
+                </div>
+                
+                <div className="flex-1">
+                  <h4 className="text-sm font-black text-textPrimary font-headline tracking-wide uppercase">MCP Server Support Live!</h4>
+                  <p className="text-xs text-textSecondary mt-1 leading-relaxed">
+                    Connect local workflows to Claude Desktop or web platforms like ChatGPT Actions using standard API keys and OAuth 2.0.
+                  </p>
+                  
+                  <div className="mt-4 flex items-center justify-between gap-3 pt-3 border-t border-border/10">
+                    <button
+                      type="button"
+                      onClick={dismissMcpNotification}
+                      className="text-xs font-bold text-textMuted hover:text-textPrimary transition-all uppercase tracking-wider"
+                    >
+                      Maybe Later
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        dismissMcpNotification();
+                        navigate("/settings?tab=mcp");
+                      }}
+                      className="px-3.5 py-1.5 rounded-input bg-primary text-black hover:bg-primaryHover text-xs font-black uppercase tracking-wider font-headline shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                      Configure Now
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </PageTransition>
   );

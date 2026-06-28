@@ -467,6 +467,8 @@ export type McpInfo = {
   python_path: string;
   server_script_path: string;
   api_key: string;
+  oauth_client_id: string;
+  oauth_client_secret: string;
 };
 
 export type McpTool = {
