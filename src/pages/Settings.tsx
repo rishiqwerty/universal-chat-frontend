@@ -35,7 +35,11 @@ export default function Settings() {
   const [error, setError] = useState("");
 
   // Tab management
-  const [activeTab, setActiveTab] = useState<"providers" | "mcp">("providers");
+  const [activeTab, setActiveTab] = useState<"providers" | "mcp">(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get("tab");
+    return tabParam === "mcp" ? "mcp" : "providers";
+  });
 
   // MCP Configuration State
   const [mcpInfo, setMcpInfo] = useState<McpInfo | null>(null);
@@ -51,6 +55,7 @@ export default function Settings() {
   // Copy feedback state
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showMcpApiKey, setShowMcpApiKey] = useState(false);
+  const [mcpIntegrationMode, setMcpIntegrationMode] = useState<"personal" | "oauth">("personal");
 
   const loadKeys = async () => {
     try {
@@ -273,6 +278,37 @@ export default function Settings() {
     navigator.clipboard.writeText(configString);
     setCopiedKey("claude-config");
     setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const renderCopyableRow = (label: string, value: string, copyKey: string) => {
+    return (
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded bg-background/50 border border-border/20 font-mono text-[11px]">
+        <span className="text-textSecondary font-headline uppercase font-bold tracking-wider text-[10px]">{label}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-textPrimary font-semibold break-all select-all">{value}</span>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(value);
+              setCopiedKey(copyKey);
+              setTimeout(() => setCopiedKey(null), 2000);
+            }}
+            className="shrink-0 p-1 rounded bg-surface hover:bg-elevated border border-border/30 text-textMuted hover:text-textPrimary transition-all"
+            title={`Copy ${label}`}
+          >
+            {copiedKey === copyKey ? (
+              <svg className="h-3 w-3 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            ) : (
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+              </svg>
+            )}
+          </button>
+        </div>
+      </div>
+    );
   };
 
 
@@ -505,6 +541,7 @@ export default function Settings() {
             ) : (
               <div className="space-y-8 pb-10">
                 {/* Connection Status Card */}
+                {/* Connection Status Card */}
                 <div className="rounded-card bg-surface p-6 ring-1 ring-border/40">
                   <div className="flex items-center justify-between border-b border-border/20 pb-4">
                     <div>
@@ -542,57 +579,6 @@ export default function Settings() {
                       <span className="text-textSecondary text-[11px] font-headline uppercase font-bold tracking-wider">SSE Connection URL</span>
                       <span className="text-textPrimary font-semibold select-all break-all">{mcpInfo ? `${getApiBaseUrl()}${mcpInfo.sse_url}` : "Loading..."}</span>
                     </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-input bg-elevated/40 border border-primary/20">
-                      <span className="text-textSecondary text-[11px] font-headline uppercase font-bold tracking-wider">Your API Key</span>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-textPrimary font-semibold break-all text-[11px] min-w-0 select-all">
-                          {mcpInfo?.api_key
-                            ? showMcpApiKey
-                              ? mcpInfo.api_key
-                              : `${mcpInfo.api_key.slice(0, 12)}${"•".repeat(24)}${mcpInfo.api_key.slice(-8)}`
-                            : "Loading..."}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowMcpApiKey((v) => !v)}
-                          className="shrink-0 p-1.5 rounded bg-surface hover:bg-elevated border border-border/30 text-textMuted hover:text-textPrimary transition-all"
-                          title={showMcpApiKey ? "Hide API Key" : "Reveal API Key"}
-                        >
-                          {showMcpApiKey ? (
-                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-                            </svg>
-                          ) : (
-                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                              <path strokeLinecap="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (mcpInfo?.api_key) {
-                              navigator.clipboard.writeText(mcpInfo.api_key);
-                              setCopiedKey("mcp-api-key");
-                              setTimeout(() => setCopiedKey(null), 2000);
-                            }
-                          }}
-                          className="shrink-0 p-1.5 rounded bg-surface hover:bg-elevated border border-border/30 text-textMuted hover:text-textPrimary transition-all"
-                          title="Copy API Key"
-                        >
-                          {copiedKey === "mcp-api-key" ? (
-                            <svg className="h-3.5 w-3.5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                            </svg>
-                          ) : (
-                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                    </div>
                     {isLocalhost && (
                       <>
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-3 rounded-input bg-elevated/40 border border-border/20">
@@ -608,52 +594,204 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {/* Claude Desktop Integration */}
-                <div className="rounded-card bg-surface p-6 ring-1 ring-border/40">
-                  <h2 className="text-lg font-semibold text-textPrimary">Claude Desktop Integration</h2>
-                  <p className="text-xs text-textSecondary mt-1">
-                    {isLocalhost 
-                      ? "Run this server locally within Claude Desktop client using Standard I/O (stdio)." 
-                      : "Connect Claude Desktop client to your remote server using Server-Sent Events (SSE)."}
-                  </p>
-
-                  <div className="mt-4 p-4 rounded-input bg-elevated/20 border border-border/20">
-                    <p className="text-xs text-textSecondary leading-relaxed">
-                      1. Open or create the Claude Desktop config file on macOS at:
-                      <br />
-                      <code className="text-[11px] font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded mt-1 inline-block select-all">~/Library/Application Support/Claude/claude_desktop_config.json</code>
+                {/* Unified AI Client Integrations Card */}
+                <div className="rounded-card bg-surface p-6 ring-1 ring-border/40 space-y-6">
+                  <div>
+                    <h2 className="text-lg font-semibold text-textPrimary">AI Client Integrations</h2>
+                    <p className="text-xs text-textSecondary mt-1">
+                      Configure authentication and connect this MCP server to your local development IDEs or remote AI web platforms.
                     </p>
-                    <p className="text-xs text-textSecondary leading-relaxed mt-3">
-                      2. Add the following JSON configuration snippet to your config file:
-                    </p>
-
-                    <div className="relative mt-3 rounded-input bg-background border border-border/30 overflow-hidden font-mono text-xs">
-                      <pre className="p-4 overflow-x-auto text-textPrimary max-h-60 leading-relaxed [scrollbar-width:thin]">
-                        {configString}
-                      </pre>
-                      <button
-                        onClick={handleCopyConfig}
-                        className="absolute top-3 right-3 p-2 rounded-input bg-surface hover:bg-elevated border border-border/30 text-textSecondary hover:text-textPrimary transition-all flex items-center gap-1.5 text-[10px] font-headline font-bold"
-                      >
-                        {copiedKey === "claude-config" ? (
-                          <>
-                            <svg className="h-3.5 w-3.5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                            </svg>
-                            Copy snippet
-                          </>
-                        )}
-                      </button>
-                    </div>
                   </div>
+
+                  {/* Mode Selector Segmented Tabs */}
+                  <div className="flex p-0.5 rounded-lg bg-elevated/50 border border-border/20 self-start max-w-fit">
+                    <button
+                      type="button"
+                      onClick={() => setMcpIntegrationMode("personal")}
+                      className={`px-4 py-2 text-xs font-bold rounded-md transition-all ${
+                        mcpIntegrationMode === "personal"
+                          ? "bg-surface text-primary shadow-sm"
+                          : "text-textSecondary hover:text-textPrimary"
+                      }`}
+                    >
+                      Personal Clients (API Key)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMcpIntegrationMode("oauth")}
+                      className={`px-4 py-2 text-xs font-bold rounded-md transition-all ${
+                        mcpIntegrationMode === "oauth"
+                          ? "bg-surface text-primary shadow-sm"
+                          : "text-textSecondary hover:text-textPrimary"
+                      }`}
+                    >
+                      Web Platforms (OAuth 2.0)
+                    </button>
+                  </div>
+
+                  {/* Tab Contents */}
+                  {mcpIntegrationMode === "personal" ? (
+                    <div className="space-y-6">
+                      {/* API Key Row */}
+                      <div className="p-4 rounded-input bg-elevated/20 border border-border/20 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xs font-bold text-textPrimary uppercase tracking-wider">Your Personal API Key</h3>
+                          <span className="text-[10px] text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">Personal Auth</span>
+                        </div>
+                        <p className="text-xs text-textSecondary">
+                          Use this key to authenticate direct connections (e.g., Claude Desktop, Cursor, Continue, Cherry Studio).
+                        </p>
+                        <div className="flex items-center gap-2 p-3 rounded-input bg-background/50 border border-primary/20">
+                          <span className="text-textPrimary font-mono break-all text-xs min-w-0 flex-1 select-all select-none">
+                            {mcpInfo?.api_key
+                              ? showMcpApiKey
+                                ? mcpInfo.api_key
+                                : `${mcpInfo.api_key.slice(0, 12)}${"•".repeat(24)}${mcpInfo.api_key.slice(-8)}`
+                              : "Loading..."}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowMcpApiKey((v) => !v)}
+                            className="shrink-0 p-1.5 rounded bg-surface hover:bg-elevated border border-border/30 text-textMuted hover:text-textPrimary transition-all"
+                            title={showMcpApiKey ? "Hide API Key" : "Reveal API Key"}
+                          >
+                            {showMcpApiKey ? (
+                              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                              </svg>
+                            ) : (
+                              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                                <path strokeLinecap="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (mcpInfo?.api_key) {
+                                navigator.clipboard.writeText(mcpInfo.api_key);
+                                setCopiedKey("mcp-api-key");
+                                setTimeout(() => setCopiedKey(null), 2000);
+                              }
+                            }}
+                            className="shrink-0 p-1.5 rounded bg-surface hover:bg-elevated border border-border/30 text-textMuted hover:text-textPrimary transition-all"
+                            title="Copy API Key"
+                          >
+                            {copiedKey === "mcp-api-key" ? (
+                              <svg className="h-3.5 w-3.5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            ) : (
+                              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Claude Desktop Integration instructions */}
+                      <div className="border-t border-border/20 pt-5">
+                        <h3 className="text-sm font-semibold text-textPrimary">Claude Desktop Integration</h3>
+                        <p className="text-xs text-textSecondary mt-1 leading-relaxed">
+                          Configure Claude Desktop to run your MCP tools locally using the dynamic configuration snippet below.
+                        </p>
+
+                        <div className="mt-4 p-4 rounded-input bg-elevated/20 border border-border/20">
+                          <p className="text-xs text-textSecondary leading-relaxed">
+                            1. Open or create the Claude Desktop config file on macOS at:
+                            <br />
+                            <code className="text-[11px] font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded mt-1 inline-block select-all">~/Library/Application Support/Claude/claude_desktop_config.json</code>
+                          </p>
+                          <p className="text-xs text-textSecondary leading-relaxed mt-3">
+                            2. Add the following JSON configuration snippet to your config file:
+                          </p>
+
+                          <div className="relative mt-3 rounded-input bg-background border border-border/30 overflow-hidden font-mono text-xs">
+                            <pre className="p-4 overflow-x-auto text-textPrimary max-h-60 leading-relaxed [scrollbar-width:thin]">
+                              {configString}
+                            </pre>
+                            <button
+                              type="button"
+                              onClick={handleCopyConfig}
+                              className="absolute top-3 right-3 p-2 rounded-input bg-surface hover:bg-elevated border border-border/30 text-textSecondary hover:text-textPrimary transition-all flex items-center gap-1.5 text-[10px] font-headline font-bold"
+                            >
+                              {copiedKey === "claude-config" ? (
+                                <>
+                                  <svg className="h-3.5 w-3.5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Copied
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                                  </svg>
+                                  Copy snippet
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* OAuth 2.0 Connection Parameters */}
+                      <div className="p-4 rounded-input bg-elevated/20 border border-border/20 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xs font-bold text-textPrimary uppercase tracking-wider">OAuth 2.0 Credentials</h3>
+                          <span className="text-[10px] text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">Standard Web Auth</span>
+                        </div>
+                        <p className="text-xs text-textSecondary">
+                          Supply these parameters when registering this MCP server in third-party platforms requiring OAuth 2.0.
+                        </p>
+
+                        <div className="space-y-2.5">
+                          {renderCopyableRow("Authorization URL", `${getApiBaseUrl().replace(/\/+$/, "")}/api/v1/oauth/authorize`, "auth-url")}
+                          {renderCopyableRow("Token URL", `${getApiBaseUrl().replace(/\/+$/, "")}/api/v1/oauth/token`, "token-url")}
+                          {renderCopyableRow("Client ID", mcpInfo?.oauth_client_id || "Loading...", "client-id")}
+                          {renderCopyableRow("Client Secret", mcpInfo?.oauth_client_secret || "Loading...", "client-secret")}
+                        </div>
+                      </div>
+
+                      {/* Setup Guides */}
+                      <div className="border-t border-border/20 pt-5 space-y-4">
+                        <h3 className="text-sm font-semibold text-textPrimary">Web Platform Integration Guides</h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="p-4 rounded-input bg-elevated/10 border border-border/10 space-y-2">
+                            <h4 className="text-xs font-bold text-textPrimary uppercase tracking-wider flex items-center gap-1.5">
+                              <span className="h-1.5 w-1.5 bg-primary rounded-full" />
+                              ChatGPT Actions
+                            </h4>
+                            <ol className="list-decimal list-inside text-xs text-textSecondary space-y-1.5 leading-relaxed">
+                              <li>Create a custom GPT or Plugin action.</li>
+                              <li>Paste the MCP OpenAPI Schema.</li>
+                              <li>Under Authentication, select <strong>OAuth</strong>.</li>
+                              <li>Provide the Client ID, Client Secret, and URLs shown above.</li>
+                            </ol>
+                          </div>
+
+                          <div className="p-4 rounded-input bg-elevated/10 border border-border/10 space-y-2">
+                            <h4 className="text-xs font-bold text-textPrimary uppercase tracking-wider flex items-center gap-1.5">
+                              <span className="h-1.5 w-1.5 bg-primary rounded-full" />
+                              Claude Web Tools
+                            </h4>
+                            <ol className="list-decimal list-inside text-xs text-textSecondary space-y-1.5 leading-relaxed">
+                              <li>Open your project developer settings on Claude.ai.</li>
+                              <li>Add a new <strong>Custom Connector</strong>.</li>
+                              <li>Provide the OAuth connection credentials.</li>
+                              <li>Authorize the application upon connection prompt.</li>
+                            </ol>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Tools Registry & Tester */}
