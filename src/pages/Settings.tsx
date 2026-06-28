@@ -100,15 +100,25 @@ export default function Settings() {
     }));
     try {
       const res = await testMcpTool(toolName, args);
-      if (res.success) {
+      const isError = res.isError || false;
+      const textVal = res.content && res.content[0] ? res.content[0].text : "";
+      
+      let finalResult = textVal;
+      try {
+        finalResult = JSON.parse(textVal);
+      } catch {
+        // Keep raw text
+      }
+
+      if (!isError) {
         setToolResults((prev) => ({
           ...prev,
-          [toolName]: { loading: false, response: res.result },
+          [toolName]: { loading: false, response: finalResult },
         }));
       } else {
         setToolResults((prev) => ({
           ...prev,
-          [toolName]: { loading: false, error: res.error || "Failed to execute tool" },
+          [toolName]: { loading: false, error: finalResult || "Failed to execute tool" },
         }));
       }
     } catch (err: any) {

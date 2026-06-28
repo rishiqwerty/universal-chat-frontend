@@ -482,9 +482,8 @@ export type McpTool = {
 };
 
 export type McpToolTestResponse = {
-  success: boolean;
-  result?: any;
-  error?: string;
+  content?: Array<{ type: string; text: string }>;
+  isError?: boolean;
 };
 
 export async function getMcpInfo(): Promise<McpInfo> {
