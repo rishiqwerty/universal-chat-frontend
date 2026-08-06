@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { getRecentConversations, type Conversation } from "../api/api";
+import HelpModal from "./HelpModal";
 
 type NavKey = "chat" | "studio" | "models" | "settings";
 
@@ -76,6 +77,7 @@ export default function Sidebar({
   const navigate = useNavigate();
   const [internalRecentChats, setInternalRecentChats] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(isAuthenticated);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isOpen, setIsOpen] = useState(() => {
     const isMobile = window.innerWidth < 768;
     if (isMobile) return false;
@@ -336,6 +338,7 @@ export default function Sidebar({
           <div className="mt-auto shrink-0 flex flex-col gap-2 border-t border-border/30 pt-6">
             <button
               type="button"
+              onClick={() => setIsHelpModalOpen(true)}
               className="flex items-center gap-2 text-sm text-textMuted transition-colors hover:text-textSecondary"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -356,6 +359,11 @@ export default function Sidebar({
           </div>
         </div>
       </aside>
+
+      <HelpModal 
+        isOpen={isHelpModalOpen} 
+        onClose={() => setIsHelpModalOpen(false)} 
+      />
     </>
   );
 }

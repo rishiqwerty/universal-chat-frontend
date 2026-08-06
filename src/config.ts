@@ -48,5 +48,24 @@ export function getBalanceCheckInterval(): number {
   return DEFAULT_BALANCE_CHECK_INTERVAL_SECONDS;
 }
 
+/**
+ * Google OAuth Client ID for Google Authentication.
+ * Override with `VITE_GOOGLE_CLIENT_ID` in environment variables.
+ */
+export function getGoogleClientId(): string {
+  const raw = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  return typeof raw === "string" ? raw.trim() : "";
+}
 
+/**
+ * Whether Email Password and Email OTP authentication is enabled.
+ * Override with `VITE_ENABLE_PASSWORD_OTP_AUTH` in environment variables.
+ * Default: true
+ */
+export function isPasswordOtpAuthEnabled(): boolean {
+  const raw = import.meta.env.VITE_ENABLE_PASSWORD_OTP_AUTH;
+  if (raw === undefined || raw === null || raw === "") return true;
+  const val = String(raw).trim().toLowerCase();
+  return val !== "false" && val !== "0" && val !== "off";
+}
 
