@@ -67,10 +67,6 @@ export default function GoogleAuthButton({
         text: "continue_with",
         shape: "rectangular",
       });
-
-      if (window.google.accounts.id.prompt) {
-        window.google.accounts.id.prompt();
-      }
     } catch (err: any) {
       console.error("Google Auth initialization error:", err);
     }
