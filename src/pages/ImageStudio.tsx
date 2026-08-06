@@ -63,10 +63,20 @@ export default function ImageStudio() {
   const [gallery, setGallery] = useState<GeneratedImage[]>([]);
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | StudioPreset | null>(null);
   const galleryEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const sliderRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autoCloseTimerRef = useRef<any>(null);
+
+  const scrollToLatestGeneration = useCallback(() => {
+    setActiveTab("generations");
+    requestAnimationFrame(() => {
+      scrollAreaRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+      sliderRef.current?.scrollTo({ left: 0, behavior: "smooth" });
+    });
+  }, []);
 
   useEffect(() => {
     // Automatically close options panel after 3.5 seconds only on first load
@@ -152,6 +162,13 @@ export default function ImageStudio() {
             prev.map((img) => (img.id === imageId ? updated : img))
           );
           window.dispatchEvent(new Event("balance-update"));
+
+          // Automatically focus and scroll to the completed generation
+          setActiveTab("generations");
+          requestAnimationFrame(() => {
+            scrollAreaRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+            sliderRef.current?.scrollTo({ left: 0, behavior: "smooth" });
+          });
         }
       } catch {
         clearInterval(interval);
@@ -223,6 +240,9 @@ export default function ImageStudio() {
       setShowCreditSuggestion(false);
       setGenerating(false);
 
+      // Switch tab to Recent Generations & scroll immediately to latest generation
+      scrollToLatestGeneration();
+
       if (paymentMode === "free_queue") {
         // Refresh queue status
         getQueueStatus().then(setQueueStatus).catch(() => { });
@@ -233,9 +253,6 @@ export default function ImageStudio() {
 
       // Dispatch balance update
       window.dispatchEvent(new Event("balance-update"));
-
-      // Scroll to top to show new image
-      galleryEndRef.current?.scrollIntoView({ behavior: "smooth" });
     } catch (err: any) {
       const detail = err?.response?.data?.detail || "";
       const status = err?.response?.status;
@@ -264,6 +281,8 @@ export default function ImageStudio() {
       );
       // Resume polling
       pollForCompletion(imageId);
+      // Switch tab and scroll to latest generation
+      scrollToLatestGeneration();
       // Dispatch balance update
       window.dispatchEvent(new Event("balance-update"));
     } catch (err: any) {
@@ -745,7 +764,7 @@ export default function ImageStudio() {
           />
 
           {/* Scrollable Gallery Area */}
-          <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-36 md:pb-48 pt-0">
+          <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-4 md:px-8 pb-36 md:pb-48 pt-0">
             <div ref={galleryEndRef} />
 
             {/* Tabs Selector */}
@@ -850,6 +869,7 @@ export default function ImageStudio() {
                         </div>
                       ) : (
                         <div
+                          ref={sliderRef}
                           onScroll={handleScroll}
                           className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
                         >
