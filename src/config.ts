@@ -48,5 +48,11 @@ export function getBalanceCheckInterval(): number {
   return DEFAULT_BALANCE_CHECK_INTERVAL_SECONDS;
 }
 
-
-
+/**
+ * Google OAuth Client ID for Google Authentication.
+ * Override with `VITE_GOOGLE_CLIENT_ID` in environment variables.
+ */
+export function getGoogleClientId(): string {
+  const raw = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  return typeof raw === "string" ? raw.trim() : "";
+}

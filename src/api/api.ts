@@ -48,6 +48,11 @@ export async function loginAccount(payload: SignupPayload): Promise<string> {
   return data.access_token;
 }
 
+export async function googleLoginAccount(credential: string): Promise<string> {
+  const { data } = await client.post("/auth/google", { credential });
+  return data.access_token;
+}
+
 export type Conversation = {
   id: string;
   title: string;
