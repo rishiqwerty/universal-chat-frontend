@@ -53,6 +53,16 @@ export async function googleLoginAccount(credential: string): Promise<string> {
   return data.access_token;
 }
 
+export async function requestOtpApi(email: string, purpose: string = "login"): Promise<{ message: string; email: string }> {
+  const { data } = await client.post("/auth/request-otp", { email, purpose });
+  return data;
+}
+
+export async function verifyOtpApi(email: string, code: string): Promise<string> {
+  const { data } = await client.post("/auth/verify-otp", { email, code });
+  return data.access_token;
+}
+
 export type Conversation = {
   id: string;
   title: string;
