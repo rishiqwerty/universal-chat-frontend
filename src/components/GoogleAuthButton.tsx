@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { getGoogleClientId } from "../config";
 
 interface GoogleAuthButtonProps {
@@ -26,6 +26,7 @@ export default function GoogleAuthButton({
   const [isHovered, setIsHovered] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
   const [cursorPos, setCursorPos] = useState({ x: 100, y: 20 });
+  const [popupFailed, setPopupFailed] = useState(false);
 
   useEffect(() => {
     if (!clientId) return;
@@ -63,7 +64,7 @@ export default function GoogleAuthButton({
       window.google.accounts.id.renderButton(gsiOverlayRef.current, {
         theme: "filled_black",
         size: "large",
-        width: 380,
+        width: 400,
         text: "continue_with",
         shape: "rectangular",
       });
@@ -71,6 +72,78 @@ export default function GoogleAuthButton({
       console.error("Google Auth initialization error:", err);
     }
   }, [scriptLoaded, clientId, onSuccess, onError]);
+
+  // Fallback: open Google OAuth popup directly from our origin (works in strict browsers)
+  const handleFallbackClick = useCallback(() => {
+    if (!clientId || disabled) return;
+
+    // Build a nonce for security
+    const nonce = crypto.randomUUID?.() || Math.random().toString(36).slice(2);
+
+    // Open popup FIRST (synchronously in click handler = trusted user gesture)
+    const width = 500;
+    const height = 600;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+
+    const redirectUri = window.location.origin + "/login";
+    const authUrl =
+      `https://accounts.google.com/o/oauth2/v2/auth?` +
+      `client_id=${encodeURIComponent(clientId)}&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `response_type=id_token&` +
+      `scope=openid%20email%20profile&` +
+      `nonce=${nonce}&` +
+      `prompt=select_account`;
+
+    const popup = window.open(
+      authUrl,
+      "google-auth-popup",
+      `width=${width},height=${height},left=${left},top=${top},popup=yes`
+    );
+
+    if (!popup) {
+      onError("Popup blocked by browser. Please allow popups for this site.");
+      return;
+    }
+
+    // Poll the popup for the redirect with the id_token fragment
+    const pollTimer = setInterval(() => {
+      try {
+        if (popup.closed) {
+          clearInterval(pollTimer);
+          return;
+        }
+        // Check if popup has redirected back to our origin
+        if (popup.location?.origin === window.location.origin) {
+          const hash = popup.location.hash;
+          popup.close();
+          clearInterval(pollTimer);
+
+          if (hash) {
+            const params = new URLSearchParams(hash.substring(1));
+            const idToken = params.get("id_token");
+            if (idToken) {
+              onSuccess(idToken);
+            } else {
+              const error = params.get("error");
+              onError(error || "Google Sign-In failed. No token received.");
+            }
+          }
+        }
+      } catch {
+        // Cross-origin access error — popup hasn't redirected back yet, keep polling
+      }
+    }, 500);
+
+    // Safety timeout: stop polling after 5 minutes
+    setTimeout(() => {
+      clearInterval(pollTimer);
+      try {
+        if (!popup.closed) popup.close();
+      } catch { /* ignore */ }
+    }, 300000);
+  }, [clientId, disabled, onSuccess, onError]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -176,11 +249,28 @@ export default function GoogleAuthButton({
         </span>
       </div>
 
-      {/* Transparent Google GSI Native Button Overlay */}
-      <div
-        ref={gsiOverlayRef}
-        className="absolute inset-0 z-30 opacity-[0.0001] cursor-pointer overflow-hidden flex justify-center items-center [&_iframe]:w-full [&_iframe]:h-full [&_iframe]:cursor-pointer"
-      />
+      {/* GSI Native Button Overlay — primary method (Chrome, Firefox, Safari) */}
+      {!popupFailed && (
+        <div
+          ref={gsiOverlayRef}
+          onClick={() => {
+            // If the GSI iframe popup fails, detect it after a short delay and switch to fallback
+            setTimeout(() => {
+              // Check if no credential callback was fired — means popup likely failed
+              setPopupFailed(true);
+            }, 3000);
+          }}
+          className="absolute inset-0 z-30 opacity-[0.0001] cursor-pointer overflow-hidden flex justify-center items-center [&_iframe]:w-full [&_iframe]:h-full [&_iframe]:cursor-pointer"
+        />
+      )}
+
+      {/* Fallback click target — for browsers that block cross-origin iframe popups (Helium, Brave, Arc) */}
+      {popupFailed && (
+        <div
+          onClick={handleFallbackClick}
+          className="absolute inset-0 z-30 cursor-pointer"
+        />
+      )}
     </div>
   );
 }
