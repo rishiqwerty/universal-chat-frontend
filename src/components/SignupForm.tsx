@@ -161,13 +161,12 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
             </div>
           )}
           
-          <div className="flex justify-center">
-            <GoogleAuthButton
-              onSuccess={handleGoogleSuccess}
-              onError={handleGoogleError}
-              disabled={loading}
-            />
-          </div>
+          <GoogleAuthButton
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+            disabled={loading}
+            text="Sign up with Google"
+          />
         </div>
 
         {!showPasswordOtp && (

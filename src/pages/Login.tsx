@@ -156,13 +156,12 @@ export default function Login() {
                 </div>
               )}
               
-              <div className="flex justify-center">
-                <GoogleAuthButton
-                  onSuccess={handleGoogleSuccess}
-                  onError={handleGoogleError}
-                  disabled={loading}
-                />
-              </div>
+              <GoogleAuthButton
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                disabled={loading}
+                text="Continue with Google"
+              />
             </div>
 
             {!showPasswordOtp && (
