@@ -82,6 +82,17 @@ export async function getAvailableModels(): Promise<ProviderModels[]> {
   return data;
 }
 
+export type OpenRouterModel = {
+  id: string;
+  name: string;
+  context_length?: number;
+};
+
+export async function searchOpenRouterModels(query: string): Promise<OpenRouterModel[]> {
+  const { data } = await client.get("/chat/models/search", { params: { q: query } });
+  return data;
+}
+
 export async function createConversation(title: string): Promise<Conversation> {
   const { data } = await client.post("/chat/conversations", { title });
   return data;

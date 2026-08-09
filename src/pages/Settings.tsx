@@ -385,6 +385,7 @@ export default function Settings() {
                         <option value="openai">OpenAI</option>
                         <option value="anthropic">Anthropic</option>
                         <option value="gemini">Gemini</option>
+                        <option value="openrouter">OpenRouter</option>
                         <option value="local">Local LLM</option>
                       </select>
                     </label>

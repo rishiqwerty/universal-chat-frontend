@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { type ProviderModels } from "../api/api";
+import { type ProviderModels, type OpenRouterModel, searchOpenRouterModels } from "../api/api";
 
 type MessageInputProps = {
+  inputRef?: React.RefObject<MessageInputHandle> | React.MutableRefObject<MessageInputHandle | null>;
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
@@ -21,7 +22,8 @@ export interface MessageInputHandle {
   triggerGlow: () => void;
 }
 
-const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
+export default function MessageInput({
+  inputRef: outerRef,
   value,
   onChange,
   onSend,
@@ -32,20 +34,28 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   selectedModel,
   onModelChange,
   isTempMode,
-}, ref) => {
+}: MessageInputProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [isGlowing, setIsGlowing] = useState(false);
+  const [modelSearch, setModelSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<OpenRouterModel[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useImperativeHandle(ref, () => ({
-    openPicker: () => setShowPicker(true),
-    focus: () => inputRef.current?.focus(),
-    triggerGlow: () => {
-      setIsGlowing(true);
-      setTimeout(() => setIsGlowing(false), 1200);
+  useEffect(() => {
+    if (outerRef) {
+      (outerRef as React.MutableRefObject<MessageInputHandle | null>).current = {
+        openPicker: () => setShowPicker(true),
+        focus: () => inputRef.current?.focus(),
+        triggerGlow: () => {
+          setIsGlowing(true);
+          setTimeout(() => setIsGlowing(false), 1200);
+        }
+      };
     }
-  }));
+  }, [outerRef]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -59,6 +69,39 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
 
   const currentProviderData = availableModels.find((p) => p.provider === selectedProvider);
   const isImageModel = currentProviderData?.image_models?.includes(selectedModel || "");
+  const isOpenRouter = selectedProvider === "openrouter";
+  const isOpenRouterBYOK = isOpenRouter && !currentProviderData?.is_free;
+
+  // Debounced search for OpenRouter models
+  const handleModelSearch = useCallback((query: string) => {
+    setModelSearch(query);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (query.length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const results = await searchOpenRouterModels(query);
+        setSearchResults(results);
+      } catch (err) {
+        console.error("Model search failed:", err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  }, []);
+
+  // Reset search when picker closes or provider changes
+  useEffect(() => {
+    if (!showPicker) {
+      setModelSearch("");
+      setSearchResults([]);
+    }
+  }, [showPicker, selectedProvider]);
 
   return (
     <div className="border-t border-border/30 bg-background px-6 py-4">
@@ -166,64 +209,122 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 </div>
 
                 {/* Models Column */}
-                <div className="flex-1 p-1 overflow-y-auto custom-scrollbar">
-                  {/* Text Models Section */}
-                  {currentProviderData?.text_models && currentProviderData.text_models.length > 0 && (
-                    <div className="mb-4">
-                      <div className="mb-1.5 flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-textMuted">
-                        <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  {/* OpenRouter Search Bar */}
+                  {isOpenRouterBYOK && (
+                    <div className="shrink-0 border-b border-border/20 p-1.5">
+                      <div className="relative">
+                        <svg className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <circle cx="11" cy="11" r="8" />
+                          <path d="m21 21-4.35-4.35" />
                         </svg>
-                        Text Analytics
-                      </div>
-                      <div className="space-y-0.5">
-                        {currentProviderData.text_models.map((m) => (
-                          <button
-                            key={m}
-                            onClick={() => {
-                              onModelChange(selectedProvider!, m);
-                              setShowPicker(false);
-                            }}
-                            className={`w-full rounded-md px-2 py-1.5 text-left text-[11px] transition-colors ${
-                              selectedModel === m ? 'bg-elevated text-primary font-bold' : 'text-textSecondary hover:bg-elevated/50'
-                            }`}
-                          >
-                            {m}
-                          </button>
-                        ))}
+                        <input
+                          type="text"
+                          value={modelSearch}
+                          onChange={(e) => handleModelSearch(e.target.value)}
+                          placeholder="Search 200+ models..."
+                          className="h-7 w-full rounded-md border border-border/30 bg-elevated/50 pl-7 pr-2 text-[11px] text-textPrimary placeholder:text-textMuted focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                        />
+                        {isSearching && (
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
 
-                  {/* Image Models Section */}
-                  {currentProviderData?.image_models && currentProviderData.image_models.length > 0 && (
-                    <div>
-                      <div className="mb-1.5 flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-primary">
-                        <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                          <circle cx="8.5" cy="8.5" r="1.5" />
-                          <polyline points="21 15 16 10 5 21" />
-                        </svg>
-                        Neural Synthesis (Image)
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
+                    {/* Search Results (OpenRouter BYOK only) */}
+                    {isOpenRouterBYOK && searchResults.length > 0 && (
+                      <div className="mb-4">
+                        <div className="mb-1.5 flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-primary">
+                          <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.35-4.35" />
+                          </svg>
+                          Search Results
+                        </div>
+                        <div className="space-y-0.5">
+                          {searchResults.map((m) => (
+                            <button
+                              key={m.id}
+                              onClick={() => {
+                                onModelChange(selectedProvider!, m.id);
+                                setShowPicker(false);
+                              }}
+                              className={`w-full rounded-md px-2 py-1.5 text-left text-[11px] transition-colors ${
+                                selectedModel === m.id ? 'bg-elevated text-primary font-bold' : 'text-textSecondary hover:bg-elevated/50'
+                              }`}
+                            >
+                              <span>{m.id}</span>
+                              {m.context_length && (
+                                <span className="ml-1.5 text-[9px] text-textMuted">{Math.round(m.context_length / 1000)}k</span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      <div className="space-y-0.5">
-                        {currentProviderData.image_models.map((m) => (
-                          <button
-                            key={m}
-                            onClick={() => {
-                              onModelChange(selectedProvider!, m);
-                              setShowPicker(false);
-                            }}
-                            className={`w-full rounded-md px-2 py-1.5 text-left text-[11px] transition-colors ${
-                              selectedModel === m ? 'bg-primary/10 text-primary font-bold shadow-[inset_0_0_8px_rgba(217,255,0,0.1)]' : 'text-textSecondary hover:bg-elevated/50'
-                            }`}
-                          >
-                            {m}
-                          </button>
-                        ))}
+                    )}
+
+                    {/* Text Models Section */}
+                    {currentProviderData?.text_models && currentProviderData.text_models.length > 0 && (
+                      <div className="mb-4">
+                        <div className="mb-1.5 flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-textMuted">
+                          <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                          </svg>
+                          {isOpenRouter ? "Featured Models" : "Text Analytics"}
+                        </div>
+                        <div className="space-y-0.5">
+                          {currentProviderData.text_models.map((m) => (
+                            <button
+                              key={m}
+                              onClick={() => {
+                                onModelChange(selectedProvider!, m);
+                                setShowPicker(false);
+                              }}
+                              className={`w-full rounded-md px-2 py-1.5 text-left text-[11px] transition-colors ${
+                                selectedModel === m ? 'bg-elevated text-primary font-bold' : 'text-textSecondary hover:bg-elevated/50'
+                              }`}
+                            >
+                              {m}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+
+                    {/* Image Models Section */}
+                    {currentProviderData?.image_models && currentProviderData.image_models.length > 0 && (
+                      <div>
+                        <div className="mb-1.5 flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-primary">
+                          <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            <circle cx="8.5" cy="8.5" r="1.5" />
+                            <polyline points="21 15 16 10 5 21" />
+                          </svg>
+                          Neural Synthesis (Image)
+                        </div>
+                        <div className="space-y-0.5">
+                          {currentProviderData.image_models.map((m) => (
+                            <button
+                              key={m}
+                              onClick={() => {
+                                onModelChange(selectedProvider!, m);
+                                setShowPicker(false);
+                              }}
+                              className={`w-full rounded-md px-2 py-1.5 text-left text-[11px] transition-colors ${
+                                selectedModel === m ? 'bg-primary/10 text-primary font-bold shadow-[inset_0_0_8px_rgba(217,255,0,0.1)]' : 'text-textSecondary hover:bg-elevated/50'
+                              }`}
+                            >
+                              {m}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -232,6 +333,6 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
       </div>
     </div>
   );
-});
+}
 
-export default MessageInput;
+
