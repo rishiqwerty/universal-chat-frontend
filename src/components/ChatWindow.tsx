@@ -9,6 +9,13 @@ export type ChatMessage = {
   model?: string;
   isComplete?: boolean;
   images?: string[];
+  provider_metadata?: {
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+    };
+  };
 };
 
 type ChatWindowProps = {
@@ -29,24 +36,27 @@ export default function ChatWindow({ messages, onDeleteMessage }: ChatWindowProp
     return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
   }, []);
 
-  // Scroll to bottom programmatically
+  // Smooth auto-scroll helper
   const scrollToBottom = useCallback(() => {
     isAutoScrolling.current = true;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    // Reset the flag after scroll animation completes
+    setUserScrolledUp(false);
     setTimeout(() => {
       isAutoScrolling.current = false;
-      setUserScrolledUp(false);
-    }, 400);
+    }, 300);
   }, []);
 
-  // Track user scroll
+  // Handle scroll events to detect if user manually scrolled up
   const handleScroll = useCallback(() => {
     if (isAutoScrolling.current) return;
-    setUserScrolledUp(!isNearBottom());
+    if (!isNearBottom()) {
+      setUserScrolledUp(true);
+    } else {
+      setUserScrolledUp(false);
+    }
   }, [isNearBottom]);
 
-  // Auto-scroll when messages change, unless user scrolled up
+  // Scroll to bottom when new messages arrive (only if user hasn't scrolled up)
   useEffect(() => {
     if (!userScrolledUp) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -54,23 +64,25 @@ export default function ChatWindow({ messages, onDeleteMessage }: ChatWindowProp
   }, [messages, userScrolledUp]);
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-      <div
+    <div className="relative flex-1 overflow-hidden bg-background">
+      <div 
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-6 py-6"
+        className="h-full overflow-y-auto px-6 py-6 custom-scrollbar"
       >
-        <div className="mx-auto flex max-w-4xl flex-col gap-4">
+        <div className="mx-auto flex max-w-4xl flex-col gap-6">
           {messages.map((m) => (
             <MessageBubble 
               key={m.id} 
+              id={m.id}
               role={m.role} 
               content={m.content} 
               images={m.images}
               provider={m.provider} 
               model={m.model} 
               isComplete={m.isComplete} 
-              onDelete={onDeleteMessage ? () => onDeleteMessage(m.id) : undefined} 
+              providerMetadata={m.provider_metadata}
+              onDelete={onDeleteMessage} 
             />
           ))}
           <div ref={bottomRef} />

@@ -120,6 +120,13 @@ export type ApiMessage = {
   model: string;
   is_complete: boolean;
   images?: string[];
+  provider_metadata?: {
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+    };
+  };
   created_at: string;
 };
 

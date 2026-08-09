@@ -7,6 +7,7 @@ type MessageInputProps = {
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
+  onStop?: () => void;
   disabled?: boolean;
   isStreaming?: boolean;
   availableModels: ProviderModels[];
@@ -27,6 +28,7 @@ export default function MessageInput({
   value,
   onChange,
   onSend,
+  onStop,
   disabled,
   isStreaming,
   availableModels,
@@ -165,14 +167,26 @@ export default function MessageInput({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={onSend}
-            disabled={disabled || isStreaming || !value.trim()}
-            className="shrink-0 rounded-input bg-primary px-5 text-sm font-semibold text-background shadow-[0_0_16px_rgba(217,255,0,0.2)] transition-colors hover:bg-primaryHover disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Send
-          </button>
+          {isStreaming ? (
+            <button
+              type="button"
+              onClick={onStop}
+              className="flex shrink-0 items-center justify-center gap-1.5 rounded-input border border-red-500/40 bg-red-500/10 px-4 text-xs font-bold uppercase tracking-wider text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.2)] transition-all hover:bg-red-500 hover:text-white"
+              title="Stop generating AI response"
+            >
+              <span className="h-2 w-2 rounded-sm bg-current" />
+              <span>Stop</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onSend}
+              disabled={disabled || !value.trim()}
+              className="shrink-0 rounded-input bg-primary px-5 text-sm font-semibold text-background shadow-[0_0_16px_rgba(217,255,0,0.2)] transition-colors hover:bg-primaryHover disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Send
+            </button>
+          )}
         </div>
 
         {/* Picker Popover */}
