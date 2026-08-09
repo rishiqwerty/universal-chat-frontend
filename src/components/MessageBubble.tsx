@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -7,13 +7,21 @@ import { extractBrowserCode, isBrowserLanguage } from "../utils/codeDetector";
 import CodeRunnerModal from "./CodeRunnerModal";
 
 type MessageBubbleProps = {
+  id?: string;
   role: "user" | "assistant";
   content: string;
   images?: string[];
-  onDelete?: () => void;
+  onDelete?: (id: string) => void;
   provider?: string;
   model?: string;
   isComplete?: boolean;
+  providerMetadata?: {
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+    };
+  };
 };
 
 function CodeBlock({
@@ -108,7 +116,7 @@ function CodeBlock({
   );
 }
 
-export default function MessageBubble({ role, content, images, onDelete, provider, model, isComplete }: MessageBubbleProps) {
+const MessageBubble = memo(function MessageBubble({ id, role, content, images, onDelete, provider, model, isComplete, providerMetadata }: MessageBubbleProps) {
   const isUser = role === "user";
   const [isRunnerOpen, setIsRunnerOpen] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -124,6 +132,10 @@ export default function MessageBubble({ role, content, images, onDelete, provide
     setCopiedIndex(idx);
     setTimeout(() => setCopiedIndex(null), 2000);
   };
+
+  const handleDelete = useCallback(() => {
+    if (onDelete && id) onDelete(id);
+  }, [onDelete, id]);
 
   const renderImages = () => {
     if (!images || images.length === 0) return null;
@@ -170,7 +182,7 @@ export default function MessageBubble({ role, content, images, onDelete, provide
         <div className="flex items-center gap-2">
           {onDelete && (
             <button
-              onClick={onDelete}
+              onClick={handleDelete}
               className="p-1 rounded text-textMuted opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 hover:bg-surface"
               title="Delete message"
             >
@@ -267,7 +279,7 @@ export default function MessageBubble({ role, content, images, onDelete, provide
         </div>
         {onDelete && (
           <button
-            onClick={onDelete}
+            onClick={handleDelete}
             className="mt-2 p-1 rounded text-textMuted opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500 hover:bg-surface"
             title="Delete message"
           >
@@ -277,10 +289,28 @@ export default function MessageBubble({ role, content, images, onDelete, provide
           </button>
         )}
       </div>
-      {(model || provider) && (
+      {(model || provider || providerMetadata?.usage) && (
         <div className="mt-1.5 flex flex-col gap-0.5 px-3 truncate max-w-[min(100%,48rem)]">
-          <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary/60 leading-tight">{provider || "AI"}</span>
-          <span className="text-[10px] font-medium text-textMuted/60 leading-tight tracking-tight">{model}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary/60 leading-tight">{provider || "AI"}</span>
+            {model && <span className="text-[10px] font-medium text-textMuted/60 leading-tight tracking-tight">{model}</span>}
+          </div>
+          {providerMetadata?.usage && (
+            <div className="flex items-center gap-1.5 text-[10px] font-medium text-textMuted/70 mt-0.5">
+              <svg className="h-3 w-3 text-primary/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
+              <span>
+                {providerMetadata.usage.total_tokens ?? 
+                  ((providerMetadata.usage.prompt_tokens || 0) + (providerMetadata.usage.completion_tokens || 0))} tokens
+              </span>
+              {providerMetadata.usage.prompt_tokens !== undefined && providerMetadata.usage.completion_tokens !== undefined && (
+                <span className="text-[9px] text-textMuted/40">
+                  ({providerMetadata.usage.prompt_tokens} prompt • {providerMetadata.usage.completion_tokens} completion)
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
       {isComplete === false && (
@@ -303,4 +333,6 @@ export default function MessageBubble({ role, content, images, onDelete, provide
       />
     </div>
   );
-}
+});
+
+export default MessageBubble;

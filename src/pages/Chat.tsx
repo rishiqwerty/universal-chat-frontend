@@ -51,6 +51,8 @@ export default function Chat() {
 
   const streamControllerRef = useRef<AbortController | null>(null);
   const messageInputRef = useRef<MessageInputHandle>(null);
+  const loadedChatIdRef = useRef<string | null>(null);
+  const pollCountRef = useRef<number>(0);
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [chatIdToDelete, setChatIdToDelete] = useState<string | null>(null);
@@ -78,6 +80,17 @@ export default function Chat() {
     if (streamControllerRef.current) {
       streamControllerRef.current.abort();
       streamControllerRef.current = null;
+      setPending(false);
+      setMessages((prev) =>
+        prev.map((msg, i) =>
+          i === prev.length - 1 && msg.role === "assistant" ? { ...msg, isComplete: true } : msg
+        )
+      );
+      setTempMessages((prev) =>
+        prev.map((msg, i) =>
+          i === prev.length - 1 && msg.role === "assistant" ? { ...msg, isComplete: true } : msg
+        )
+      );
     }
   }, []);
 
@@ -86,6 +99,7 @@ export default function Chat() {
   }, [cancelActiveStream]);
 
   const handleNewChat = useCallback(() => {
+    loadedChatIdRef.current = null;
     if (!activeChatId && messages.length === 0) {
       // Already in a new empty chat, just focus and show glow
       messageInputRef.current?.focus();
@@ -117,11 +131,11 @@ export default function Chat() {
 
     // Auto focus new chat
     setTimeout(() => messageInputRef.current?.focus(), 100);
-  }, [cancelActiveStream, activeChatId, messages.length]);
+  }, [cancelActiveStream, activeChatId, messages.length, isTempMode]);
 
   const loadConversation = useCallback(async (id: string) => {
-    // Only return early if we already have messages for this chat
-    if (id === activeChatId && messages.length > 0) return;
+    if (loadedChatIdRef.current === id) return;
+    loadedChatIdRef.current = id;
 
     cancelActiveStream();
     setIsTempMode(false);
@@ -151,6 +165,7 @@ export default function Chat() {
         model: m.model,
         isComplete: m.is_complete,
         images: m.images,
+        provider_metadata: m.provider_metadata,
       }));
       setMessages(formatted);
 
@@ -174,7 +189,7 @@ export default function Chat() {
           setSelectedModel(model);
         } else {
           // Priority 3: Global default
-          const savedDefault = localStorage.getItem("default_model_config");
+          const savedDefault = localStorage.getItem("saved_default_model_config");
           if (savedDefault) {
             const { provider, model } = JSON.parse(savedDefault);
             setSelectedProvider(provider);
@@ -193,7 +208,7 @@ export default function Chat() {
     } finally {
       setLoadingHistory(false);
     }
-  }, [cancelActiveStream, activeChatId, messages.length, availableModels]);
+  }, [cancelActiveStream, availableModels]);
 
   const syncMessages = useCallback(async (id: string) => {
     try {
@@ -206,6 +221,7 @@ export default function Chat() {
         model: m.model,
         isComplete: m.is_complete,
         images: m.images,
+        provider_metadata: m.provider_metadata,
       }));
       setMessages((prev) => {
         // Find our last locally generated assistant message
@@ -234,16 +250,19 @@ export default function Chat() {
 
   useEffect(() => {
     if (location.state?.newChat) {
+      loadedChatIdRef.current = null;
       handleNewChat();
       navigate(".", { replace: true, state: {} });
     } else if (location.state?.chatId) {
-      loadConversation(location.state.chatId);
+      if (loadedChatIdRef.current !== location.state.chatId) {
+        loadConversation(location.state.chatId);
+      }
       navigate(".", { replace: true, state: {} });
-    } else if (activeChatId && messages.length === 0) {
+    } else if (activeChatId && loadedChatIdRef.current !== activeChatId) {
       // Restore last conversation on refresh
       loadConversation(activeChatId);
     }
-  }, [location.state, handleNewChat, navigate, loadConversation]);  // activeChatId intentionally excluded to avoid re-trigger
+  }, [location.state, handleNewChat, navigate, loadConversation, activeChatId]);
 
   const handleUpdateTitle = useCallback(async (newTitle: string) => {
     if (!activeChatId) {
@@ -375,10 +394,17 @@ export default function Chat() {
               displayContent = displayContent.substring(0, startIdx) + displayContent.substring(endIdx);
             }
 
+            let parsedMeta: any = null;
             // Also strip metadata markers
             while (displayContent.includes(metaStart) && displayContent.includes(metaEnd)) {
               const startIdx = displayContent.indexOf(metaStart);
               const endIdx = displayContent.indexOf(metaEnd) + metaEnd.length;
+              const metaPayload = displayContent.substring(startIdx + metaStart.length, endIdx - metaEnd.length);
+              try {
+                parsedMeta = JSON.parse(metaPayload.trim());
+              } catch (e) {
+                console.error("Failed to parse metadata marker", e);
+              }
               displayContent = displayContent.substring(0, startIdx) + displayContent.substring(endIdx);
             }
 
@@ -387,7 +413,8 @@ export default function Chat() {
                 ? {
                   ...msg,
                   content: displayContent.trim() === "" ? "" : displayContent,
-                  images: foundImages.length > 0 ? [...(msg.images || []), ...foundImages] : msg.images
+                  images: foundImages.length > 0 ? [...(msg.images || []), ...foundImages] : msg.images,
+                  provider_metadata: parsedMeta || msg.provider_metadata,
                 }
                 : msg
             ));
@@ -401,6 +428,9 @@ export default function Chat() {
       } finally {
         setPending(false);
         streamControllerRef.current = null;
+        setTempMessages((m) =>
+          m.map((msg) => (msg.id === assistantMsgId ? { ...msg, isComplete: true } : msg))
+        );
       }
       return;
     }
@@ -458,11 +488,14 @@ export default function Chat() {
           // Check for image markers
           const markerStart = "__IMAGE_START__";
           const markerEnd = "__IMAGE_END__";
+          const metaStart = "__METADATA_START__";
+          const metaEnd = "__METADATA_END__";
 
           let displayContent = accumulatedChunks;
           let foundImages: string[] = [];
+          let parsedMeta: any = null;
 
-          // While there are complete markers, extract them
+          // While there are complete image markers, extract them
           while (displayContent.includes(markerStart) && displayContent.includes(markerEnd)) {
             const startIdx = displayContent.indexOf(markerStart);
             const endIdx = displayContent.indexOf(markerEnd) + markerEnd.length;
@@ -475,7 +508,21 @@ export default function Chat() {
               console.error("Failed to parse image marker", e);
             }
 
-            // Remove marker from the display content
+            displayContent = displayContent.substring(0, startIdx) + displayContent.substring(endIdx);
+          }
+
+          // Parse metadata markers (usage, etc.)
+          while (displayContent.includes(metaStart) && displayContent.includes(metaEnd)) {
+            const startIdx = displayContent.indexOf(metaStart);
+            const endIdx = displayContent.indexOf(metaEnd) + metaEnd.length;
+
+            const metaPayload = displayContent.substring(startIdx + metaStart.length, endIdx - metaEnd.length);
+            try {
+              parsedMeta = JSON.parse(metaPayload.trim());
+            } catch (e) {
+              console.error("Failed to parse metadata marker", e);
+            }
+
             displayContent = displayContent.substring(0, startIdx) + displayContent.substring(endIdx);
           }
 
@@ -488,7 +535,8 @@ export default function Chat() {
                 content: displayContent.trim() === "" ? "" : displayContent,
                 images: foundImages.length > 0 ? foundImages : msg.images,
                 provider: selectedProvider,
-                model: selectedModel
+                model: selectedModel,
+                provider_metadata: parsedMeta || msg.provider_metadata,
               };
             })
           );
@@ -510,6 +558,11 @@ export default function Chat() {
       if (streamControllerRef.current === controller) {
         streamControllerRef.current = null;
         setPending(false);
+
+        // Mark the assistant message as complete in local state
+        setMessages((m) =>
+          m.map((msg) => (msg.id === assistantMsgId ? { ...msg, isComplete: true } : msg))
+        );
 
         // ONLY sync if no error occurred. Syncing on error causes the 
         // failed message (which isn't in DB yet) to be overwritten by stale state.
@@ -557,9 +610,23 @@ export default function Chat() {
   }, [pending, lastMessage]);
 
   useEffect(() => {
-    if (!activeChatId || !isProcessing || pending) return;
+    if (!activeChatId || !isProcessing || pending) {
+      pollCountRef.current = 0;
+      return;
+    }
 
     const interval = setInterval(() => {
+      pollCountRef.current += 1;
+      if (pollCountRef.current > 6) {
+        // Cap polling after 30 seconds and mark complete locally
+        setMessages((prev) =>
+          prev.map((msg, idx) =>
+            idx === prev.length - 1 && msg.role === "assistant" ? { ...msg, isComplete: true } : msg
+          )
+        );
+        clearInterval(interval);
+        return;
+      }
       syncMessages(activeChatId);
     }, 5000);
 
@@ -739,6 +806,7 @@ export default function Chat() {
                       value={draft}
                       onChange={setDraft}
                       onSend={send}
+                      onStop={cancelActiveStream}
                       disabled={true}
                       isStreaming={false}
                       availableModels={availableModels}
@@ -799,7 +867,8 @@ export default function Chat() {
                       value={draft}
                       onChange={setDraft}
                       onSend={send}
-                      disabled={!!streamError || isProcessing}
+                      onStop={cancelActiveStream}
+                      disabled={pending}
                       isStreaming={pending}
                       availableModels={availableModels}
                       selectedProvider={selectedProvider}
@@ -858,7 +927,8 @@ export default function Chat() {
                       value={draft}
                       onChange={setDraft}
                       onSend={send}
-                      disabled={!!streamError || isProcessing}
+                      onStop={cancelActiveStream}
+                      disabled={pending}
                       isStreaming={pending}
                       availableModels={availableModels}
                       selectedProvider={selectedProvider}
