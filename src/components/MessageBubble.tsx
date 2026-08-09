@@ -16,6 +16,98 @@ type MessageBubbleProps = {
   isComplete?: boolean;
 };
 
+function CodeBlock({
+  rawCode,
+  lang,
+  children,
+  showRunButton,
+  onRun,
+  onCopy,
+  isCopied,
+}: {
+  rawCode: string;
+  lang: string;
+  children: React.ReactNode;
+  showRunButton: boolean;
+  onRun: () => void;
+  onCopy: () => void;
+  isCopied: boolean;
+}) {
+  const lineCount = (rawCode.match(/\n/g) || []).length + 1;
+  const isLong = lineCount > 10 || rawCode.length > 350;
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="group/code relative my-3 overflow-hidden rounded-input border border-border/30 bg-[#0d0d0e]">
+      {/* Code Block Top Header */}
+      <div className="flex items-center justify-between border-b border-border/20 bg-elevated/40 px-4 py-1.5 text-xs text-textMuted">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[11px] uppercase tracking-wider font-semibold text-textSecondary">
+            {lang || "code"}
+          </span>
+          {isLong && (
+            <span className="text-[10px] font-medium text-textMuted/70">({lineCount} lines)</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {showRunButton && (
+            <button
+              type="button"
+              onClick={onRun}
+              className="flex items-center gap-1 rounded bg-primary/20 px-2 py-0.5 text-[11px] font-bold text-primary transition-colors hover:bg-primary hover:text-background"
+              title="Run web code in interactive sandbox"
+            >
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              Run Code
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onCopy}
+            className="text-[11px] text-textMuted hover:text-textPrimary transition-colors"
+          >
+            {isCopied ? "Copied!" : "Copy"}
+          </button>
+        </div>
+      </div>
+
+      {/* Code Body Container */}
+      <div className={`relative transition-all duration-300 ${isLong && !isExpanded ? "max-h-[220px] overflow-hidden" : ""}`}>
+        <pre className="overflow-x-auto p-4 text-[13px] leading-relaxed">{children}</pre>
+
+        {/* Gradient Overlay for collapsed code */}
+        {isLong && !isExpanded && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0d0d0e] via-[#0d0d0e]/80 to-transparent" />
+        )}
+      </div>
+
+      {/* Show More / Show Less Toggle Button */}
+      {isLong && (
+        <div className="relative z-10 flex items-center justify-center border-t border-border/10 bg-[#0d0d0e] py-1.5">
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center gap-1.5 rounded-md px-3 py-1 text-[11px] font-semibold text-primary hover:bg-elevated/40 transition-colors"
+          >
+            <span>{isExpanded ? "Show Less" : `Show More (${lineCount} lines)`}</span>
+            <svg
+              className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MessageBubble({ role, content, images, onDelete, provider, model, isComplete }: MessageBubbleProps) {
   const isUser = role === "user";
   const [isRunnerOpen, setIsRunnerOpen] = useState(false);
@@ -142,37 +234,16 @@ export default function MessageBubble({ role, content, images, onDelete, provide
                   const showRunButton = isBrowser && isComplete !== false;
 
                   return (
-                    <div className="group/code relative my-3 overflow-hidden rounded-input border border-border/30 bg-[#0d0d0e]">
-                      {/* Code Block Top Header */}
-                      <div className="flex items-center justify-between border-b border-border/20 bg-elevated/40 px-4 py-1.5 text-xs text-textMuted">
-                        <span className="font-mono text-[11px] uppercase tracking-wider font-semibold text-textSecondary">
-                          {lang || "code"}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          {showRunButton && (
-                            <button
-                              type="button"
-                              onClick={() => setIsRunnerOpen(true)}
-                              className="flex items-center gap-1 rounded bg-primary/20 px-2 py-0.5 text-[11px] font-bold text-primary transition-colors hover:bg-primary hover:text-background"
-                              title="Run web code in interactive sandbox"
-                            >
-                              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
-                                <polygon points="5 3 19 12 5 21 5 3" />
-                              </svg>
-                              Run Code
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleCopyText(rawCode, 1)}
-                            className="text-[11px] text-textMuted hover:text-textPrimary transition-colors"
-                          >
-                            {copiedIndex === 1 ? "Copied!" : "Copy"}
-                          </button>
-                        </div>
-                      </div>
-                      <pre className="overflow-x-auto p-4 text-[13px] leading-relaxed">{children}</pre>
-                    </div>
+                    <CodeBlock
+                      rawCode={rawCode}
+                      lang={lang}
+                      showRunButton={showRunButton}
+                      onRun={() => setIsRunnerOpen(true)}
+                      onCopy={() => handleCopyText(rawCode, 1)}
+                      isCopied={copiedIndex === 1}
+                    >
+                      {children}
+                    </CodeBlock>
                   );
                 },
                 ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-1 marker:text-textMuted">{children}</ul>,
@@ -193,33 +264,6 @@ export default function MessageBubble({ role, content, images, onDelete, provide
             </ReactMarkdown>
           )}
           {renderImages()}
-
-          {/* Dedicated Executable Web Code Banner (Only when isComplete !== false) */}
-          {browserCode.isBrowserCode && isComplete !== false && (
-            <div className="mt-3 flex items-center justify-between rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 backdrop-blur-sm animate-fade-in">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/20 text-primary shrink-0">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polygon points="5 3 19 12 5 21 5 3" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-textPrimary">Executable Web Code Detected</p>
-                  <p className="text-[10px] text-textMuted">{browserCode.langSummary} — Ready to run in interactive sandbox</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsRunnerOpen(true)}
-                className="flex items-center gap-2 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-background shadow-[0_0_12px_rgba(217,255,0,0.25)] transition-all hover:bg-primaryHover hover:scale-[1.02] shrink-0"
-              >
-                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-                Run Code
-              </button>
-            </div>
-          )}
         </div>
         {onDelete && (
           <button
