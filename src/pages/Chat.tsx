@@ -735,7 +735,7 @@ export default function Chat() {
                 >
                   <div className="mx-auto w-full max-w-4xl px-6 pb-6 pt-2">
                     <MessageInput
-                      ref={messageInputRef}
+                      inputRef={messageInputRef}
                       value={draft}
                       onChange={setDraft}
                       onSend={send}
@@ -795,7 +795,7 @@ export default function Chat() {
                       </div>
                     )}
                     <MessageInput
-                      ref={messageInputRef}
+                      inputRef={messageInputRef}
                       value={draft}
                       onChange={setDraft}
                       onSend={send}
@@ -854,7 +854,7 @@ export default function Chat() {
                       </div>
                     )}
                     <MessageInput
-                      ref={messageInputRef}
+                      inputRef={messageInputRef}
                       value={draft}
                       onChange={setDraft}
                       onSend={send}

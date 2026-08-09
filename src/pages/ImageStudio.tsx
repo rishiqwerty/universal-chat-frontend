@@ -342,14 +342,13 @@ export default function ImageStudio() {
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
-        className={`group relative cursor-pointer overflow-hidden rounded-card border bg-surface transition-all ${
-          isGridMode ? "w-full aspect-square" : "w-[240px] flex-shrink-0 snap-start"
-        } ${img.status === "failed"
-          ? "border-red-500/30"
-          : img.status === "completed"
-            ? "border-border/30 hover:border-primary/30 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.06)]"
-            : "border-border/20"
-        }`}
+        className={`group relative cursor-pointer overflow-hidden rounded-card border bg-surface transition-all ${isGridMode ? "w-full aspect-square" : "w-[240px] flex-shrink-0 snap-start"
+          } ${img.status === "failed"
+            ? "border-red-500/30"
+            : img.status === "completed"
+              ? "border-border/30 hover:border-primary/30 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.06)]"
+              : "border-border/20"
+          }`}
         onClick={() => img.status === "completed" && setLightboxImage(img)}
       >
         {img.reference_image_url && (
@@ -428,7 +427,7 @@ export default function ImageStudio() {
                 >
                   Try Again
                 </motion.button>
-                
+
                 {img.payment_mode === "credits" ? (
                   <button
                     onClick={(e) => {
@@ -484,11 +483,8 @@ export default function ImageStudio() {
                           strokeWidth="1"
                           fill="none"
                           animate={{
-                            d: [
-                              `M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${2 + (i % 2) * 3} ${8 + i * 2.5} 10`,
-                              `M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${6 - (i % 2) * 3} ${8 + i * 2.5} 10`,
-                              `M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${2 + (i % 2) * 3} ${8 + i * 2.5} 10`,
-                            ]
+                            opacity: [0.3, 0.8, 0.3],
+                            y: [0, -1, 0],
                           }}
                           transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 }}
                         />
@@ -658,16 +654,15 @@ export default function ImageStudio() {
   const renderSkeletonGrid = (count = 5, isGrid = false) => {
     const items = Array.from({ length: count });
     return (
-      <div className={isGrid 
-        ? "grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-4" 
+      <div className={isGrid
+        ? "grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-4"
         : "flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
       }>
         {items.map((_, i) => (
           <div
             key={`skeleton-${i}`}
-            className={`relative overflow-hidden rounded-card border border-border/20 bg-surface/40 p-1 flex-shrink-0 ${
-              isGrid ? "w-full aspect-square" : "w-[240px] h-[240px]"
-            }`}
+            className={`relative overflow-hidden rounded-card border border-border/20 bg-surface/40 p-1 flex-shrink-0 ${isGrid ? "w-full aspect-square" : "w-[240px] h-[240px]"
+              }`}
           >
             <div className="relative h-full w-full rounded-[10px] overflow-hidden bg-elevated/40 flex items-center justify-center">
               {/* Shimmer animation */}
@@ -771,9 +766,8 @@ export default function ImageStudio() {
             <div className="sticky top-0 z-30 bg-background pt-6 pb-3 mb-6 flex gap-6 md:gap-8 border-b border-border/20">
               <button
                 onClick={() => setActiveTab("generations")}
-                className={`relative pb-3 text-sm font-bold uppercase tracking-wider transition-colors ${
-                  activeTab === "generations" ? "text-primary" : "text-textMuted hover:text-textSecondary"
-                }`}
+                className={`relative pb-3 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === "generations" ? "text-primary" : "text-textMuted hover:text-textSecondary"
+                  }`}
                 style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               >
                 Recent Generations
@@ -787,9 +781,8 @@ export default function ImageStudio() {
               </button>
               <button
                 onClick={() => setActiveTab("presets")}
-                className={`relative pb-3 text-sm font-bold uppercase tracking-wider transition-colors ${
-                  activeTab === "presets" ? "text-primary" : "text-textMuted hover:text-textSecondary"
-                }`}
+                className={`relative pb-3 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === "presets" ? "text-primary" : "text-textMuted hover:text-textSecondary"
+                  }`}
                 style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               >
                 Preset Libraries
@@ -948,11 +941,10 @@ export default function ImageStudio() {
                           <button
                             key={cat}
                             onClick={() => setSelectedCategory(cat)}
-                            className={`rounded-full px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
-                              isActive
+                            className={`rounded-full px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${isActive
                                 ? "bg-primary text-background shadow-md shadow-primary/10"
                                 : "bg-surface-elevated border border-border/40 text-textMuted hover:text-textSecondary hover:bg-surface"
-                            }`}
+                              }`}
                           >
                             {cat}
                           </button>
@@ -1092,188 +1084,188 @@ export default function ImageStudio() {
                     <div className="flex flex-col gap-3 pb-2">
                       {/* Top row: controls */}
                       <div className="flex flex-wrap items-end gap-3">
-                {/* Provider & Model */}
-                {paymentMode !== "free_queue" && (
-                  hasModels ? (
-                    <>
-                      <div className="w-full sm:w-auto min-w-[120px] flex-1 sm:flex-initial">
-                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Provider</label>
-                        <select
-                          value={selectedProvider}
-                          onChange={(e) => handleProviderChange(e.target.value)}
-                          className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
-                        >
-                          {providerKeys.map((p) => (
-                            <option key={p} value={p}>
-                              {p.charAt(0).toUpperCase() + p.slice(1)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="w-full sm:w-auto min-w-[160px] flex-1 sm:flex-initial">
-                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Model</label>
-                        <select
-                          value={selectedModel}
-                          onChange={(e) => setSelectedModel(e.target.value)}
-                          className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
-                        >
-                          {(models[selectedProvider] || []).map((m) => (
-                            <option key={m} value={m}>{m}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="h-9 flex items-center rounded-input border border-border/40 bg-surface/50 px-3 text-xs text-textMuted w-full sm:w-auto">
-                      No image models found.{" "}
-                      <a href="/settings" className="ml-1 text-primary underline">Add a key</a>.
-                    </div>
-                  )
-                )}
+                        {/* Provider & Model */}
+                        {paymentMode !== "free_queue" && (
+                          hasModels ? (
+                            <>
+                              <div className="w-full sm:w-auto min-w-[120px] flex-1 sm:flex-initial">
+                                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Provider</label>
+                                <select
+                                  value={selectedProvider}
+                                  onChange={(e) => handleProviderChange(e.target.value)}
+                                  className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
+                                >
+                                  {providerKeys.map((p) => (
+                                    <option key={p} value={p}>
+                                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="w-full sm:w-auto min-w-[160px] flex-1 sm:flex-initial">
+                                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Model</label>
+                                <select
+                                  value={selectedModel}
+                                  onChange={(e) => setSelectedModel(e.target.value)}
+                                  className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
+                                >
+                                  {(models[selectedProvider] || []).map((m) => (
+                                    <option key={m} value={m}>{m}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="h-9 flex items-center rounded-input border border-border/40 bg-surface/50 px-3 text-xs text-textMuted w-full sm:w-auto">
+                              No image models found.{" "}
+                              <a href="/settings" className="ml-1 text-primary underline">Add a key</a>.
+                            </div>
+                          )
+                        )}
 
-                <div className="w-full sm:w-auto min-w-[110px] flex-1 sm:flex-initial">
-                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Aspect Ratio</label>
-                  <select
-                    value={aspectRatio}
-                    onChange={(e) => setAspectRatio(e.target.value)}
-                    className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors cursor-pointer"
-                  >
-                    {ASPECT_RATIOS.map((ar) => (
-                      <option key={ar} value={ar}>{ar}</option>
-                    ))}
-                  </select>
-                </div>
+                        <div className="w-full sm:w-auto min-w-[110px] flex-1 sm:flex-initial">
+                          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Aspect Ratio</label>
+                          <select
+                            value={aspectRatio}
+                            onChange={(e) => setAspectRatio(e.target.value)}
+                            className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                          >
+                            {ASPECT_RATIOS.map((ar) => (
+                              <option key={ar} value={ar}>{ar}</option>
+                            ))}
+                          </select>
+                        </div>
 
-                {/* Pill Shaped Switcher */}
-                <div className="w-full sm:w-auto flex-1 sm:flex-initial">
-                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Payment</label>
-                  <div className="flex h-9 w-full sm:w-auto items-center rounded-full border border-border/40 bg-surface/40 p-1">
-                    <button
-                      onClick={() => setPaymentMode("own_key")}
-                      className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-2 rounded-full px-4 transition-all ${paymentMode === "own_key"
-                        ? "text-textPrimary"
-                        : "text-textMuted hover:text-textSecondary"
-                        }`}
-                    >
-                      {paymentMode === "own_key" && (
+                        {/* Pill Shaped Switcher */}
+                        <div className="w-full sm:w-auto flex-1 sm:flex-initial">
+                          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Payment</label>
+                          <div className="flex h-9 w-full sm:w-auto items-center rounded-full border border-border/40 bg-surface/40 p-1">
+                            <button
+                              onClick={() => setPaymentMode("own_key")}
+                              className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-2 rounded-full px-4 transition-all ${paymentMode === "own_key"
+                                ? "text-textPrimary"
+                                : "text-textMuted hover:text-textSecondary"
+                                }`}
+                            >
+                              {paymentMode === "own_key" && (
+                                <motion.div
+                                  layoutId="pill-highlight"
+                                  className="absolute inset-0 rounded-full bg-elevated shadow-sm ring-1 ring-border/20"
+                                  initial={false}
+                                  transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                                />
+                              )}
+                              <div className="relative z-10 flex items-center gap-2">
+                                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                </svg>
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Personal</span>
+                              </div>
+                            </button>
+
+                            <button
+                              onClick={() => setPaymentMode("credits")}
+                              className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-2 rounded-full px-4 transition-all ${paymentMode === "credits"
+                                ? "bg-primary text-background shadow-[0_0_15px_rgba(var(--color-primary),0.4)]"
+                                : "text-textMuted hover:text-textSecondary"
+                                }`}
+                            >
+                              {paymentMode === "credits" && (
+                                <motion.div
+                                  layoutId="pill-highlight"
+                                  className="absolute inset-0 rounded-full bg-primary ring-2 ring-primary ring-offset-2 ring-offset-background"
+                                  initial={false}
+                                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                                />
+                              )}
+                              <div className="relative z-10 flex items-center gap-2">
+                                <motion.svg
+                                  animate={{
+                                    opacity: [1, 0.4, 1, 0.2, 1],
+                                    filter: [
+                                      "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 2px rgba(255, 0, 255, 0))",
+                                      "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 12px rgba(255, 0, 255, 1))",
+                                      "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 4px rgba(255, 0, 255, 0.5))",
+                                      "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 15px rgba(255, 0, 255, 1))",
+                                      "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 2px rgba(255, 0, 255, 0))"
+                                    ],
+                                    scale: [1, 1.1, 0.9, 1.2, 1],
+                                  }}
+                                  transition={{
+                                    duration: 0.4,
+                                    repeat: Infinity,
+                                    repeatDelay: Math.random() * 2 + 1,
+                                    times: [0, 0.1, 0.2, 0.3, 1]
+                                  }}
+                                  className={`h-3 w-3 ${paymentMode === "credits" ? "text-[#FF00FF]" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </motion.svg>
+                                <span className="text-[10px] font-black uppercase tracking-wider">Use Credits</span>
+                              </div>
+                            </button>
+
+                            <button
+                              onClick={() => setPaymentMode("free_queue")}
+                              className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-2 rounded-full px-4 transition-all ${paymentMode === "free_queue"
+                                ? "text-textPrimary"
+                                : "text-textMuted hover:text-textSecondary"
+                                }`}
+                            >
+                              {paymentMode === "free_queue" && (
+                                <motion.div
+                                  layoutId="pill-highlight"
+                                  className="absolute inset-0 rounded-full bg-elevated shadow-sm ring-1 ring-border/20"
+                                  initial={false}
+                                  transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                                />
+                              )}
+                              <div className="relative z-10 flex items-center gap-2">
+                                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span className="text-[10px] font-bold uppercase tracking-wider">
+                                  Free {queueStatus ? `(${Math.max(0, queueStatus.limit - queueStatus.used_today)}/${queueStatus.limit})` : ""}
+                                </span>
+                              </div>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Dynamic Payment Mode Info/Description */}
+                      <div className="mb-3 text-[11px] leading-relaxed text-textSecondary bg-surface/30 rounded-lg p-3 border border-border/20 flex flex-col gap-1.5">
+                        {paymentMode === "own_key" && (
+                          <div>
+                            <span className="font-semibold text-textPrimary">Personal API Key:</span> Generates images instantly using your own configured keys in Settings. No credits consumed.
+                          </div>
+                        )}
+                        {paymentMode === "credits" && (
+                          <div>
+                            <span className="font-semibold text-primary">⚡ Instant Generation (5 Credits):</span> High-priority, premium generation with dedicated resources. Images start synthesizing immediately without queue delays.
+                          </div>
+                        )}
+                        {paymentMode === "free_queue" && (
+                          <div className="flex flex-col gap-1">
+                            <div>
+                              <span className="font-semibold text-textPrimary">⏳ Standard Queue (Free / 2 Credits):</span> Background-priority queue generation. Images are queued and processed using system default models.
+                            </div>
+                            <div className="text-[10px] text-textMuted border-t border-border/10 pt-1 mt-1">
+                              Free for first <strong className="text-textPrimary">{queueStatus?.limit || 3} generations/week</strong>, then costs <strong className="text-textPrimary">2 credits</strong> per generation.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {paymentMode === "free_queue" && queueStatus && queueStatus.used_today >= queueStatus.limit && (
                         <motion.div
-                          layoutId="pill-highlight"
-                          className="absolute inset-0 rounded-full bg-elevated shadow-sm ring-1 ring-border/20"
-                          initial={false}
-                          transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-                        />
-                      )}
-                      <div className="relative z-10 flex items-center gap-2">
-                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                        </svg>
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Personal</span>
-                      </div>
-                    </button>
-
-                    <button
-                      onClick={() => setPaymentMode("credits")}
-                      className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-2 rounded-full px-4 transition-all ${paymentMode === "credits"
-                        ? "bg-primary text-background shadow-[0_0_15px_rgba(var(--color-primary),0.4)]"
-                        : "text-textMuted hover:text-textSecondary"
-                        }`}
-                    >
-                      {paymentMode === "credits" && (
-                        <motion.div
-                          layoutId="pill-highlight"
-                          className="absolute inset-0 rounded-full bg-primary ring-2 ring-primary ring-offset-2 ring-offset-background"
-                          initial={false}
-                          transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                        />
-                      )}
-                      <div className="relative z-10 flex items-center gap-2">
-                        <motion.svg
-                          animate={{
-                            opacity: [1, 0.4, 1, 0.2, 1],
-                            filter: [
-                              "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 2px rgba(255, 0, 255, 0))",
-                              "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 12px rgba(255, 0, 255, 1))",
-                              "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 4px rgba(255, 0, 255, 0.5))",
-                              "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 15px rgba(255, 0, 255, 1))",
-                              "drop-shadow(0 0 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 2px rgba(255, 0, 255, 0))"
-                            ],
-                            scale: [1, 1.1, 0.9, 1.2, 1],
-                          }}
-                          transition={{
-                            duration: 0.4,
-                            repeat: Infinity,
-                            repeatDelay: Math.random() * 2 + 1,
-                            times: [0, 0.1, 0.2, 0.3, 1]
-                          }}
-                          className={`h-3 w-3 ${paymentMode === "credits" ? "text-[#FF00FF]" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mb-2 text-[10px] text-amber-500/90 leading-normal px-1"
                         >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </motion.svg>
-                        <span className="text-[10px] font-black uppercase tracking-wider">Use Credits</span>
-                      </div>
-                    </button>
-
-                    <button
-                      onClick={() => setPaymentMode("free_queue")}
-                      className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-2 rounded-full px-4 transition-all ${paymentMode === "free_queue"
-                        ? "text-textPrimary"
-                        : "text-textMuted hover:text-textSecondary"
-                        }`}
-                    >
-                      {paymentMode === "free_queue" && (
-                        <motion.div
-                          layoutId="pill-highlight"
-                          className="absolute inset-0 rounded-full bg-elevated shadow-sm ring-1 ring-border/20"
-                          initial={false}
-                          transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-                        />
+                          ⚠️ Weekly free limit reached ({queueStatus.used_today}/{queueStatus.limit}). Want immediate processing? <button type="button" onClick={() => setPaymentMode("credits")} className="font-bold underline text-amber-400 hover:text-amber-300 transition-colors">Switch to Instant Generation</button> (⚡ 5 Credits).
+                        </motion.div>
                       )}
-                      <div className="relative z-10 flex items-center gap-2">
-                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-[10px] font-bold uppercase tracking-wider">
-                          Free {queueStatus ? `(${Math.max(0, queueStatus.limit - queueStatus.used_today)}/${queueStatus.limit})` : ""}
-                        </span>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dynamic Payment Mode Info/Description */}
-              <div className="mb-3 text-[11px] leading-relaxed text-textSecondary bg-surface/30 rounded-lg p-3 border border-border/20 flex flex-col gap-1.5">
-                {paymentMode === "own_key" && (
-                  <div>
-                    <span className="font-semibold text-textPrimary">Personal API Key:</span> Generates images instantly using your own configured keys in Settings. No credits consumed.
-                  </div>
-                )}
-                {paymentMode === "credits" && (
-                  <div>
-                    <span className="font-semibold text-primary">⚡ Instant Generation (5 Credits):</span> High-priority, premium generation with dedicated resources. Images start synthesizing immediately without queue delays.
-                  </div>
-                )}
-                {paymentMode === "free_queue" && (
-                  <div className="flex flex-col gap-1">
-                    <div>
-                      <span className="font-semibold text-textPrimary">⏳ Standard Queue (Free / 2 Credits):</span> Background-priority queue generation. Images are queued and processed using system default models.
-                    </div>
-                    <div className="text-[10px] text-textMuted border-t border-border/10 pt-1 mt-1">
-                      Free for first <strong className="text-textPrimary">{queueStatus?.limit || 3} generations/week</strong>, then costs <strong className="text-textPrimary">2 credits</strong> per generation.
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {paymentMode === "free_queue" && queueStatus && queueStatus.used_today >= queueStatus.limit && (
-                <motion.div
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-2 text-[10px] text-amber-500/90 leading-normal px-1"
-                >
-                  ⚠️ Weekly free limit reached ({queueStatus.used_today}/{queueStatus.limit}). Want immediate processing? <button type="button" onClick={() => setPaymentMode("credits")} className="font-bold underline text-amber-400 hover:text-amber-300 transition-colors">Switch to Instant Generation</button> (⚡ 5 Credits).
-                </motion.div>
-              )}
                     </div>
                   </motion.div>
                 )}
@@ -1372,8 +1364,8 @@ export default function ImageStudio() {
                       selectedPreset
                         ? "Type additional instructions to customize this preset style..."
                         : paymentMode === "free_queue"
-                        ? "Describe the image you want to request..."
-                        : "Describe the image you want to create..."
+                          ? "Describe the image you want to request..."
+                          : "Describe the image you want to create..."
                     }
                     rows={1}
                     disabled={generating}
@@ -1394,11 +1386,10 @@ export default function ImageStudio() {
                         }
                         setShowOptions(!showOptions);
                       }}
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
-                        showOptions
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${showOptions
                           ? "border-primary/50 text-primary bg-primary/10"
                           : "border-border/30 bg-surface-elevated text-textMuted hover:text-primary hover:border-primary/50"
-                      }`}
+                        }`}
                       title="Toggle Options"
                     >
                       <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1411,11 +1402,10 @@ export default function ImageStudio() {
                     <div className="relative">
                       <label
                         title="Upload image"
-                        className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition-all disabled:opacity-50 ${
-                          selectedPreset && !referenceImage && !dismissedPresetPrompt
+                        className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition-all disabled:opacity-50 ${selectedPreset && !referenceImage && !dismissedPresetPrompt
                             ? "border-primary text-primary bg-primary/5 shadow-[0_0_12px_rgba(var(--color-primary),0.25)] ring-1 ring-primary animate-pulse"
                             : "border-border/30 bg-surface-elevated text-textMuted hover:border-primary/50 hover:text-primary"
-                        }`}
+                          }`}
                       >
                         <input
                           ref={fileInputRef}
@@ -1454,7 +1444,7 @@ export default function ImageStudio() {
                         )}
                       </AnimatePresence>
                     </div>
-                    
+
                     {/* Selected payment indicator when options are minimized */}
                     {!showOptions && !generating && (
                       <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-textSecondary bg-surface-elevated px-2.5 h-8 rounded-lg border border-border/30">
