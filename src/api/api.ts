@@ -487,6 +487,7 @@ export type StudioPreset = {
   prompt?: string;
   image_url: string;
   thumbnail_url?: string | null;
+  before_image_url?: string | null;
   description: string;
 };
 

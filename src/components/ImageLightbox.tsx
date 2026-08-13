@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
+import BeforeAfterSlider from "./BeforeAfterSlider";
 import { resolveImagePath, getProxyDownloadUrl, type GeneratedImage, type StudioPreset } from "../api/api";
 
 type Props = {
@@ -60,13 +61,25 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
             className="relative mx-4 w-full max-w-2xl overflow-hidden rounded-card border border-border/40 bg-surface shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Image */}
+            {/* Image / Before After Slider */}
             <div className="flex items-center justify-center bg-background/50 p-2">
-              <img
-                src={resolveImagePath(image.thumbnail_url || image.image_url)}
-                alt={isPreset(image) ? image.title : image.prompt}
-                className="max-h-[60vh] rounded object-contain"
-              />
+              {isPreset(image) && image.before_image_url ? (
+                <div className="w-full flex items-center justify-center p-1">
+                  <BeforeAfterSlider
+                    beforeImage={resolveImagePath(image.before_image_url)}
+                    afterImage={resolveImagePath(image.thumbnail_url || image.image_url)}
+                    altTitle={image.title}
+                    aspectRatio="aspect-square"
+                    className="max-h-[55vh] max-w-[500px] w-full mx-auto"
+                  />
+                </div>
+              ) : (
+                <img
+                  src={resolveImagePath(image.thumbnail_url || image.image_url)}
+                  alt={isPreset(image) ? image.title : image.prompt}
+                  className="max-h-[60vh] rounded object-contain"
+                />
+              )}
             </div>
 
             {/* Info Bar */}

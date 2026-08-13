@@ -100,13 +100,6 @@ export default function Chat() {
 
   const handleNewChat = useCallback(() => {
     loadedChatIdRef.current = null;
-    if (!activeChatId && messages.length === 0) {
-      // Already in a new empty chat, just focus and show glow
-      messageInputRef.current?.focus();
-      messageInputRef.current?.triggerGlow();
-      return;
-    }
-
     cancelActiveStream();
     setPending(false);
 
@@ -131,7 +124,7 @@ export default function Chat() {
 
     // Auto focus new chat
     setTimeout(() => messageInputRef.current?.focus(), 100);
-  }, [cancelActiveStream, activeChatId, messages.length, isTempMode]);
+  }, [cancelActiveStream, isTempMode]);
 
   const loadConversation = useCallback(async (id: string) => {
     if (loadedChatIdRef.current === id) return;
@@ -250,19 +243,19 @@ export default function Chat() {
 
   useEffect(() => {
     if (location.state?.newChat) {
-      loadedChatIdRef.current = null;
+      navigate(".", { replace: true, state: {} });
       handleNewChat();
-      navigate(".", { replace: true, state: {} });
     } else if (location.state?.chatId) {
-      if (loadedChatIdRef.current !== location.state.chatId) {
-        loadConversation(location.state.chatId);
-      }
+      const targetId = location.state.chatId;
       navigate(".", { replace: true, state: {} });
-    } else if (activeChatId && loadedChatIdRef.current !== activeChatId) {
+      if (loadedChatIdRef.current !== targetId) {
+        loadConversation(targetId);
+      }
+    } else if (activeChatId && loadedChatIdRef.current !== activeChatId && !pending) {
       // Restore last conversation on refresh
       loadConversation(activeChatId);
     }
-  }, [location.state, handleNewChat, navigate, loadConversation, activeChatId]);
+  }, [location.state?.newChat, location.state?.chatId, activeChatId, pending, handleNewChat, loadConversation, navigate]);
 
   const handleUpdateTitle = useCallback(async (newTitle: string) => {
     if (!activeChatId) {
@@ -440,6 +433,7 @@ export default function Chat() {
       try {
         const conv = await createConversation(activeChatTitle || "Untitled Chat");
         currentChatId = conv.id;
+        loadedChatIdRef.current = conv.id;
         setActiveChatId(conv.id);
         localStorage.setItem("activeChatId", conv.id);
         setActiveChatTitle(conv.title);

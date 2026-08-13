@@ -4,6 +4,7 @@ import Sidebar from "../components/Sidebar";
 import ConfirmModal from "../components/ConfirmModal";
 import Topbar from "../components/Topbar";
 import ImageLightbox from "../components/ImageLightbox";
+import BeforeAfterSlider from "../components/BeforeAfterSlider";
 import PageTransition from "../components/PageTransition";
 import { getStudioPollingInterval } from "../config";
 import {
@@ -1001,12 +1002,20 @@ export default function ImageStudio() {
                           onClick={() => setLightboxImage(preset)}
                           className="group relative aspect-square cursor-pointer rounded-card border border-border/30 bg-surface overflow-hidden hover:border-primary/20 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.04)] transition-all"
                         >
-                          <img
-                            src={resolveImagePath(preset.thumbnail_url || preset.image_url)}
-                            alt={preset.title}
-                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            loading="lazy"
-                          />
+                          {preset.before_image_url ? (
+                            <BeforeAfterSlider
+                              beforeImage={resolveImagePath(preset.before_image_url)}
+                              afterImage={resolveImagePath(preset.thumbnail_url || preset.image_url)}
+                              altTitle={preset.title}
+                            />
+                          ) : (
+                            <img
+                              src={resolveImagePath(preset.thumbnail_url || preset.image_url)}
+                              alt={preset.title}
+                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              loading="lazy"
+                            />
+                          )}
                           <div className="absolute left-3 top-3 rounded bg-background/80 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary border border-primary/20 backdrop-blur-sm z-10">
                             {preset.category}
                           </div>
