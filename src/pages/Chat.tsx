@@ -13,6 +13,7 @@ import SignupModal from "../components/SignupModal";
 import PageTransition from "../components/PageTransition";
 import UpgradeFlyer from "../components/UpgradeFlyer";
 import { useDocumentSEO } from "../hooks/useDocumentSEO";
+import { useAuth } from "../context/AuthContext";
 
 const initialMessages: ChatMessage[] = [];
 
@@ -24,6 +25,7 @@ export default function Chat() {
 
   const location = useLocation();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
@@ -42,11 +44,8 @@ export default function Chat() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
 
-  const [isTempMode, setIsTempMode] = useState(() => {
-    return localStorage.getItem("isAuthenticated") !== "true";
-  });
+  const [isTempMode, setIsTempMode] = useState(!isAuthenticated);
   const [tempMessages, setTempMessages] = useState<ChatMessage[]>([]);
-  const isAuthenticated = useMemo(() => localStorage.getItem("isAuthenticated") === "true", []);
   const [loadingRecentChats, setLoadingRecentChats] = useState(isAuthenticated);
 
   const streamControllerRef = useRef<AbortController | null>(null);
@@ -328,7 +327,6 @@ export default function Chat() {
     const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: "user", content: text };
 
     if (isTempMode) {
-      const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
       if (!isAuthenticated && tempMessages.length >= 30) {
         setIsSignupModalOpen(true);
         return;
@@ -628,12 +626,16 @@ export default function Chat() {
   }, [activeChatId, isProcessing, pending, syncMessages]);
 
   useEffect(() => {
+    setIsTempMode(!isAuthenticated);
     if (isAuthenticated) {
       setLoadingRecentChats(true);
       getRecentConversations(true)
         .then((chats) => setRecentChats(chats))
         .catch(() => { })
         .finally(() => setLoadingRecentChats(false));
+    } else {
+      setRecentChats([]);
+      setLoadingRecentChats(false);
     }
 
     getAvailableModels()
@@ -670,7 +672,7 @@ export default function Chat() {
         }
       })
       .catch(() => { });
-  }, []);
+  }, [isAuthenticated]);
 
   const renderChatHistorySkeleton = () => {
     return (

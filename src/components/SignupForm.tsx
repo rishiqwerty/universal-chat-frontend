@@ -170,9 +170,13 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
         </div>
 
         {!showPasswordOtp && (
-          <p className="text-center text-[11px] text-textMuted leading-relaxed">
-            🔒 Instant Account Setup • Powered by Google Authentication
-          </p>
+          <div className="flex items-center justify-center gap-1.5 text-[11px] text-textMuted leading-relaxed">
+            <svg className="h-3 w-3 text-textMuted/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <span>Instant Workspace Setup • Google Authentication</span>
+          </div>
         )}
 
         {error ? (

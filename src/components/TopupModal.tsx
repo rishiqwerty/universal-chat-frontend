@@ -110,9 +110,57 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
               )}
             </div>
  
+            {/* Legal & Payment Gateway Compliance Links */}
+            <div className="mt-6 border-t border-border/30 pt-4 text-center text-[11px] text-textMuted">
+              <div className="flex items-center justify-center gap-2.5">
+                <a
+                  href="/refund-policy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-textMuted hover:text-primary transition-colors underline underline-offset-2"
+                >
+                  Refund Policy
+                </a>
+                <span>•</span>
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-textMuted hover:text-primary transition-colors underline underline-offset-2"
+                >
+                  Terms
+                </a>
+                <span>•</span>
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-textMuted hover:text-primary transition-colors underline underline-offset-2"
+                >
+                  Privacy
+                </a>
+                <span>•</span>
+                <a
+                  href="/contact-us"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-textMuted hover:text-primary transition-colors underline underline-offset-2"
+                >
+                  Support
+                </a>
+              </div>
+              <div className="mt-2 flex items-center justify-center gap-1.5 text-[10px] text-textMuted/70">
+                <svg className="h-3 w-3 text-primary/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                <span>Instant electronic delivery • 256-bit encrypted checkout</span>
+              </div>
+            </div>
+
             <button
               onClick={onClose}
-              className="mt-8 w-full py-3 text-sm font-medium text-textMuted hover:text-textPrimary hover:scale-[1.02] transition-all"
+              className="mt-4 w-full py-2 text-xs font-medium text-textMuted hover:text-textPrimary hover:scale-[1.02] transition-all"
             >
               Maybe later
             </button>
