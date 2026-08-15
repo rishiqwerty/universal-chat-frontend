@@ -12,6 +12,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { useDocumentSEO } from "../hooks/useDocumentSEO";
+import { useAuth } from "../context/AuthContext";
 
 export default function Documentation() {
   useDocumentSEO({
@@ -19,7 +20,7 @@ export default function Documentation() {
     description: "Read setup guides, api configurations, credits billing guidelines, and Model Context Protocol instructions.",
   });
 
-  const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
+  const { isAuthenticated } = useAuth();
   const [docs, setDocs] = useState<DocMetadata[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>("");
   const [selectedDoc, setSelectedDoc] = useState<DocDetail | null>(null);
