@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import SignupForm from "../components/SignupForm";
 import PageTransition from "../components/PageTransition";
 import { useDocumentSEO } from "../hooks/useDocumentSEO";
@@ -18,16 +19,19 @@ export default function Signup() {
         <div className="relative w-full max-w-[420px]">
           <SignupForm />
 
-          <footer className="mt-16 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
-            <button type="button" className="hover:text-textSecondary">
-              Security protocol
-            </button>
-            <button type="button" className="hover:text-textSecondary">
-              API documentation
-            </button>
-            <button type="button" className="hover:text-textSecondary">
-              Privacy systems
-            </button>
+          <footer className="mt-12 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
+            <Link to="/terms" className="hover:text-primary transition-colors">
+              Terms & Conditions
+            </Link>
+            <Link to="/privacy" className="hover:text-primary transition-colors">
+              Privacy Policy
+            </Link>
+            <Link to="/refund-policy" className="hover:text-primary transition-colors">
+              Refund Policy
+            </Link>
+            <Link to="/contact-us" className="hover:text-primary transition-colors">
+              Contact Us
+            </Link>
           </footer>
         </div>
       </div>

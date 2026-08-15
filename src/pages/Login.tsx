@@ -165,9 +165,13 @@ export default function Login() {
             </div>
 
             {!showPasswordOtp && (
-              <p className="text-center text-[11px] text-textMuted leading-relaxed">
-                🔒 Secure Single Sign-On (SSO) • No password required
-              </p>
+              <div className="flex items-center justify-center gap-1.5 text-[11px] text-textMuted leading-relaxed">
+                <svg className="h-3 w-3 text-textMuted/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                <span>Single Sign-On (SSO) • Passwordless authentication</span>
+              </div>
             )}
 
             {error && (
@@ -354,15 +358,18 @@ export default function Login() {
             </Link>
           </p>
 
-          <footer className="mt-16 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
-            <button type="button" className="hover:text-textSecondary">
-              Privacy Protocol
-            </button>
-            <button type="button" className="hover:text-textSecondary">
-              Terms of Ingress
-            </button>
-            <Link to="/" className="hover:text-textSecondary">
-              System Root
+          <footer className="mt-12 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
+            <Link to="/privacy" className="hover:text-primary transition-colors">
+              Privacy Policy
+            </Link>
+            <Link to="/terms" className="hover:text-primary transition-colors">
+              Terms & Conditions
+            </Link>
+            <Link to="/refund-policy" className="hover:text-primary transition-colors">
+              Refund Policy
+            </Link>
+            <Link to="/contact-us" className="hover:text-primary transition-colors">
+              Contact Us
             </Link>
           </footer>
         </div>

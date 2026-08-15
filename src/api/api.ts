@@ -537,10 +537,20 @@ export async function testMcpTool(toolName: string, args: Record<string, any>): 
   return data;
 }
 
+export type DocVersion = {
+  version: string;
+  date: string;
+  summary: string;
+  is_current: boolean;
+};
+
 export type DocMetadata = {
   id: string;
   title: string;
   description: string;
+  current_version?: string;
+  effective_date?: string;
+  last_updated?: string;
 };
 
 export type DocDetail = {
@@ -548,6 +558,11 @@ export type DocDetail = {
   title: string;
   description: string;
   content_markdown: string;
+  version?: string;
+  effective_date?: string;
+  last_updated?: string;
+  is_current?: boolean;
+  versions?: DocVersion[];
 };
 
 export async function getDocumentsList(): Promise<DocMetadata[]> {
@@ -555,8 +570,9 @@ export async function getDocumentsList(): Promise<DocMetadata[]> {
   return data;
 }
 
-export async function getDocumentDetails(id: string): Promise<DocDetail> {
-  const { data } = await client.get(`/docs/${id}`);
+export async function getDocumentDetails(id: string, version?: string): Promise<DocDetail> {
+  const url = version ? `/docs/${id}?version=${encodeURIComponent(version)}` : `/docs/${id}`;
+  const { data } = await client.get(url);
   return data;
 }
 

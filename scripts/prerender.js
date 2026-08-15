@@ -90,6 +90,104 @@ const routes = [
       'url': `${SITE_URL}/signup`,
       'description': 'Initialize your operative account and get access to the AI interface.'
     }
+  },
+  {
+    path: '/docs',
+    title: 'Documentation | Neural Architect',
+    description: 'Read setup guides, api configurations, credits billing guidelines, and Model Context Protocol instructions.',
+    canonical: `${SITE_URL}/docs`,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      '@id': `${SITE_URL}/docs#webpage`,
+      'name': 'Documentation - Neural Architect',
+      'url': `${SITE_URL}/docs`,
+      'description': 'Read setup guides, api configurations, credits billing guidelines, and Model Context Protocol instructions.'
+    }
+  },
+  {
+    path: '/terms',
+    title: 'Terms & Conditions | Neural Architect',
+    description: 'Universal user agreement, acceptable use rules, and platform terms of service.',
+    canonical: `${SITE_URL}/terms`,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      '@id': `${SITE_URL}/terms#webpage`,
+      'name': 'Terms & Conditions - Neural Architect',
+      'url': `${SITE_URL}/terms`,
+      'description': 'Universal user agreement, acceptable use rules, and platform terms of service.'
+    }
+  },
+  {
+    path: '/privacy',
+    title: 'Privacy Policy | Neural Architect',
+    description: 'How we protect, process, and respect your personal data and AI workspace privacy.',
+    canonical: `${SITE_URL}/privacy`,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      '@id': `${SITE_URL}/privacy#webpage`,
+      'name': 'Privacy Policy - Neural Architect',
+      'url': `${SITE_URL}/privacy`,
+      'description': 'How we protect, process, and respect your personal data and AI workspace privacy.'
+    }
+  },
+  {
+    path: '/refund-policy',
+    title: 'Cancellation & Refund Policy | Neural Architect',
+    description: 'Digital credits fulfillment, order cancellation, and refund eligibility standards.',
+    canonical: `${SITE_URL}/refund-policy`,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      '@id': `${SITE_URL}/refund-policy#webpage`,
+      'name': 'Cancellation & Refund Policy - Neural Architect',
+      'url': `${SITE_URL}/refund-policy`,
+      'description': 'Digital credits fulfillment, order cancellation, and refund eligibility standards.'
+    }
+  },
+  {
+    path: '/pricing',
+    title: 'Pricing & Credit Plans | Neural Architect',
+    description: 'Credit package tiers, generative model rates, pay-as-you-go parameters, and zero-surcharge BYOK rules.',
+    canonical: `${SITE_URL}/pricing`,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      '@id': `${SITE_URL}/pricing#webpage`,
+      'name': 'Pricing & Plans - Neural Architect',
+      'url': `${SITE_URL}/pricing`,
+      'description': 'Credit package tiers, generative model rates, pay-as-you-go parameters, and zero-surcharge BYOK rules.'
+    }
+  },
+  {
+    path: '/contact-us',
+    title: 'Contact Us & Support | Neural Architect',
+    description: 'Official customer support channels, grievance redressal, and operating office address.',
+    canonical: `${SITE_URL}/contact-us`,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      '@id': `${SITE_URL}/contact-us#webpage`,
+      'name': 'Contact Us - Neural Architect',
+      'url': `${SITE_URL}/contact-us`,
+      'description': 'Official customer support channels, grievance redressal, and operating office address.'
+    }
+  },
+  {
+    path: '/delivery-policy',
+    title: 'Shipping & Delivery Policy | Neural Architect',
+    description: 'Electronic fulfillment terms for digital software credits and services.',
+    canonical: `${SITE_URL}/delivery-policy`,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      '@id': `${SITE_URL}/delivery-policy#webpage`,
+      'name': 'Shipping & Delivery Policy - Neural Architect',
+      'url': `${SITE_URL}/delivery-policy`,
+      'description': 'Electronic fulfillment terms for digital software credits and services.'
+    }
   }
 ];
 
