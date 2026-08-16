@@ -8,6 +8,53 @@ type TopupModalProps = {
   onClose: () => void;
 };
 
+let razorpaySdkPromise: Promise<any> | null = null;
+
+function loadRazorpaySdk(): Promise<any> {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  if ((window as any).Razorpay) return Promise.resolve((window as any).Razorpay);
+  if (razorpaySdkPromise) return razorpaySdkPromise;
+
+  razorpaySdkPromise = new Promise((resolve, reject) => {
+    const existing = document.getElementById("razorpay-checkout-script");
+    if (existing) {
+      if ((window as any).Razorpay) {
+        resolve((window as any).Razorpay);
+      } else {
+        existing.addEventListener("load", () => resolve((window as any).Razorpay));
+        existing.addEventListener("error", () => {
+          razorpaySdkPromise = null;
+          reject(new Error("Failed to load Razorpay Checkout SDK."));
+        });
+      }
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "razorpay-checkout-script";
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve((window as any).Razorpay);
+    script.onerror = () => {
+      razorpaySdkPromise = null;
+      script.remove();
+      reject(new Error("Failed to load Razorpay Checkout SDK."));
+    };
+    document.body.appendChild(script);
+  });
+
+  return razorpaySdkPromise;
+}
+
+function cleanupRazorpayDom() {
+  try {
+    const elements = document.querySelectorAll(".razorpay-container, iframe[src*='razorpay'], iframe[name^='razorpay']");
+    elements.forEach((el) => el.remove());
+  } catch {
+    // ignore
+  }
+}
+
 export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
   const [plans, setPlans] = useState<CreditPlan[]>([]);
   const [loading, setLoading] = useState<string | number | null>(null);
@@ -15,6 +62,12 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { user, refreshProfile } = useAuth();
+
+  useEffect(() => {
+    return () => {
+      cleanupRazorpayDom();
+    };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -26,19 +79,10 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
           console.error("Failed to load plans", err);
           setErrorMessage("Failed to load credit plans. Please try again.");
         });
+    } else {
+      cleanupRazorpayDom();
     }
   }, [isOpen]);
-
-  // Ensure Razorpay SDK script is loaded
-  useEffect(() => {
-    if (!document.getElementById("razorpay-checkout-script")) {
-      const script = document.createElement("script");
-      script.id = "razorpay-checkout-script";
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.async = true;
-      document.body.appendChild(script);
-    }
-  }, []);
 
   async function handleCheckout(plan: CreditPlan) {
     setLoading(plan.id || plan.amount);
@@ -46,19 +90,20 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
     setSuccessMessage(null);
 
     try {
-      // 1. Create order on backend
-      const orderData = await createPaymentOrder({
-        plan_id: plan.id,
-        amount: plan.amount,
-        currency: plan.currency || "INR",
-      });
+      // 1. Create order on backend and load Razorpay SDK on-demand in parallel
+      const [orderData, RazorpayConstructor] = await Promise.all([
+        createPaymentOrder({
+          plan_id: plan.id,
+          amount: plan.amount,
+          currency: plan.currency || "INR",
+        }),
+        loadRazorpaySdk(),
+      ]);
 
       if (!orderData || !orderData.order_id) {
         throw new Error("Failed to initialize payment order.");
       }
 
-      // 2. Configure and open Razorpay Checkout Modal
-      const RazorpayConstructor = (window as any).Razorpay;
       if (!RazorpayConstructor) {
         throw new Error("Razorpay SDK is still loading. Please check your internet connection.");
       }
@@ -98,6 +143,7 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
             );
 
             setTimeout(() => {
+              cleanupRazorpayDom();
               onClose();
               setSuccessMessage(null);
             }, 2500);
@@ -114,6 +160,7 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
         modal: {
           ondismiss: function () {
             setLoading(null);
+            cleanupRazorpayDom();
           },
         },
       };
@@ -125,6 +172,7 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
           response?.error?.description || "Payment failed or was cancelled by user."
         );
         setLoading(null);
+        cleanupRazorpayDom();
       });
 
       rzpInstance.open();
@@ -134,6 +182,7 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
         err?.response?.data?.detail || err?.message || "Failed to initiate payment. Please try again."
       );
       setLoading(null);
+      cleanupRazorpayDom();
     }
   }
 
