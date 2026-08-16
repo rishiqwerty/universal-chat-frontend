@@ -43,6 +43,23 @@ const routes = [
     }
   },
   {
+    path: '/chat',
+    title: 'Chat | Neural Architect',
+    description: 'Communicate with advanced language models and direct neural processes.',
+    canonical: `${SITE_URL}/chat`,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'WebApplication',
+      '@id': `${SITE_URL}/chat#webapp`,
+      'name': 'Neural Architect Chat',
+      'url': `${SITE_URL}/chat`,
+      'description': 'Communicate with advanced language models and direct neural processes.',
+      'applicationCategory': 'ChatApplication',
+      'operatingSystem': 'All',
+      'browserRequirements': 'Requires JavaScript. Requires HTML5.'
+    }
+  },
+  {
     path: '/studio',
     title: 'Studio | Neural Architect',
     description: 'Generate viral picture perfect images using popular diffusion models.',
@@ -89,6 +106,34 @@ const routes = [
       'name': 'Sign Up - Neural Architect',
       'url': `${SITE_URL}/signup`,
       'description': 'Initialize your operative account and get access to the AI interface.'
+    }
+  },
+  {
+    path: '/settings',
+    title: 'Settings | Neural Architect',
+    description: 'Configure model weights, customize themes, and manage API keys.',
+    canonical: `${SITE_URL}/settings`,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      '@id': `${SITE_URL}/settings#webpage`,
+      'name': 'Settings - Neural Architect',
+      'url': `${SITE_URL}/settings`,
+      'description': 'Configure model weights, customize themes, and manage API keys.'
+    }
+  },
+  {
+    path: '/legal',
+    title: 'Compliance & Policies | Neural Architect',
+    description: 'Legal terms, payment standards, data protection protocols, and support information.',
+    canonical: `${SITE_URL}/legal`,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      '@id': `${SITE_URL}/legal#webpage`,
+      'name': 'Compliance & Policies - Neural Architect',
+      'url': `${SITE_URL}/legal`,
+      'description': 'Legal terms, payment standards, data protection protocols, and support information.'
     }
   },
   {
