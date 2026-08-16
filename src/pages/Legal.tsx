@@ -140,7 +140,7 @@ export default function Legal() {
   // Resolve active tab from current URL path or parameter
   const initialTab = useMemo<LegalDocKey>(() => {
     const currentPath = location.pathname.toLowerCase();
-    
+
     // Check specific routes
     for (const tab of LEGAL_TABS) {
       if (tab.routes.includes(currentPath)) {
@@ -359,37 +359,33 @@ export default function Legal() {
                           key={tab.id}
                           type="button"
                           onClick={() => handleSelectTab(tab.id)}
-                          className={`group relative flex flex-col rounded-xl border p-3.5 text-left transition-all duration-200 ${
-                            isActive
+                          className={`group relative flex flex-col rounded-xl border p-3.5 text-left transition-all duration-200 ${isActive
                               ? "border-primary/60 bg-primary/10 shadow-[0_0_20px_rgba(217,255,0,0.06)]"
                               : "border-border/30 bg-surface hover:border-border/60 hover:bg-surface/80"
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2.5">
                               <div
-                                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors ${
-                                  isActive
+                                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors ${isActive
                                     ? "border-primary/40 bg-primary/20 text-primary"
                                     : "border-border/40 bg-elevated/50 text-textMuted group-hover:border-border group-hover:text-textPrimary"
-                                }`}
+                                  }`}
                               >
                                 <LegalIcon type={tab.id} className="h-3.5 w-3.5" />
                               </div>
                               <span
-                                className={`text-xs font-bold transition-colors ${
-                                  isActive ? "text-primary" : "text-textPrimary group-hover:text-textPrimary"
-                                }`}
+                                className={`text-xs font-bold transition-colors ${isActive ? "text-primary" : "text-textPrimary group-hover:text-textPrimary"
+                                  }`}
                               >
                                 {tab.title}
                               </span>
                             </div>
                             <span
-                              className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
-                                isActive
+                              className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${isActive
                                   ? "bg-primary text-background"
                                   : "bg-elevated text-textMuted group-hover:text-textSecondary"
-                              }`}
+                                }`}
                             >
                               {tab.badge}
                             </span>
@@ -487,19 +483,17 @@ export default function Legal() {
                                             key={v.version}
                                             type="button"
                                             onClick={() => handleSelectVersion(v.is_current ? "" : v.version)}
-                                            className={`flex flex-col rounded-lg p-2 text-left transition-all ${
-                                              isSelected
+                                            className={`flex flex-col rounded-lg p-2 text-left transition-all ${isSelected
                                                 ? "bg-primary/15 border border-primary/40 text-textPrimary"
                                                 : "hover:bg-surface/80 text-textSecondary"
-                                            }`}
+                                              }`}
                                           >
                                             <div className="flex items-center justify-between">
                                               <span className={`font-mono text-xs font-bold ${isSelected ? "text-primary" : "text-textPrimary"}`}>
                                                 {v.version}
                                               </span>
-                                              <span className={`text-[9px] font-bold uppercase rounded px-1.5 py-0.5 ${
-                                                v.is_current ? "bg-emerald-500/10 text-emerald-400" : "bg-elevated text-textMuted"
-                                              }`}>
+                                              <span className={`text-[9px] font-bold uppercase rounded px-1.5 py-0.5 ${v.is_current ? "bg-emerald-500/10 text-emerald-400" : "bg-elevated text-textMuted"
+                                                }`}>
                                                 {v.is_current ? "Current" : "Archived"}
                                               </span>
                                             </div>
@@ -657,9 +651,8 @@ export default function Legal() {
                       key={tab.id}
                       type="button"
                       onClick={() => handleSelectTab(tab.id)}
-                      className={`hover:text-primary transition-colors ${
-                        tab.id === activeTabId ? "text-primary font-bold" : ""
-                      }`}
+                      className={`hover:text-primary transition-colors ${tab.id === activeTabId ? "text-primary font-bold" : ""
+                        }`}
                     >
                       {tab.shortTitle}
                     </button>
@@ -669,7 +662,7 @@ export default function Legal() {
                   </Link>
                 </div>
                 <p className="mt-4 text-[11px] text-textMuted/70">
-                  © 2026 Universal Chat Technologies Pvt. Ltd. All rights reserved. Designed for reliable, high-assurance neural computing.
+                  © 2026 Neural Architect All rights reserved. Designed for reliable, high-assurance neural computing.
                 </p>
               </footer>
             </div>
