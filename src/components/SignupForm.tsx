@@ -4,7 +4,7 @@ import { signupAccount, googleLoginAccount, requestOtpApi, verifyOtpApi, clearCh
 import GoogleAuthButton from "./GoogleAuthButton";
 import OtpInput from "./OtpInput";
 import { useAuth } from "../context/AuthContext";
-import { isPasswordOtpAuthEnabled } from "../config";
+import { isEmailPasswordSignUpEnabled, isEmailOtpSignUpEnabled, isEmailSignInEnabled } from "../config";
 
 
 function LogoMark() {
@@ -25,8 +25,15 @@ type SignupFormProps = {
 export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const showPasswordOtp = isPasswordOtpAuthEnabled();
-  const [method, setMethod] = useState<"standard" | "otp">("standard");
+  const showPasswordSignup = isEmailPasswordSignUpEnabled();
+  const showOtpSignup = isEmailOtpSignUpEnabled();
+  const showEmailSignUp = showPasswordSignup || showOtpSignup;
+  const showEmailSignIn = isEmailSignInEnabled();
+
+  const [method, setMethod] = useState<"standard" | "otp">(() => {
+    if (!showPasswordSignup && showOtpSignup) return "otp";
+    return "standard";
+  });
   const [otpStep, setOtpStep] = useState<"request" | "verify">("request");
 
   const [email, setEmail] = useState("");
@@ -141,7 +148,7 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
 
       <div className={`${isModal ? "" : "rounded-card bg-surface p-8 shadow-2xl ring-1 ring-border/40 backdrop-blur-xl"}`}>
         
-        {!showPasswordOtp && (
+        {!showEmailSignUp && (
           <div className="mb-6 text-center">
             <h2 className="text-xl font-headline font-bold text-textPrimary">
               Create Your Account
@@ -153,8 +160,8 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
         )}
 
         {/* RECOMMENDED GOOGLE AUTH AT TOP */}
-        <div className={`${showPasswordOtp ? "mb-6" : "mb-4"} rounded-xl border border-primary/20 bg-primary/[0.03] p-4 text-center`}>
-          {showPasswordOtp && (
+        <div className={`${showEmailSignUp ? "mb-6" : "mb-4"} rounded-xl border border-primary/20 bg-primary/[0.03] p-4 text-center`}>
+          {showEmailSignUp && (
             <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary mb-3">
               <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
               Recommended • 1-Click Signup
@@ -169,7 +176,7 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
           />
         </div>
 
-        {!showPasswordOtp && (
+        {!showEmailSignUp && (
           <div className="flex items-center justify-center gap-1.5 text-[11px] text-textMuted leading-relaxed">
             <svg className="h-3 w-3 text-textMuted/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -192,7 +199,7 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
         ) : null}
 
 
-        {showPasswordOtp && (
+        {showEmailSignUp && (
           <>
             {/* DIVIDER */}
             <div className="relative my-6 flex items-center justify-center">
@@ -202,33 +209,35 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
               </span>
             </div>
 
-            {/* Method selector */}
-            <div className="flex border-b border-border/30 mb-6 text-xs font-semibold uppercase tracking-wider">
-              <button
-                type="button"
-                onClick={() => { setMethod("standard"); setError(""); setSuccessMsg(""); }}
-                className={`flex-1 pb-3 text-center transition-colors border-b-2 ${
-                  method === "standard"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-textMuted hover:text-textSecondary"
-                }`}
-              >
-                Password Signup
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMethod("otp"); setError(""); setSuccessMsg(""); setOtpStep("request"); }}
-                className={`flex-1 pb-3 text-center transition-colors border-b-2 ${
-                  method === "otp"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-textMuted hover:text-textSecondary"
-                }`}
-              >
-                OTP Signup
-              </button>
-            </div>
+            {/* Method selector (shown only when BOTH password and OTP are active) */}
+            {showPasswordSignup && showOtpSignup && (
+              <div className="flex border-b border-border/30 mb-6 text-xs font-semibold uppercase tracking-wider">
+                <button
+                  type="button"
+                  onClick={() => { setMethod("standard"); setError(""); setSuccessMsg(""); }}
+                  className={`flex-1 pb-3 text-center transition-colors border-b-2 ${
+                    method === "standard"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-textMuted hover:text-textSecondary"
+                  }`}
+                >
+                  Password Signup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMethod("otp"); setError(""); setSuccessMsg(""); setOtpStep("request"); }}
+                  className={`flex-1 pb-3 text-center transition-colors border-b-2 ${
+                    method === "otp"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-textMuted hover:text-textSecondary"
+                  }`}
+                >
+                  OTP Signup
+                </button>
+              </div>
+            )}
 
-            {method === "standard" ? (
+            {method === "standard" && showPasswordSignup && (
               <form onSubmit={handleSignup}>
                 <label className="block">
                   <span className="text-xs font-medium text-textSecondary">Email</span>
@@ -324,7 +333,8 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
                   {loading ? "Creating account…" : "Create account"}
                 </button>
               </form>
-            ) : (
+            )}
+            {method === "otp" && showOtpSignup && (
               <div>
                 {otpStep === "request" ? (
                   <form onSubmit={handleRequestOtp}>
@@ -380,12 +390,14 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
       </div>
 
 
-      <p className="mt-8 text-center text-sm text-textSecondary">
-        Already registered?{" "}
-        <Link to="/login" className="font-medium text-primary hover:text-primaryHover">
-          Sign in
-        </Link>
-      </p>
+      {showEmailSignIn && (
+        <p className="mt-8 text-center text-sm text-textSecondary">
+          Already registered?{" "}
+          <Link to="/login" className="font-medium text-primary hover:text-primaryHover">
+            Sign in
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

@@ -26,12 +26,12 @@ export default function Signup() {
             <Link to="/privacy" className="hover:text-primary transition-colors">
               Privacy Policy
             </Link>
-            <Link to="/refund-policy" className="hover:text-primary transition-colors">
+            {/* <Link to="/refund-policy" className="hover:text-primary transition-colors">
               Refund Policy
-            </Link>
-            <Link to="/contact-us" className="hover:text-primary transition-colors">
+            </Link> */}
+            {/* <Link to="/contact-us" className="hover:text-primary transition-colors">
               Contact Us
-            </Link>
+            </Link> */}
           </footer>
         </div>
       </div>
