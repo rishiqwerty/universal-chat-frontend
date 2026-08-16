@@ -6,7 +6,7 @@ import GoogleAuthButton from "../components/GoogleAuthButton";
 import OtpInput from "../components/OtpInput";
 import { useDocumentSEO } from "../hooks/useDocumentSEO";
 import { useAuth } from "../context/AuthContext";
-import { isPasswordOtpAuthEnabled } from "../config";
+import { isEmailPasswordSignInEnabled, isEmailOtpSignInEnabled, isEmailSignUpEnabled } from "../config";
 
 
 function LogoMark() {
@@ -27,14 +27,21 @@ export default function Login() {
 
   const navigate = useNavigate();
   const { login } = useAuth();
-  const showPasswordOtp = isPasswordOtpAuthEnabled();
-  const [authMode, setAuthMode] = useState<"password" | "otp">("password");
+  const showPasswordLogin = isEmailPasswordSignInEnabled();
+  const showOtpLogin = isEmailOtpSignInEnabled();
+  const showEmailSignIn = showPasswordLogin || showOtpLogin;
+  const showEmailSignUp = isEmailSignUpEnabled();
+
+  const [authMode, setAuthMode] = useState<"password" | "otp">(() => {
+    if (!showPasswordLogin && showOtpLogin) return "otp";
+    return "password";
+  });
   const [otpStep, setOtpStep] = useState<"request" | "verify">("request");
-  
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
@@ -47,31 +54,37 @@ export default function Login() {
       localStorage.clear();
       clearChatCache();
       login(token);
-      navigate("/chat");
+      navigate("/");
     } catch (err: any) {
-      setError(err.response?.data?.message || err.response?.data?.detail || "Google authentication failed.");
+      console.error("Google sign-in error:", err);
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : "Google Sign-In failed. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  function handleGoogleError(errMsg: string) {
-    setError(errMsg);
+  function handleGoogleError() {
+    setError("Google Sign-In popup was closed or unavailable. Please try again.");
   }
 
   async function handlePasswordLogin(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    if (!email || !password) return;
     setError("");
     setSuccessMsg("");
+    setLoading(true);
+
     try {
       const token = await loginAccount({ email, password });
       localStorage.clear();
       clearChatCache();
       login(token);
-      navigate("/chat");
+      navigate("/");
     } catch (err: any) {
-      setError(err.response?.data?.message || err.response?.data?.detail || "Invalid credentials. Access denied.");
+      console.error(err);
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : "Invalid email or password. Please verify credentials.");
     } finally {
       setLoading(false);
     }
@@ -83,32 +96,39 @@ export default function Login() {
       setError("Please enter a valid email address.");
       return;
     }
-    setLoading(true);
     setError("");
     setSuccessMsg("");
+    setLoading(true);
+
     try {
-      const res = await requestOtpApi(email, "login");
-      setSuccessMsg(res.message || `Verification code sent to ${email}`);
+      await requestOtpApi(email);
+      setSuccessMsg(`A 6-digit access code was dispatched to ${email}.`);
       setOtpStep("verify");
     } catch (err: any) {
-      setError(err.response?.data?.message || err.response?.data?.detail || "Failed to send verification code.");
+      console.error(err);
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : "Failed to generate security code. Please retry.");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleVerifyOtp(code: string) {
-    setLoading(true);
+    if (!email || !code || code.length < 6) return;
     setError("");
     setSuccessMsg("");
+    setLoading(true);
+
     try {
       const token = await verifyOtpApi(email, code);
       localStorage.clear();
       clearChatCache();
       login(token);
-      navigate("/chat");
+      navigate("/");
     } catch (err: any) {
-      setError(err.response?.data?.message || err.response?.data?.detail || "Invalid or expired verification code.");
+      console.error(err);
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : "Invalid or expired passcode. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -116,16 +136,12 @@ export default function Login() {
 
   return (
     <PageTransition>
-      <div className="relative flex min-h-screen flex-col items-center justify-center bg-background px-4 py-16">
-        <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background via-sidebar to-background opacity-90"
-          aria-hidden
-        />
-        <div className="relative w-full max-w-[420px]">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 sm:p-6 lg:p-8">
+        <div className="w-full max-w-md">
           <div className="mb-8 text-center">
-            <Link to="/" className="group block">
+            <Link to="/" className="inline-block transition-transform hover:scale-[1.02]">
               <LogoMark />
-              <h1 className="mt-5 text-2xl font-headline font-bold tracking-tight text-textPrimary group-hover:text-primary transition-colors">
+              <h1 className="mt-4 font-headline text-2xl font-black uppercase tracking-widest text-textPrimary">
                 Neural Architect
               </h1>
             </Link>
@@ -135,8 +151,8 @@ export default function Login() {
           </div>
 
           <div className="rounded-card bg-surface p-8 shadow-2xl ring-1 ring-border/40 backdrop-blur-xl">
-            
-            {!showPasswordOtp && (
+
+            {!showEmailSignIn && (
               <div className="mb-6 text-center">
                 <h2 className="text-xl font-headline font-bold text-textPrimary">
                   Sign In to Neural Architect
@@ -147,15 +163,14 @@ export default function Login() {
               </div>
             )}
 
-            {/* RECOMMENDED GOOGLE AUTH HEADER AT TOP */}
-            <div className={`${showPasswordOtp ? "mb-6" : "mb-4"} rounded-xl border border-primary/20 bg-primary/[0.03] p-4 text-center`}>
-              {showPasswordOtp && (
+            <div className={`${showEmailSignIn ? "mb-6" : "mb-4"} rounded-xl border border-primary/20 bg-primary/[0.03] p-4 text-center`}>
+              {showEmailSignIn && (
                 <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary mb-3">
                   <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                   Recommended • 1-Click Ingress
                 </div>
               )}
-              
+
               <GoogleAuthButton
                 onSuccess={handleGoogleSuccess}
                 onError={handleGoogleError}
@@ -164,7 +179,7 @@ export default function Login() {
               />
             </div>
 
-            {!showPasswordOtp && (
+            {!showEmailSignIn && (
               <div className="flex items-center justify-center gap-1.5 text-[11px] text-textMuted leading-relaxed">
                 <svg className="h-3 w-3 text-textMuted/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -187,9 +202,8 @@ export default function Login() {
             )}
 
 
-            {showPasswordOtp && (
+            {showEmailSignIn && (
               <>
-                {/* DIVIDER */}
                 <div className="relative my-6 flex items-center justify-center">
                   <div className="w-full border-t border-border/30" />
                   <span className="absolute bg-surface px-3 text-[10px] font-semibold uppercase tracking-widest text-textMuted">
@@ -197,34 +211,34 @@ export default function Login() {
                   </span>
                 </div>
 
-                {/* Mode Switcher Tabs */}
-                <div className="flex border-b border-border/30 mb-6 text-xs font-semibold uppercase tracking-wider">
-                  <button
-                    type="button"
-                    onClick={() => { setAuthMode("password"); setError(""); setSuccessMsg(""); }}
-                    className={`flex-1 pb-3 text-center transition-colors border-b-2 ${
-                      authMode === "password"
+                {/* Mode Switcher Tabs (shown only when BOTH password and OTP are active) */}
+                {showPasswordLogin && showOtpLogin && (
+                  <div className="flex border-b border-border/30 mb-6 text-xs font-semibold uppercase tracking-wider">
+                    <button
+                      type="button"
+                      onClick={() => { setAuthMode("password"); setError(""); setSuccessMsg(""); }}
+                      className={`flex-1 pb-3 text-center transition-colors border-b-2 ${authMode === "password"
                         ? "border-primary text-primary"
                         : "border-transparent text-textMuted hover:text-textSecondary"
-                    }`}
-                  >
-                    Password
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setAuthMode("otp"); setError(""); setSuccessMsg(""); setOtpStep("request"); }}
-                    className={`flex-1 pb-3 text-center transition-colors border-b-2 ${
-                      authMode === "otp"
+                        }`}
+                    >
+                      Password
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setAuthMode("otp"); setError(""); setSuccessMsg(""); setOtpStep("request"); }}
+                      className={`flex-1 pb-3 text-center transition-colors border-b-2 ${authMode === "otp"
                         ? "border-primary text-primary"
                         : "border-transparent text-textMuted hover:text-textSecondary"
-                    }`}
-                  >
-                    Email OTP
-                  </button>
-                </div>
+                        }`}
+                    >
+                      Email OTP
+                    </button>
+                  </div>
+                )}
 
                 {/* PASSWORD LOGIN FORM */}
-                {authMode === "password" && (
+                {authMode === "password" && showPasswordLogin && (
                   <form onSubmit={handlePasswordLogin}>
                     <label className="block">
                       <span className="text-xs font-medium text-textSecondary">Credential Ingress (Email)</span>
@@ -295,7 +309,7 @@ export default function Login() {
                 )}
 
                 {/* EMAIL OTP LOGIN FORM */}
-                {authMode === "otp" && (
+                {authMode === "otp" && showOtpLogin && (
                   <div>
                     {otpStep === "request" ? (
                       <form onSubmit={handleRequestOtp}>
@@ -351,12 +365,14 @@ export default function Login() {
           </div>
 
 
-          <p className="mt-8 text-center text-sm text-textSecondary">
-            New operative?{" "}
-            <Link to="/signup" className="font-medium text-primary hover:text-primaryHover">
-              Initialize Account
-            </Link>
-          </p>
+          {showEmailSignUp && (
+            <p className="mt-8 text-center text-sm text-textSecondary">
+              New operative?{" "}
+              <Link to="/signup" className="font-medium text-primary hover:text-primaryHover">
+                Initialize Account
+              </Link>
+            </p>
+          )}
 
           <footer className="mt-12 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[10px] font-semibold uppercase tracking-wider text-textMuted">
             <Link to="/privacy" className="hover:text-primary transition-colors">
@@ -365,12 +381,12 @@ export default function Login() {
             <Link to="/terms" className="hover:text-primary transition-colors">
               Terms & Conditions
             </Link>
-            <Link to="/refund-policy" className="hover:text-primary transition-colors">
+            {/* <Link to="/refund-policy" className="hover:text-primary transition-colors">
               Refund Policy
-            </Link>
-            <Link to="/contact-us" className="hover:text-primary transition-colors">
+            </Link> */}
+            {/* <Link to="/contact-us" className="hover:text-primary transition-colors">
               Contact Us
-            </Link>
+            </Link> */}
           </footer>
         </div>
       </div>

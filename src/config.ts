@@ -57,15 +57,89 @@ export function getGoogleClientId(): string {
   return typeof raw === "string" ? raw.trim() : "";
 }
 
+function parseBoolFlag(raw: any, defaultVal = true): boolean {
+  if (raw === undefined || raw === null || raw === "") return defaultVal;
+  const val = String(raw).trim().toLowerCase();
+  return val !== "false" && val !== "0" && val !== "off" && val !== "no";
+}
+
 /**
- * Whether Email Password and Email OTP authentication is enabled.
- * Override with `VITE_ENABLE_PASSWORD_OTP_AUTH` in environment variables.
+ * Whether Email Sign In is enabled on the login page.
+ * Override with `VITE_ENABLE_EMAIL_SIGNIN`.
+ * Default: true
+ */
+export function isEmailSignInEnabled(): boolean {
+  return parseBoolFlag(import.meta.env.VITE_ENABLE_EMAIL_SIGNIN, true);
+}
+
+/**
+ * Whether Email Sign Up is enabled on the registration page.
+ * Override with `VITE_ENABLE_EMAIL_SIGNUP`.
+ * Default: true
+ */
+export function isEmailSignUpEnabled(): boolean {
+  return parseBoolFlag(import.meta.env.VITE_ENABLE_EMAIL_SIGNUP, true);
+}
+
+/**
+ * Whether Email OTP authentication is enabled.
+ * Override with `VITE_ENABLE_EMAIL_OTP`.
+ * Default: true
+ */
+export function isEmailOtpEnabled(): boolean {
+  const specific = import.meta.env.VITE_ENABLE_EMAIL_OTP;
+  if (specific !== undefined && specific !== null && specific !== "") {
+    return parseBoolFlag(specific, true);
+  }
+  return true;
+}
+
+/**
+ * Whether Email Password authentication is enabled.
+ * Override with `VITE_ENABLE_EMAIL_PASSWORD`.
+ * Default: true
+ */
+export function isEmailPasswordEnabled(): boolean {
+  const specific = import.meta.env.VITE_ENABLE_EMAIL_PASSWORD;
+  if (specific !== undefined && specific !== null && specific !== "") {
+    return parseBoolFlag(specific, true);
+  }
+  return true;
+}
+
+/**
+ * Whether Email Password sign-in is enabled on the login page.
+ */
+export function isEmailPasswordSignInEnabled(): boolean {
+  return isEmailSignInEnabled() && isEmailPasswordEnabled();
+}
+
+/**
+ * Whether Email OTP sign-in is enabled on the login page.
+ */
+export function isEmailOtpSignInEnabled(): boolean {
+  return isEmailSignInEnabled() && isEmailOtpEnabled();
+}
+
+/**
+ * Whether Email Password sign-up is enabled on the registration page.
+ */
+export function isEmailPasswordSignUpEnabled(): boolean {
+  return isEmailSignUpEnabled() && isEmailPasswordEnabled();
+}
+
+/**
+ * Whether Email OTP sign-up is enabled on the registration page.
+ */
+export function isEmailOtpSignUpEnabled(): boolean {
+  return isEmailSignUpEnabled() && isEmailOtpEnabled();
+}
+
+/**
+ * Master helper for checking if any email authentication is enabled.
  * Default: true
  */
 export function isPasswordOtpAuthEnabled(): boolean {
-  const raw = import.meta.env.VITE_ENABLE_PASSWORD_OTP_AUTH;
-  if (raw === undefined || raw === null || raw === "") return true;
-  const val = String(raw).trim().toLowerCase();
-  return val !== "false" && val !== "0" && val !== "off";
+  return isEmailSignInEnabled() || isEmailSignUpEnabled();
 }
 
