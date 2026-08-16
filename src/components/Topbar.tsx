@@ -163,6 +163,7 @@ export default function Topbar({
   }, []);
 
   const fetchBalance = useCallback(async () => {
+    if (typeof document !== "undefined" && document.hidden) return;
     if (isAuthenticated && !isTempMode) {
       try {
         const data = await getCreditBalance();
