@@ -235,7 +235,7 @@ export default function Topbar({
       )}
       {leftContent}
       <div className={`relative min-w-0 flex-1 max-w-2xl flex items-center gap-2.5 ${leftContent ? "hidden md:flex" : ""}`}>
-        {activeChatTitle != null ? (
+        {activeChatTitle != null && (
           <>
             <input
               type="text"
@@ -252,20 +252,6 @@ export default function Topbar({
                 Archived
               </span>
             )}
-          </>
-        ) : (
-          <>
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted">
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M20 20l-4-4" />
-              </svg>
-            </span>
-            <input
-              type="search"
-              placeholder="Search across chat library..."
-              className="h-10 w-full rounded-input border border-border/50 bg-surface py-2 pl-10 pr-3 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
-            />
           </>
         )}
       </div>

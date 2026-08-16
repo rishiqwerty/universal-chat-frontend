@@ -11,7 +11,7 @@ import {
 } from "../api/api";
 import HelpModal from "./HelpModal";
 
-export type NavKey = "chat" | "studio" | "models" | "settings";
+export type NavKey = "chat" | "studio" | "library" | "models" | "settings";
 export type ChatFilterMode = "all" | "starred" | "archived";
 
 const MAX_PREVIEW_CHATS = 8;
@@ -54,6 +54,22 @@ function NavIcon({ name }: { name: NavKey }) {
       </svg>
     );
   }
+  if (name === "studio") {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+      </svg>
+    );
+  }
+  if (name === "library") {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <polyline points="21 15 16 10 5 21" />
+      </svg>
+    );
+  }
   if (name === "models") {
     return (
       <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -61,13 +77,6 @@ function NavIcon({ name }: { name: NavKey }) {
         <rect x="13" y="4" width="7" height="7" rx="1" />
         <rect x="4" y="13" width="7" height="7" rx="1" />
         <rect x="13" y="13" width="7" height="7" rx="1" />
-      </svg>
-    );
-  }
-  if (name === "studio") {
-    return (
-      <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
       </svg>
     );
   }
@@ -447,6 +456,20 @@ export default function Sidebar({
                     New
                   </span>
                 )}
+              </Link>
+            )}
+
+            {isAuthenticated && (
+              <Link
+                to="/library"
+                className={`flex items-center gap-2.5 rounded-input px-3 py-2 text-sm font-headline font-semibold transition-all ${
+                  activeNav === "library"
+                    ? "bg-surface text-primary"
+                    : "text-textSecondary hover:bg-surface/60 hover:text-textPrimary"
+                }`}
+              >
+                <NavIcon name="library" />
+                <span>Image Library</span>
               </Link>
             )}
           </div>

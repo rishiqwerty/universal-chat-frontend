@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import Chat from "./pages/Chat";
-// import Library from "./pages/Library";
+import Library from "./pages/Library";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Settings from "./pages/Settings";
@@ -37,7 +37,8 @@ export default function App() {
         <Route path="/signup" element={<Signup />} />
         
         {/* Protected routes: Redirect to /login if unauthenticated */}
-        {/* <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} /> */}
+        <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+        <Route path="/gallery" element={<Navigate to="/library" replace />} />
         <Route path="/studio" element={<ProtectedRoute><ImageStudio /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         
