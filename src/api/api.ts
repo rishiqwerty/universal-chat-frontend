@@ -474,6 +474,42 @@ export async function fetchCreditPlans(): Promise<CreditPlan[]> {
   return data;
 }
 
+export type RazorpayOrderResponse = {
+  order_id: string;
+  id: string;
+  amount: number;
+  currency: string;
+  key_id: string;
+  transaction_id: string;
+  credits: number;
+  plan?: CreditPlan;
+  checkout_url?: string;
+};
+
+export type VerifyPaymentPayload = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+export type VerifyPaymentResponse = {
+  success: boolean;
+  message: string;
+  credits_added: number;
+  new_balance: number;
+  transaction_id?: string;
+};
+
+export async function createPaymentOrder(params: { amount?: number; plan_id?: string; currency?: string }): Promise<RazorpayOrderResponse> {
+  const { data } = await client.post("/credits/payment/create-order", params);
+  return data;
+}
+
+export async function verifyPayment(payload: VerifyPaymentPayload): Promise<VerifyPaymentResponse> {
+  const { data } = await client.post("/credits/payment/verify-payment", payload);
+  return data;
+}
+
 export async function topupCredits(amount: number, redirectUrl?: string): Promise<CheckoutResponse> {
   const { data } = await client.post("/credits/topup", { amount, redirect_url: redirectUrl });
   return data;
