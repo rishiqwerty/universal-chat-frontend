@@ -81,6 +81,23 @@ const routes = [
     }
   },
   {
+    path: '/library',
+    title: 'Image Library | Neural Architect',
+    description: 'Centralized gallery of all your synthesized AI images, prompt history, and model outputs.',
+    canonical: `${SITE_URL}/library`,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'WebApplication',
+      '@id': `${SITE_URL}/library#webapp`,
+      'name': 'Neural Architect Image Library',
+      'url': `${SITE_URL}/library`,
+      'description': 'Centralized gallery of all your synthesized AI images, prompt history, and model outputs.',
+      'applicationCategory': 'MultimediaApplication',
+      'operatingSystem': 'All',
+      'browserRequirements': 'Requires JavaScript. Requires HTML5.'
+    }
+  },
+  {
     path: '/login',
     title: 'Login | Neural Architect',
     description: 'Sign in to access your secure AI chat and image generation workspace.',
@@ -284,6 +301,11 @@ const sitemapContent = `<?xml version="1.0" encoding="UTF-8"?>
   </url>
   <url>
     <loc>${SITE_URL}/studio</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${SITE_URL}/library</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>

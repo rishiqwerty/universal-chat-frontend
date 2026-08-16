@@ -1,11 +1,29 @@
 import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { createConversation, updateConversationTitle, getRecentConversations, getConversationDetails, getConversationMessages, sendMessageStream, sendTempChatMessageStream, deleteConversation, deleteMessage, getAvailableModels, type Conversation, type ProviderModels } from "../api/api";
+import { 
+  createConversation, 
+  updateConversationTitle, 
+  getRecentConversations, 
+  getConversations,
+  getConversationDetails, 
+  getConversationMessages, 
+  starConversation,
+  unstarConversation,
+  archiveConversation,
+  unarchiveConversation,
+  sendMessageStream, 
+  sendTempChatMessageStream, 
+  deleteConversation, 
+  deleteMessage, 
+  getAvailableModels, 
+  type Conversation, 
+  type ProviderModels 
+} from "../api/api";
 import { type UnifiedMessage } from "../api/api";
 import ChatWindow, { type ChatMessage } from "../components/ChatWindow";
 import MessageInput, { type MessageInputHandle } from "../components/MessageInput";
-import Sidebar from "../components/Sidebar";
+import Sidebar, { type ChatFilterMode } from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import WelcomeScreen from "../components/WelcomeScreen";
 import ConfirmModal from "../components/ConfirmModal";
@@ -38,7 +56,9 @@ export default function Chat() {
     () => localStorage.getItem("activeChatId")
   );
   const [activeChatTitle, setActiveChatTitle] = useState<string | null>(null);
+  const [activeChatMeta, setActiveChatMeta] = useState<Conversation | null>(null);
   const [recentChats, setRecentChats] = useState<Conversation[]>([]);
+  const [chatFilter, setChatFilter] = useState<ChatFilterMode>("all");
 
   const [availableModels, setAvailableModels] = useState<ProviderModels[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
@@ -111,6 +131,7 @@ export default function Chat() {
     setActiveChatId(null);
     localStorage.removeItem("activeChatId");
     setActiveChatTitle("Untitled Chat");
+    setActiveChatMeta(null);
     setMessages([]);
 
     // Restore global default for new chat
@@ -142,10 +163,11 @@ export default function Chat() {
       setActiveChatId(details.id);
       localStorage.setItem("activeChatId", details.id);
       setActiveChatTitle(details.title);
+      setActiveChatMeta(details);
 
       // Sync sidebar title if it changed on backend
       setRecentChats((prev) =>
-        prev.map((c) => (c.id === details.id ? { ...c, title: details.title } : c))
+        prev.map((c) => (c.id === details.id ? { ...c, ...details } : c))
       );
 
       // Map server roles down to valid UI Chat window roles
@@ -282,6 +304,62 @@ export default function Chat() {
     }
   }, [activeChatId]);
 
+  const handleToggleStar = useCallback(async (id?: string, currentlyStarred?: boolean) => {
+    const targetId = id || activeChatId;
+    if (!targetId) return;
+
+    const isCurrentlyStarred = currentlyStarred !== undefined 
+      ? currentlyStarred 
+      : activeChatMeta?.id === targetId ? !!activeChatMeta.is_starred : false;
+
+    // Optimistic update
+    setRecentChats((prev) =>
+      prev.map((c) => (c.id === targetId ? { ...c, is_starred: !isCurrentlyStarred } : c))
+    );
+    if (activeChatMeta && activeChatMeta.id === targetId) {
+      setActiveChatMeta((prev) => (prev ? { ...prev, is_starred: !isCurrentlyStarred } : null));
+    }
+
+    try {
+      if (isCurrentlyStarred) {
+        await unstarConversation(targetId);
+      } else {
+        await starConversation(targetId);
+      }
+    } catch (e) {
+      console.error("Failed to toggle star", e);
+      getConversations({ limit: 50 }).then(setRecentChats).catch(() => {});
+    }
+  }, [activeChatId, activeChatMeta]);
+
+  const handleToggleArchive = useCallback(async (id?: string, currentlyArchived?: boolean) => {
+    const targetId = id || activeChatId;
+    if (!targetId) return;
+
+    const isCurrentlyArchived = currentlyArchived !== undefined
+      ? currentlyArchived
+      : activeChatMeta?.id === targetId ? !!activeChatMeta.is_archived : false;
+
+    // Optimistic update
+    setRecentChats((prev) =>
+      prev.map((c) => (c.id === targetId ? { ...c, is_archived: !isCurrentlyArchived } : c))
+    );
+    if (activeChatMeta && activeChatMeta.id === targetId) {
+      setActiveChatMeta((prev) => (prev ? { ...prev, is_archived: !isCurrentlyArchived } : null));
+    }
+
+    try {
+      if (isCurrentlyArchived) {
+        await unarchiveConversation(targetId);
+      } else {
+        await archiveConversation(targetId);
+      }
+    } catch (e) {
+      console.error("Failed to toggle archive", e);
+      getConversations({ limit: 50 }).then(setRecentChats).catch(() => {});
+    }
+  }, [activeChatId, activeChatMeta]);
+
   const handleDeleteConversation = useCallback(async (id?: string) => {
     const targetId = id || activeChatId;
     if (!targetId) return;
@@ -293,7 +371,7 @@ export default function Chat() {
     if (!chatIdToDelete) return;
     try {
       await deleteConversation(chatIdToDelete);
-      getRecentConversations(true)
+      getConversations({ limit: 50 })
         .then((chats) => setRecentChats(chats))
         .catch(() => { });
 
@@ -629,7 +707,7 @@ export default function Chat() {
     setIsTempMode(!isAuthenticated);
     if (isAuthenticated) {
       setLoadingRecentChats(true);
-      getRecentConversations(true)
+      getConversations({ limit: 50 })
         .then((chats) => setRecentChats(chats))
         .catch(() => { })
         .finally(() => setLoadingRecentChats(false));
@@ -760,16 +838,24 @@ export default function Chat() {
           onNewChat={handleNewChat}
           onSelectChat={loadConversation}
           onDeleteChat={handleDeleteConversation}
+          onToggleStar={handleToggleStar}
+          onToggleArchive={handleToggleArchive}
           recentChats={recentChats}
           activeChatId={isTempMode ? null : activeChatId}
           isAuthenticated={isAuthenticated}
           isLoadingRecent={loadingRecentChats}
+          filterMode={chatFilter}
+          onFilterChange={setChatFilter}
         />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <Topbar
             activeChatTitle={isTempMode ? "Temporary Chat" : activeChatTitle}
             onUpdateTitle={isTempMode ? undefined : handleUpdateTitle}
             onDeleteChat={(!isTempMode && activeChatId) ? () => handleDeleteConversation() : undefined}
+            isStarred={!isTempMode ? !!activeChatMeta?.is_starred : false}
+            onToggleStar={(!isTempMode && activeChatId) ? () => handleToggleStar() : undefined}
+            isArchived={!isTempMode ? !!activeChatMeta?.is_archived : false}
+            onToggleArchive={(!isTempMode && activeChatId) ? () => handleToggleArchive() : undefined}
             isTempMode={isTempMode}
             onToggleTempMode={() => {
               setIsTempMode(!isTempMode);
@@ -884,6 +970,27 @@ export default function Chat() {
                 transition={{ duration: 0.3 }}
                 className="flex min-h-0 flex-1 flex-col"
               >
+                {!isTempMode && activeChatMeta?.is_archived && (
+                  <div className="mx-auto w-full max-w-4xl px-6 pt-3">
+                    <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-200 backdrop-blur-md">
+                      <div className="flex items-center gap-2">
+                        <svg className="h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                          <polyline points="21 8 21 21 3 21 3 8" />
+                          <rect x="1" y="3" width="22" height="5" />
+                          <line x1="10" y1="12" x2="14" y2="12" />
+                        </svg>
+                        <span>This conversation is archived.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleArchive(activeChatId!, true)}
+                        className="rounded-input bg-amber-400 px-3 py-1 text-[11px] font-bold text-black hover:bg-amber-300 transition-colors shadow"
+                      >
+                        Unarchive
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <ChatWindow messages={displayedMessages} onDeleteMessage={isTempMode ? undefined : handleDeleteMessage} />
                 <motion.div
                   layoutId="chat-input-container"

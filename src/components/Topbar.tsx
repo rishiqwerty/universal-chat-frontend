@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ConfirmModal from "./ConfirmModal";
 import SignupModal from "./SignupModal";
 import TopupModal from "./TopupModal";
-import { getCreditBalance } from "../api/api";
+import { getCreditBalance, resolveImagePath } from "../api/api";
 import { getBalanceCheckInterval } from "../config";
 import { useAuth } from "../context/AuthContext";
 
@@ -93,6 +93,10 @@ type TopbarProps = {
   activeChatTitle?: string | null;
   onUpdateTitle?: (newTitle: string) => void;
   onDeleteChat?: () => void;
+  isStarred?: boolean;
+  onToggleStar?: () => void;
+  isArchived?: boolean;
+  onToggleArchive?: () => void;
   isTempMode?: boolean;
   onToggleTempMode?: () => void;
   isAuthenticated?: boolean;
@@ -104,6 +108,10 @@ export default function Topbar({
   activeChatTitle,
   onUpdateTitle,
   onDeleteChat,
+  isStarred = false,
+  onToggleStar,
+  isArchived = false,
+  onToggleArchive,
   isTempMode,
   onToggleTempMode,
   isAuthenticated = true,
@@ -111,7 +119,7 @@ export default function Topbar({
   leftContent
 }: TopbarProps) {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [editingTitle, setEditingTitle] = useState("");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -226,40 +234,80 @@ export default function Topbar({
         </button>
       )}
       {leftContent}
-      <div className={`relative min-w-0 flex-1 max-w-2xl ${leftContent ? "hidden md:block" : ""}`}>
-        {activeChatTitle != null ? (
-          <input
-            type="text"
-            value={editingTitle}
-            onChange={(e) => setEditingTitle(e.target.value)}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-            className="w-full bg-transparent text-lg font-headline font-semibold text-textPrimary placeholder:text-textMuted focus:outline-none"
-            placeholder="Conversation Title"
-          />
-        ) : (
+      <div className={`relative min-w-0 flex-1 max-w-2xl flex items-center gap-2.5 ${leftContent ? "hidden md:flex" : ""}`}>
+        {activeChatTitle != null && (
           <>
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted">
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M20 20l-4-4" />
-              </svg>
-            </span>
             <input
-              type="search"
-              placeholder="Search across chat library..."
-              className="h-10 w-full rounded-input border border-border/50 bg-surface py-2 pl-10 pr-3 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+              type="text"
+              value={editingTitle}
+              onChange={(e) => setEditingTitle(e.target.value)}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              className="w-full bg-transparent text-lg font-headline font-semibold text-textPrimary placeholder:text-textMuted focus:outline-none truncate"
+              placeholder="Conversation Title"
             />
+            {isArchived && (
+              <span className="shrink-0 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-300 uppercase tracking-wider">
+                Archived
+              </span>
+            )}
           </>
         )}
       </div>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+        {activeChatTitle != null && onToggleStar && (
+          <button
+            type="button"
+            onClick={onToggleStar}
+            className={`flex h-9 w-9 items-center justify-center rounded-input transition-colors ${
+              isStarred
+                ? "text-yellow-400 hover:text-yellow-300 bg-yellow-500/15 border border-yellow-500/30 shadow-[0_0_12px_rgba(234,179,8,0.25)]"
+                : "text-textMuted hover:text-textPrimary hover:bg-surface"
+            }`}
+            aria-label={isStarred ? "Unstar Chat" : "Star Chat"}
+            title={isStarred ? "Starred (Click to remove star)" : "Star this conversation"}
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill={isStarred ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.75">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+          </button>
+        )}
+
+        {activeChatTitle != null && onToggleArchive && (
+          <button
+            type="button"
+            onClick={onToggleArchive}
+            className={`flex h-9 w-9 items-center justify-center rounded-input transition-colors ${
+              isArchived
+                ? "text-amber-400 hover:text-amber-300 bg-amber-500/15 border border-amber-500/30"
+                : "text-textMuted hover:text-textPrimary hover:bg-surface"
+            }`}
+            aria-label={isArchived ? "Unarchive Chat" : "Archive Chat"}
+            title={isArchived ? "Unarchive conversation" : "Archive conversation"}
+          >
+            {isArchived ? (
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                <polyline points="21 8 21 21 3 21 3 8" />
+                <rect x="1" y="3" width="22" height="5" />
+                <polyline points="10 12 12 10 14 12" />
+                <line x1="12" y1="10" x2="12" y2="17" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                <polyline points="21 8 21 21 3 21 3 8" />
+                <rect x="1" y="3" width="22" height="5" />
+                <line x1="10" y1="12" x2="14" y2="12" />
+              </svg>
+            )}
+          </button>
+        )}
+
         {activeChatTitle != null && onDeleteChat && (
           <button
             type="button"
             onClick={onDeleteChat}
-            className="flex h-9 w-9 items-center justify-center text-textMuted transition-colors hover:text-red-500"
+            className="flex h-9 w-9 items-center justify-center rounded-input text-textMuted transition-colors hover:bg-surface hover:text-red-500"
             aria-label="Delete Chat"
             title="Delete Chat"
           >
@@ -393,18 +441,6 @@ export default function Topbar({
             </AnimatePresence>
           </div>
         )}
-        <button
-          type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-input text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
-          aria-label="Layout"
-        >
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <rect x="14" y="14" width="7" height="7" rx="1" />
-          </svg>
-        </button>
         {!hideIncognito && (
           <button
             type="button"
@@ -462,9 +498,17 @@ export default function Topbar({
             aria-label="Profile"
           >
             {isAuthenticated ? (
-              <span className="text-xs font-semibold text-textSecondary uppercase">
-                OP
-              </span>
+              user?.avatar_url ? (
+                <img
+                  src={resolveImagePath(user.avatar_url)}
+                  alt={user.full_name || "User Avatar"}
+                  className="h-full w-full object-cover rounded-full"
+                />
+              ) : (
+                <span className="text-xs font-bold text-textPrimary uppercase">
+                  {user?.full_name ? user.full_name.slice(0, 2) : (user?.email ? user.email.slice(0, 2) : "OP")}
+                </span>
+              )
             ) : (
               <motion.div
                 className="relative h-full w-full flex items-center justify-center p-0.5"
@@ -518,23 +562,27 @@ export default function Topbar({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.95 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="absolute right-0 mt-2 w-56 overflow-hidden rounded-input border border-border/60 bg-elevated p-1 shadow-2xl z-50"
+                className="absolute right-0 mt-2 w-60 overflow-hidden rounded-xl border border-border/60 bg-elevated/95 p-1.5 shadow-2xl backdrop-blur-xl z-50"
               >
                 <div className="px-3 py-2 border-b border-border/20 mb-1">
-                  <p className="text-xs font-bold text-textPrimary uppercase tracking-tight">
-                    {isAuthenticated ? "Original Pro" : "Guest Operative"}
+                  <p className="text-xs font-bold text-textPrimary truncate" title={user?.full_name || user?.email || "Operative"}>
+                    {user?.full_name || (user?.email ? user.email.split('@')[0] : "Operative")}
                   </p>
-                  <p className="text-[10px] text-textMuted font-medium uppercase tracking-wider">
-                    {isAuthenticated ? "Free Tier Account" : "Temporary Session"}
+                  <p className="text-[10px] text-textMuted font-medium truncate mt-0.5" title={user?.email || "Account"}>
+                    {user?.email || (isAuthenticated ? "Active Operative" : "Guest Session")}
                   </p>
                 </div>
 
                 {isAuthenticated && (
                   <button
                     type="button"
-                    className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      navigate("/settings?tab=profile");
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
                   >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <svg className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                     </svg>
                     Profile Settings
@@ -543,15 +591,18 @@ export default function Topbar({
                 {isAuthenticated && (
                   <button
                     type="button"
-                    className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      navigate("/library");
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
                   >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <rect x="3" y="3" width="7" height="7" rx="1" />
-                      <rect x="13" y="3" width="7" height="7" rx="1" />
-                      <rect x="3" y="13" width="7" height="7" rx="1" />
-                      <rect x="13" y="13" width="7" height="7" rx="1" />
+                    <svg className="h-4 w-4 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
                     </svg>
-                    My Library
+                    Image Library
                   </button>
                 )}
                 <button
@@ -560,9 +611,9 @@ export default function Topbar({
                     setShowProfileMenu(false);
                     setShowSignupModal(true);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
                 >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <svg className="h-4 w-4 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                   </svg>
                   {isAuthenticated ? "Add Account" : "Sign In / Join"}
@@ -577,7 +628,7 @@ export default function Topbar({
                       setShowProfileMenu(false);
                       setShowLogoutConfirm(true);
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
                   >
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />

@@ -12,20 +12,25 @@ import {
   getMcpTools,
   testMcpTool,
   type McpInfo,
-  type McpTool
+  type McpTool,
+  resolveImagePath
 } from "../api/api";
 import PageTransition from "../components/PageTransition";
 import { useTheme } from "../hooks/useTheme";
 import { useDocumentSEO } from "../hooks/useDocumentSEO";
+import { useAuth } from "../context/AuthContext";
+import TopupModal from "../components/TopupModal";
 import { getApiBaseUrl } from "../config";
 
 export default function Settings() {
   useDocumentSEO({
     title: "Settings",
-    description: "Configure model weights, customize themes, and manage API keys.",
+    description: "Configure your user profile, model providers, custom themes, and MCP server.",
   });
 
   const { accentColor, setAccentColor, availableColors } = useTheme();
+  const { user, updateProfile, uploadAvatar, refreshProfile } = useAuth();
+
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [provider, setProvider] = useState("openai");
   const [apiKeyParam, setApiKeyParam] = useState("");
@@ -34,12 +39,100 @@ export default function Settings() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Tab management
-  const [activeTab, setActiveTab] = useState<"providers" | "mcp">(() => {
+  // Tab management: "profile" | "providers" | "mcp"
+  const [activeTab, setActiveTab] = useState<"profile" | "providers" | "mcp">(() => {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get("tab");
-    return tabParam === "mcp" ? "mcp" : "providers";
+    if (tabParam === "profile") return "profile";
+    if (tabParam === "mcp") return "mcp";
+    return "profile";
   });
+
+  // Profile Form States
+  const [fullName, setFullName] = useState(user?.full_name || "");
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || "");
+  const [bio, setBio] = useState(user?.bio || "");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [showTopup, setShowTopup] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setFullName(user.full_name || "");
+      setAvatarUrl(user.avatar_url || "");
+      setBio(user.bio || "");
+    }
+  }, [user]);
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileMessage({ type: "error", text: "Image file size should be less than 5MB." });
+      return;
+    }
+    setUploadingAvatar(true);
+    setProfileMessage(null);
+    try {
+      const updatedProfile = await uploadAvatar(file);
+      if (updatedProfile.avatar_url) {
+        setAvatarUrl(updatedProfile.avatar_url);
+      }
+      setProfileMessage({ type: "success", text: "Avatar image uploaded and saved successfully!" });
+      setTimeout(() => setProfileMessage(null), 3500);
+    } catch (err: any) {
+      setProfileMessage({ type: "error", text: extractErrorMessage(err) });
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = "";
+    }
+  };
+
+  const extractErrorMessage = (err: any): string => {
+    const detail = err?.response?.data?.detail;
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      return detail
+        .map((d: any) => {
+          const field = Array.isArray(d.loc) ? d.loc.slice(1).join(" ") : "";
+          return `${field ? field + ": " : ""}${d.msg}`;
+        })
+        .join(" | ");
+    }
+    if (err?.message) return err.message;
+    return "Failed to update profile. Please verify your inputs.";
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingProfile(true);
+    setProfileMessage(null);
+
+    // Validation checks for schema constraints
+    if (avatarUrl && avatarUrl.startsWith("data:") && avatarUrl.length > 500) {
+      setProfileMessage({
+        type: "error",
+        text: "Avatar image URL exceeds the 500-character limit. Please select a preset avatar or use an image URL.",
+      });
+      setSavingProfile(false);
+      return;
+    }
+
+    try {
+      await updateProfile({
+        full_name: fullName.trim() ? fullName.trim().slice(0, 255) : null,
+        avatar_url: avatarUrl.trim() ? avatarUrl.trim().slice(0, 500) : null,
+        bio: bio.trim() ? bio.trim().slice(0, 1000) : null,
+      });
+      setProfileMessage({ type: "success", text: "Profile details updated successfully." });
+      setTimeout(() => setProfileMessage(null), 3500);
+    } catch (err: any) {
+      setProfileMessage({ type: "error", text: extractErrorMessage(err) });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   // MCP Configuration State
   const [mcpInfo, setMcpInfo] = useState<McpInfo | null>(null);
@@ -337,6 +430,19 @@ export default function Settings() {
             {/* Tab Swapper */}
             <div className="flex border-b border-border/20 mt-6 mb-8 gap-6">
               <button
+                onClick={() => setActiveTab("profile")}
+                className={`pb-3 text-sm font-bold transition-all relative ${
+                  activeTab === "profile" 
+                    ? "text-primary font-headline" 
+                    : "text-textSecondary hover:text-textPrimary"
+                }`}
+              >
+                Profile & Account
+                {activeTab === "profile" && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                )}
+              </button>
+              <button
                 onClick={() => setActiveTab("providers")}
                 className={`pb-3 text-sm font-bold transition-all relative ${
                   activeTab === "providers" 
@@ -365,7 +471,232 @@ export default function Settings() {
               </button>
             </div>
 
-            {activeTab === "providers" ? (
+            {activeTab === "profile" ? (
+              <div className="space-y-8 animate-fade-in">
+                {/* Profile Overview Card */}
+                <div className="rounded-2xl border border-border/40 bg-surface/50 p-6 backdrop-blur-md">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+                    <div className="flex items-center gap-4">
+                      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-elevated ring-2 ring-primary/40 shadow-[0_0_20px_rgba(var(--color-primary),0.2)]">
+                        {avatarUrl ? (
+                          <img
+                            src={resolveImagePath(avatarUrl)}
+                            alt={fullName || "User Avatar"}
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = "/mascot_avatar.png";
+                            }}
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary">
+                            {fullName ? fullName.slice(0, 2).toUpperCase() : (user?.email ? user.email.slice(0, 2).toUpperCase() : "OP")}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-xl font-bold font-headline text-textPrimary">
+                            {fullName || (user?.email ? user.email.split('@')[0] : "Operative")}
+                          </h2>
+                          <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-primary border border-primary/30">
+                            Active
+                          </span>
+                        </div>
+                        <p className="text-xs text-textSecondary mt-0.5">{user?.email || "No email registered"}</p>
+                        {user?.created_at && (
+                          <p className="text-[10px] text-textMuted mt-1">
+                            Operative since {new Date(user.created_at).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Credits badge with topup trigger */}
+                    <div className="flex items-center gap-3 rounded-xl border border-border/40 bg-elevated/60 px-4 py-3">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-textMuted">Available Credits</p>
+                        <p className="text-lg font-bold text-primary">{user?.credits ?? "--"}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowTopup(true)}
+                        className="rounded-input bg-primary px-3 py-1.5 text-xs font-bold text-background shadow-[0_0_12px_rgba(var(--color-primary),0.2)] hover:bg-primaryHover transition-colors"
+                      >
+                        Refuel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Profile Edit Form */}
+                <form onSubmit={handleSaveProfile} className="rounded-2xl border border-border/40 bg-surface/50 p-6 backdrop-blur-md space-y-6">
+                  <div className="border-b border-border/30 pb-4">
+                    <h3 className="text-base font-bold font-headline text-textPrimary">Personal Details</h3>
+                    <p className="text-xs text-textSecondary mt-0.5">
+                      Update your operative identity, display name, and avatar image.
+                    </p>
+                  </div>
+
+                  {profileMessage && (
+                    <div
+                      className={`rounded-xl p-3 text-xs font-semibold ${
+                        profileMessage.type === "success"
+                          ? "bg-primary/15 border border-primary/40 text-primary"
+                          : "bg-red-500/15 border border-red-500/40 text-red-400"
+                      }`}
+                    >
+                      {profileMessage.text}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-textSecondary mb-2">
+                        Display Name
+                      </label>
+                      <input
+                        type="text"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="e.g. Alex Mercer"
+                        className="h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-textSecondary mb-2">
+                        Account Email (Read-Only)
+                      </label>
+                      <input
+                        type="email"
+                        value={user?.email || ""}
+                        disabled
+                        className="h-11 w-full rounded-input border border-border/30 bg-elevated/40 px-3 text-sm text-textMuted cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Avatar Section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-textSecondary">
+                        Profile Avatar Image
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <label className={`cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all ${uploadingAvatar ? "opacity-50 cursor-not-allowed" : ""}`}>
+                          {uploadingAvatar ? (
+                            <>
+                              <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                              </svg>
+                              <span>Upload Image</span>
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/gif"
+                            disabled={uploadingAvatar}
+                            onChange={handleAvatarFileChange}
+                            className="hidden"
+                          />
+                        </label>
+                        {avatarUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setAvatarUrl("")}
+                            className="text-[11px] font-semibold text-textMuted hover:text-red-400 transition-colors"
+                          >
+                            Clear Avatar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Quick Preset Avatars */}
+                    <div className="mb-3">
+                      <p className="text-[11px] text-textMuted mb-2">Quick Presets:</p>
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        {[
+                          { label: "Mascot", url: "/mascot_avatar.png" },
+                          { label: "Cyber Bot", url: "https://api.dicebear.com/7.x/bottts/svg?seed=universal-bot" },
+                          { label: "Operative", url: "https://api.dicebear.com/7.x/adventurer/svg?seed=operative-alpha" },
+                          { label: "Matrix", url: "https://api.dicebear.com/7.x/shapes/svg?seed=neural-matrix" },
+                          { label: "Agent", url: "https://api.dicebear.com/7.x/lorelei/svg?seed=universal-agent" },
+                          { label: "Techie", url: "https://api.dicebear.com/7.x/avataaars/svg?seed=agent-zero" },
+                        ].map((preset) => (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => setAvatarUrl(preset.url)}
+                            className={`flex items-center gap-2 rounded-full px-2.5 py-1 text-xs border transition-all ${
+                              avatarUrl === preset.url
+                                ? "border-primary bg-primary/15 text-primary ring-1 ring-primary/40"
+                                : "border-border/40 bg-elevated/40 text-textSecondary hover:bg-elevated hover:text-textPrimary"
+                            }`}
+                          >
+                            <img
+                              src={preset.url}
+                              alt={preset.label}
+                              className="h-4 w-4 rounded-full object-cover"
+                            />
+                            <span>{preset.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type="url"
+                        maxLength={500}
+                        value={avatarUrl}
+                        onChange={(e) => setAvatarUrl(e.target.value)}
+                        placeholder="Or enter direct image URL (https://... or /static/...)"
+                        className="h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+                      />
+                    </div>
+                    <p className="text-[11px] text-textMuted mt-1.5">
+                      Upload an image file (PNG, JPG, WebP, GIF), select a quick preset, or enter a direct hosted image URL.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-textSecondary mb-2">
+                      Bio / Personal Instructions
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                      placeholder="Share a short bio or custom instructions you want neural models to remember about you..."
+                      className="w-full rounded-input border border-border/50 bg-elevated p-3 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40 custom-scrollbar resize-y"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end pt-2 border-t border-border/20">
+                    <button
+                      type="submit"
+                      disabled={savingProfile}
+                      className="flex items-center gap-2 rounded-input bg-primary px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-background shadow-[0_0_20px_rgba(var(--color-primary),0.25)] hover:bg-primaryHover disabled:opacity-50 transition-all"
+                    >
+                      {savingProfile ? (
+                        <>
+                          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-background border-t-transparent" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <span>Save Profile</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : activeTab === "providers" ? (
               <div className="space-y-10">
                 <form onSubmit={handleAdd} className="rounded-card bg-surface p-6 shadow-none ring-1 ring-border/40">
                   <h2 className="text-lg font-semibold text-textPrimary">Add API Key</h2>
@@ -916,6 +1247,14 @@ export default function Settings() {
           </main>
         </div>
       </div>
+
+      <TopupModal
+        isOpen={showTopup}
+        onClose={() => {
+          setShowTopup(false);
+          refreshProfile();
+        }}
+      />
     </PageTransition>
   );
 }

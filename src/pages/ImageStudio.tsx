@@ -37,7 +37,7 @@ export default function ImageStudio() {
   const [selectedModel, setSelectedModel] = useState("");
   const [prompt, setPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("1:1");
-  const [paymentMode, setPaymentMode] = useState<"own_key" | "credits" | "free_queue">("own_key");
+  const [paymentMode, setPaymentMode] = useState<"own_key" | "credits" | "free_queue">("credits");
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreditSuggestion, setShowCreditSuggestion] = useState(false);

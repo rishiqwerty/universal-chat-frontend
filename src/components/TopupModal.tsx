@@ -65,7 +65,7 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
               </div>
               <h2 className="font-headline text-2xl font-bold text-textPrimary">Refuel Your Credits</h2>
               <p className="mt-2 text-sm text-textMuted">
-                Credits are only used for **Image and Video generations**. Text chat is always unlimited for members.
+                Credits are only used for <b>Image generations</b>.
               </p>
             </div>
 
@@ -109,7 +109,7 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
                 })
               )}
             </div>
- 
+
             {/* Legal & Payment Gateway Compliance Links */}
             <div className="mt-6 border-t border-border/30 pt-4 text-center text-[11px] text-textMuted">
               <div className="flex items-center justify-center gap-2.5">
@@ -154,7 +154,7 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
-                <span>Instant electronic delivery • 256-bit encrypted checkout</span>
+                <span>Instant credit delivery • Secure checkout</span>
               </div>
             </div>
 
