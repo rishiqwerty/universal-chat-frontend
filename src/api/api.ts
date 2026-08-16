@@ -63,6 +63,107 @@ export async function verifyOtpApi(email: string, code: string): Promise<string>
   return data.access_token;
 }
 
+export type UserProfile = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  image?: string | null;
+  image_url?: string | null;
+  avatar?: string | null;
+  bio: string | null;
+  preferences: Record<string, any> | null;
+  credits: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string | null;
+};
+
+export type UserProfileUpdate = {
+  full_name?: string | null;
+  avatar_url?: string | null;
+  image?: string | null;
+  image_url?: string | null;
+  avatar?: string | null;
+  bio?: string | null;
+  preferences?: Record<string, any> | null;
+};
+
+export async function getUserProfile(): Promise<UserProfile> {
+  let res;
+  try {
+    res = await client.get("/auth/users/me");
+  } catch (err: any) {
+    if (err?.response?.status === 404) {
+      try {
+        res = await client.get("/auth/profile");
+      } catch {
+        res = await client.get("/auth/me");
+      }
+    } else {
+      throw err;
+    }
+  }
+  const data = res.data;
+  const resolvedAvatar = data.avatar_url || data.image_url || data.image || data.avatar || null;
+  return {
+    ...data,
+    avatar_url: resolvedAvatar,
+  };
+}
+
+export async function updateUserProfile(payload: UserProfileUpdate): Promise<UserProfile> {
+  const resolvedAvatar = payload.avatar_url ?? payload.image_url ?? payload.image ?? payload.avatar;
+  const body: Record<string, any> = {};
+
+  if (payload.full_name !== undefined) {
+    body.full_name = payload.full_name ? payload.full_name.trim().slice(0, 255) : null;
+  }
+  if (resolvedAvatar !== undefined) {
+    body.avatar_url = resolvedAvatar ? resolvedAvatar.trim().slice(0, 500) : null;
+  }
+  if (payload.bio !== undefined) {
+    body.bio = payload.bio ? payload.bio.trim().slice(0, 1000) : null;
+  }
+  if (payload.preferences !== undefined) {
+    body.preferences = payload.preferences;
+  }
+
+  let res;
+  try {
+    res = await client.put("/auth/profile", body);
+  } catch (err: any) {
+    if (err?.response?.status === 404 || err?.response?.status === 405) {
+      try {
+        res = await client.patch("/auth/users/me", body);
+      } catch {
+        res = await client.put("/auth/me", body);
+      }
+    } else {
+      throw err;
+    }
+  }
+  const data = res.data;
+  return {
+    ...data,
+    avatar_url: data.avatar_url || data.image_url || data.image || data.avatar || null,
+  };
+}
+
+export async function uploadUserAvatar(file: File): Promise<UserProfile> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await client.post("/auth/avatar", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return {
+    ...data,
+    avatar_url: data.avatar_url || data.image_url || data.image || data.avatar || null,
+  };
+}
+
 export type Conversation = {
   id: string;
   title: string;

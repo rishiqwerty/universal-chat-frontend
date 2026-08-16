@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ConfirmModal from "./ConfirmModal";
 import SignupModal from "./SignupModal";
 import TopupModal from "./TopupModal";
-import { getCreditBalance } from "../api/api";
+import { getCreditBalance, resolveImagePath } from "../api/api";
 import { getBalanceCheckInterval } from "../config";
 import { useAuth } from "../context/AuthContext";
 
@@ -119,7 +119,7 @@ export default function Topbar({
   leftContent
 }: TopbarProps) {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [editingTitle, setEditingTitle] = useState("");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -441,18 +441,6 @@ export default function Topbar({
             </AnimatePresence>
           </div>
         )}
-        <button
-          type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-input text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
-          aria-label="Layout"
-        >
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <rect x="14" y="14" width="7" height="7" rx="1" />
-          </svg>
-        </button>
         {!hideIncognito && (
           <button
             type="button"
@@ -510,9 +498,17 @@ export default function Topbar({
             aria-label="Profile"
           >
             {isAuthenticated ? (
-              <span className="text-xs font-semibold text-textSecondary uppercase">
-                OP
-              </span>
+              user?.avatar_url ? (
+                <img
+                  src={resolveImagePath(user.avatar_url)}
+                  alt={user.full_name || "User Avatar"}
+                  className="h-full w-full object-cover rounded-full"
+                />
+              ) : (
+                <span className="text-xs font-bold text-textPrimary uppercase">
+                  {user?.full_name ? user.full_name.slice(0, 2) : (user?.email ? user.email.slice(0, 2) : "OP")}
+                </span>
+              )
             ) : (
               <motion.div
                 className="relative h-full w-full flex items-center justify-center p-0.5"
@@ -566,23 +562,27 @@ export default function Topbar({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.95 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="absolute right-0 mt-2 w-56 overflow-hidden rounded-input border border-border/60 bg-elevated p-1 shadow-2xl z-50"
+                className="absolute right-0 mt-2 w-60 overflow-hidden rounded-xl border border-border/60 bg-elevated/95 p-1.5 shadow-2xl backdrop-blur-xl z-50"
               >
                 <div className="px-3 py-2 border-b border-border/20 mb-1">
-                  <p className="text-xs font-bold text-textPrimary uppercase tracking-tight">
-                    {isAuthenticated ? "Original Pro" : "Guest Operative"}
+                  <p className="text-xs font-bold text-textPrimary truncate" title={user?.full_name || user?.email || "Operative"}>
+                    {user?.full_name || (user?.email ? user.email.split('@')[0] : "Operative")}
                   </p>
-                  <p className="text-[10px] text-textMuted font-medium uppercase tracking-wider">
-                    {isAuthenticated ? "Free Tier Account" : "Temporary Session"}
+                  <p className="text-[10px] text-textMuted font-medium truncate mt-0.5" title={user?.email || "Account"}>
+                    {user?.email || (isAuthenticated ? "Active Operative" : "Guest Session")}
                   </p>
                 </div>
 
                 {isAuthenticated && (
                   <button
                     type="button"
-                    className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      navigate("/settings?tab=profile");
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
                   >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <svg className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                     </svg>
                     Profile Settings
@@ -591,15 +591,18 @@ export default function Topbar({
                 {isAuthenticated && (
                   <button
                     type="button"
-                    className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      navigate("/library");
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
                   >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <rect x="3" y="3" width="7" height="7" rx="1" />
-                      <rect x="13" y="3" width="7" height="7" rx="1" />
-                      <rect x="3" y="13" width="7" height="7" rx="1" />
-                      <rect x="13" y="13" width="7" height="7" rx="1" />
+                    <svg className="h-4 w-4 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
                     </svg>
-                    My Library
+                    Image Library
                   </button>
                 )}
                 <button
@@ -608,9 +611,9 @@ export default function Topbar({
                     setShowProfileMenu(false);
                     setShowSignupModal(true);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
                 >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <svg className="h-4 w-4 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                   </svg>
                   {isAuthenticated ? "Add Account" : "Sign In / Join"}
@@ -625,7 +628,7 @@ export default function Topbar({
                       setShowProfileMenu(false);
                       setShowLogoutConfirm(true);
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2 text-sm text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
                   >
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
