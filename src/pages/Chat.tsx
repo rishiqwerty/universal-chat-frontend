@@ -720,18 +720,16 @@ export default function Chat() {
       .then((models) => {
         setAvailableModels(models);
 
-        // Detect Free Tier Only
-        if (isAuthenticated && !isTempMode && models.length === 1 && models[0].is_free) {
-          const lastSeenStr = localStorage.getItem("lastSeenUpgradeFlyer");
-          const lastSeen = lastSeenStr ? parseInt(lastSeenStr, 10) : 0;
-          const now = Date.now();
-          const cooldown = 1 * 60 * 1000; // 10 minutes
-
-          if (now - lastSeen > cooldown) {
-            // Delay slightly for premium feel
-            setTimeout(() => setShowUpgradeFlyer(true), 2000);
-          }
-        }
+        // Pro Nudge flyer disabled for now
+        // if (isAuthenticated && !isTempMode && models.length === 1 && models[0].is_free) {
+        //   const lastSeenStr = localStorage.getItem("lastSeenUpgradeFlyer");
+        //   const lastSeen = lastSeenStr ? parseInt(lastSeenStr, 10) : 0;
+        //   const now = Date.now();
+        //   const cooldown = 10 * 60 * 1000;
+        //   if (now - lastSeen > cooldown) {
+        //     setTimeout(() => setShowUpgradeFlyer(true), 2000);
+        //   }
+        // }
 
         // Set initial selection if none exists
         if (!selectedModel && models.length > 0) {
