@@ -66,7 +66,12 @@ export async function verifyOtpApi(email: string, code: string): Promise<string>
 export type Conversation = {
   id: string;
   title: string;
-  updatedAt: string;
+  user_id?: string;
+  is_starred?: boolean;
+  is_archived?: boolean;
+  summary?: string;
+  updatedAt?: string;
+  created_at?: string;
 };
 
 export type ProviderModels = {
@@ -108,6 +113,49 @@ export async function deleteMessage(conversationId: string, messageId: string): 
 
 export async function updateConversationTitle(id: string, title: string): Promise<Conversation> {
   const { data } = await client.put(`/chat/conversations/${id}`, { title });
+  clearChatCache();
+  return data;
+}
+
+export async function starConversation(id: string): Promise<Conversation> {
+  const { data } = await client.post(`/chat/conversations/${id}/star`);
+  clearChatCache();
+  return data;
+}
+
+export async function unstarConversation(id: string): Promise<Conversation> {
+  const { data } = await client.post(`/chat/conversations/${id}/unstar`);
+  clearChatCache();
+  return data;
+}
+
+export async function archiveConversation(id: string): Promise<Conversation> {
+  const { data } = await client.post(`/chat/conversations/${id}/archive`);
+  clearChatCache();
+  return data;
+}
+
+export async function unarchiveConversation(id: string): Promise<Conversation> {
+  const { data } = await client.post(`/chat/conversations/${id}/unarchive`);
+  clearChatCache();
+  return data;
+}
+
+export async function patchConversation(
+  id: string,
+  update: { title?: string; is_starred?: boolean; is_archived?: boolean }
+): Promise<Conversation> {
+  const { data } = await client.patch(`/chat/conversations/${id}`, update);
+  clearChatCache();
+  return data;
+}
+
+export async function getConversations(params?: {
+  limit?: number;
+  is_archived?: boolean;
+  is_starred?: boolean;
+}): Promise<Conversation[]> {
+  const { data } = await client.get("/chat/conversations", { params });
   return data;
 }
 
@@ -342,7 +390,9 @@ export function clearChatCache() {
 
 export async function getRecentConversations(forceRefresh = false): Promise<Conversation[]> {
   if (cachedRecentChats && !forceRefresh) return cachedRecentChats;
-  const { data } = await client.get("/chat/conversations?limit=5");
+  const { data } = await client.get("/chat/conversations", {
+    params: { limit: 50, is_archived: false },
+  });
   cachedRecentChats = data;
   return data;
 }

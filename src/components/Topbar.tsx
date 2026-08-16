@@ -93,6 +93,10 @@ type TopbarProps = {
   activeChatTitle?: string | null;
   onUpdateTitle?: (newTitle: string) => void;
   onDeleteChat?: () => void;
+  isStarred?: boolean;
+  onToggleStar?: () => void;
+  isArchived?: boolean;
+  onToggleArchive?: () => void;
   isTempMode?: boolean;
   onToggleTempMode?: () => void;
   isAuthenticated?: boolean;
@@ -104,6 +108,10 @@ export default function Topbar({
   activeChatTitle,
   onUpdateTitle,
   onDeleteChat,
+  isStarred = false,
+  onToggleStar,
+  isArchived = false,
+  onToggleArchive,
   isTempMode,
   onToggleTempMode,
   isAuthenticated = true,
@@ -226,18 +234,25 @@ export default function Topbar({
         </button>
       )}
       {leftContent}
-      <div className={`relative min-w-0 flex-1 max-w-2xl ${leftContent ? "hidden md:block" : ""}`}>
+      <div className={`relative min-w-0 flex-1 max-w-2xl flex items-center gap-2.5 ${leftContent ? "hidden md:flex" : ""}`}>
         {activeChatTitle != null ? (
-          <input
-            type="text"
-            value={editingTitle}
-            onChange={(e) => setEditingTitle(e.target.value)}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-            className="w-full bg-transparent text-lg font-headline font-semibold text-textPrimary placeholder:text-textMuted focus:outline-none"
-            placeholder="Conversation Title"
-          />
+          <>
+            <input
+              type="text"
+              value={editingTitle}
+              onChange={(e) => setEditingTitle(e.target.value)}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              className="w-full bg-transparent text-lg font-headline font-semibold text-textPrimary placeholder:text-textMuted focus:outline-none truncate"
+              placeholder="Conversation Title"
+            />
+            {isArchived && (
+              <span className="shrink-0 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-300 uppercase tracking-wider">
+                Archived
+              </span>
+            )}
+          </>
         ) : (
           <>
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted">
@@ -254,12 +269,59 @@ export default function Topbar({
           </>
         )}
       </div>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+        {activeChatTitle != null && onToggleStar && (
+          <button
+            type="button"
+            onClick={onToggleStar}
+            className={`flex h-9 w-9 items-center justify-center rounded-input transition-colors ${
+              isStarred
+                ? "text-yellow-400 hover:text-yellow-300 bg-yellow-500/15 border border-yellow-500/30 shadow-[0_0_12px_rgba(234,179,8,0.25)]"
+                : "text-textMuted hover:text-textPrimary hover:bg-surface"
+            }`}
+            aria-label={isStarred ? "Unstar Chat" : "Star Chat"}
+            title={isStarred ? "Starred (Click to remove star)" : "Star this conversation"}
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill={isStarred ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.75">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+          </button>
+        )}
+
+        {activeChatTitle != null && onToggleArchive && (
+          <button
+            type="button"
+            onClick={onToggleArchive}
+            className={`flex h-9 w-9 items-center justify-center rounded-input transition-colors ${
+              isArchived
+                ? "text-amber-400 hover:text-amber-300 bg-amber-500/15 border border-amber-500/30"
+                : "text-textMuted hover:text-textPrimary hover:bg-surface"
+            }`}
+            aria-label={isArchived ? "Unarchive Chat" : "Archive Chat"}
+            title={isArchived ? "Unarchive conversation" : "Archive conversation"}
+          >
+            {isArchived ? (
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                <polyline points="21 8 21 21 3 21 3 8" />
+                <rect x="1" y="3" width="22" height="5" />
+                <polyline points="10 12 12 10 14 12" />
+                <line x1="12" y1="10" x2="12" y2="17" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                <polyline points="21 8 21 21 3 21 3 8" />
+                <rect x="1" y="3" width="22" height="5" />
+                <line x1="10" y1="12" x2="14" y2="12" />
+              </svg>
+            )}
+          </button>
+        )}
+
         {activeChatTitle != null && onDeleteChat && (
           <button
             type="button"
             onClick={onDeleteChat}
-            className="flex h-9 w-9 items-center justify-center text-textMuted transition-colors hover:text-red-500"
+            className="flex h-9 w-9 items-center justify-center rounded-input text-textMuted transition-colors hover:bg-surface hover:text-red-500"
             aria-label="Delete Chat"
             title="Delete Chat"
           >
