@@ -48,15 +48,26 @@ export default function MessageInput({
   const pickerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const [isMultiline, setIsMultiline] = useState(false);
+
   const isInputBlocked = disabled || isStreaming || (Boolean(isLoadingModels) && !isTempMode);
 
-  // Auto-resize textarea height: 1 line by default, extends only when multi-line
+  // Auto-resize textarea height: single line in inline mode, multi-line in stacked mode
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       const scrollHeight = textareaRef.current.scrollHeight;
-      const minHeight = window.innerWidth < 640 ? 24 : 26;
-      textareaRef.current.style.height = `${Math.min(Math.max(scrollHeight, minHeight), 180)}px`;
+      const hasNewline = value.includes("\n");
+      const multiline = hasNewline || scrollHeight > 34;
+      setIsMultiline(multiline);
+
+      if (multiline) {
+        textareaRef.current.style.height = `${Math.min(scrollHeight, 180)}px`;
+      } else {
+        textareaRef.current.style.height = "26px";
+      }
+    } else {
+      setIsMultiline(false);
     }
   }, [value]);
 
@@ -119,6 +130,77 @@ export default function MessageInput({
     }
   }, [showPicker, selectedProvider]);
 
+  const renderModelSelector = (compact?: boolean) => {
+    if (isTempMode) return null;
+    if (isLoadingModels) {
+      return (
+        <div className="flex items-center gap-1 rounded-xl px-2 py-1 text-[10px] sm:text-[11px] font-semibold text-textMuted bg-elevated/40 border border-border/30">
+          <div className="h-2 w-2 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <span className="hidden sm:inline">Loading...</span>
+        </div>
+      );
+    }
+    return (
+      <button
+        type="button"
+        onClick={() => setShowPicker(!showPicker)}
+        disabled={isStreaming || availableModels.length === 0}
+        className={`group flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold tracking-wide transition-all ${
+          isImageModel 
+            ? 'bg-primary/10 text-primary ring-1 ring-primary/30 hover:bg-primary/20' 
+            : 'bg-elevated/60 text-textSecondary hover:bg-elevated hover:text-textPrimary border border-border/20'
+        } disabled:opacity-30`}
+        title="Select model"
+      >
+        {isImageModel ? (
+          <svg className="h-3 w-3 animate-pulse text-primary shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
+          </svg>
+        ) : (
+          <div className="h-1.5 w-1.5 rounded-full bg-primary/70 group-hover:bg-primary transition-colors shrink-0" />
+        )}
+        <span className={`${compact ? "max-w-[70px] sm:max-w-[130px]" : "max-w-[120px] sm:max-w-[180px]"} truncate`}>
+          {selectedModel || "Model"}
+        </span>
+        <svg className={`h-2.5 w-2.5 shrink-0 text-textMuted transition-transform ${showPicker ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+        </svg>
+      </button>
+    );
+  };
+
+  const renderSendButton = () => {
+    if (isStreaming) {
+      return (
+        <button
+          type="button"
+          onClick={onStop}
+          className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-red-500/40 bg-red-500/15 px-3 text-xs font-bold uppercase tracking-wider text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.2)] transition-all hover:bg-red-500 hover:text-white"
+          title="Stop generating AI response"
+        >
+          <span className="h-2 w-2 rounded-sm bg-current" />
+          <span>Stop</span>
+        </button>
+      );
+    }
+    return (
+      <button
+        type="button"
+        onClick={onSend}
+        disabled={isInputBlocked || !value.trim()}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-background shadow-[0_0_12px_rgba(217,255,0,0.25)] transition-all hover:bg-primaryHover hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100"
+        title="Send message (Enter)"
+      >
+        <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12" />
+          <polyline points="12 5 19 12 12 19" />
+        </svg>
+      </button>
+    );
+  };
+
   return (
     <div className="border-t border-border/30 bg-background px-2.5 py-1.5 sm:px-4 sm:py-2.5">
       <div className="mx-auto flex max-w-4xl flex-col gap-1.5 relative">
@@ -131,10 +213,19 @@ export default function MessageInput({
             ] 
           } : {}}
           transition={{ duration: 0.6, repeat: 1 }}
-          className="relative flex flex-col rounded-xl sm:rounded-2xl border border-border/60 bg-surface/95 shadow-sm backdrop-blur-md transition-all focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/40 focus-within:shadow-[0_0_20px_rgba(217,255,0,0.06)]"
+          className={`relative rounded-2xl border border-border/60 bg-surface/95 shadow-sm backdrop-blur-md transition-all focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/40 focus-within:shadow-[0_0_20px_rgba(217,255,0,0.06)] ${
+            isMultiline ? "flex flex-col gap-1.5 p-2 sm:p-2.5" : "flex items-center gap-1.5 p-1.5 sm:gap-2 sm:p-2"
+          }`}
         >
-          {/* Top: Auto-expanding Textarea */}
-          <div className="w-full px-2.5 pt-1.5 sm:px-3.5 sm:pt-2">
+          {/* When single-line: Model selector on the left */}
+          {!isMultiline && (
+            <div className="shrink-0 flex items-center">
+              {renderModelSelector(true)}
+            </div>
+          )}
+
+          {/* SINGLE PERSISTENT TEXTAREA: Never unmounts, preserving focus & cursor */}
+          <div className={isMultiline ? "w-full px-1 pt-1" : "flex-1 min-w-0 flex items-center"}>
             <textarea
               ref={textareaRef}
               rows={1}
@@ -156,80 +247,32 @@ export default function MessageInput({
                   : "Message Neural Architect..."
               }
               disabled={isInputBlocked}
-              className="min-h-[24px] sm:min-h-[26px] max-h-[180px] w-full resize-none bg-transparent text-[14px] sm:text-sm text-textPrimary placeholder:text-textMuted focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed leading-snug custom-scrollbar py-0"
+              className={isMultiline
+                ? "min-h-[46px] max-h-[180px] w-full resize-none bg-transparent text-[14px] sm:text-sm text-textPrimary placeholder:text-textMuted focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed leading-relaxed custom-scrollbar py-0.5"
+                : "h-[26px] min-h-[26px] max-h-[180px] w-full resize-none bg-transparent px-1 py-0.5 text-[14px] sm:text-sm text-textPrimary placeholder:text-textMuted focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed leading-snug custom-scrollbar"
+              }
             />
           </div>
 
-          {/* Bottom Toolbar: Model Selector on Left, Send/Stop on Right */}
-          <div className="flex items-center justify-between gap-2 px-2 pb-1.5 pt-0.5 sm:px-2.5 sm:pb-2">
-            {/* Left: Model Selector */}
-            <div className="flex items-center">
-              {!isTempMode && (
-                <div>
-                  {isLoadingModels ? (
-                    <div className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-semibold text-textMuted bg-elevated/40 border border-border/30">
-                      <div className="h-2 w-2 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                      <span>Loading...</span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowPicker(!showPicker)}
-                      disabled={isStreaming || availableModels.length === 0}
-                      className={`group flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] sm:text-[11px] font-semibold tracking-wide transition-all ${
-                        isImageModel 
-                          ? 'bg-primary/10 text-primary ring-1 ring-primary/30 hover:bg-primary/20' 
-                          : 'bg-elevated/60 text-textSecondary hover:bg-elevated hover:text-textPrimary border border-border/20'
-                      } disabled:opacity-30`}
-                      title="Select model"
-                    >
-                      {isImageModel ? (
-                        <svg className="h-2.5 w-2.5 animate-pulse text-primary shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                          <circle cx="8.5" cy="8.5" r="1.5" />
-                          <polyline points="21 15 16 10 5 21" />
-                        </svg>
-                      ) : (
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary/70 group-hover:bg-primary transition-colors shrink-0" />
-                      )}
-                      <span className="max-w-[100px] sm:max-w-[150px] truncate">{selectedModel || "Select Model"}</span>
-                      <svg className={`h-2.5 w-2.5 shrink-0 text-textMuted transition-transform ${showPicker ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              )}
+          {/* When single-line: Send button on the right */}
+          {!isMultiline && (
+            <div className="shrink-0 flex items-center">
+              {renderSendButton()}
             </div>
+          )}
 
-            {/* Right: Send or Stop button */}
-            <div className="flex items-center gap-1.5">
-              {isStreaming ? (
-                <button
-                  type="button"
-                  onClick={onStop}
-                  className="flex h-7 shrink-0 items-center justify-center gap-1 rounded-lg border border-red-500/40 bg-red-500/15 px-2.5 text-[10px] font-bold uppercase tracking-wider text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.2)] transition-all hover:bg-red-500 hover:text-white"
-                  title="Stop generating AI response"
-                >
-                  <span className="h-1.5 w-1.5 rounded-sm bg-current" />
-                  <span>Stop</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onSend}
-                  disabled={isInputBlocked || !value.trim()}
-                  className="flex h-7 w-7 sm:h-7.5 sm:w-7.5 shrink-0 items-center justify-center rounded-lg bg-primary text-background shadow-[0_0_10px_rgba(217,255,0,0.2)] transition-all hover:bg-primaryHover hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100"
-                  title="Send message (Enter)"
-                >
-                  <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                    <polyline points="12 5 19 12 12 19" />
-                  </svg>
-                </button>
-              )}
+          {/* When multi-line: Bottom toolbar with Model on left and Send on right */}
+          {isMultiline && (
+            <div className="flex items-center justify-between gap-2 border-t border-border/20 pt-1.5">
+              <div className="flex items-center">
+                {renderModelSelector(false)}
+              </div>
+
+              <div className="flex items-center">
+                {renderSendButton()}
+              </div>
             </div>
-          </div>
+          )}
         </motion.div>
 
         {/* Picker Popover */}
