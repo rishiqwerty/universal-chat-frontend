@@ -50,13 +50,13 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
   const startProgressTimer = (initialMsg: string) => {
     setAuthStatus(initialMsg);
     const t1 = setTimeout(() => {
-      setAuthStatus("Connecting to cloud server & database...");
+      setAuthStatus("Authenticating...");
     }, 2200);
     const t2 = setTimeout(() => {
       setAuthStatus("Please wait a moment...");
     }, 6000);
     const t3 = setTimeout(() => {
-      setAuthStatus("Almost ready, initializing secure workspace session...");
+      setAuthStatus("Setting up your workspace...");
     }, 12000);
 
     return () => {
@@ -69,12 +69,12 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
   async function handleGoogleSuccess(credential: string) {
     setLoading(true);
     setError("");
-    const stopTimer = startProgressTimer("Verifying Google account with backend...");
+    const stopTimer = startProgressTimer("Authenticating with Google...");
     try {
       const token = await googleLoginAccount(credential);
       stopTimer();
-      setAuthStatus("Backend online! Opening chat workspace...");
-      await new Promise((r) => setTimeout(r, 350));
+      setAuthStatus("Success! Redirecting...");
+      await new Promise((r) => setTimeout(r, 300));
       localStorage.clear();
       clearChatCache();
       login(token);
@@ -82,7 +82,7 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
       navigate("/chat");
     } catch (err: any) {
       stopTimer();
-      setError(err.response?.data?.message || err.response?.data?.detail || "Authentication server is currently unavailable. Please retry in a moment.");
+      setError(err.response?.data?.message || err.response?.data?.detail || "Authentication service is temporarily busy. Please retry.");
     } finally {
       setLoading(false);
       setAuthStatus("");

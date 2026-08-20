@@ -20,7 +20,22 @@ client.interceptors.request.use((config) => {
 
 client.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const config = error.config;
+    
+    // Check if error is due to cold-start / sleeping server
+    const isColdStart =
+      !error.response ||
+      error.code === "ECONNABORTED" ||
+      [502, 503, 504, 520, 521, 522, 524].includes(error.response?.status);
+
+    if (config && isColdStart && (config.__retryCount || 0) < 2) {
+      config.__retryCount = (config.__retryCount || 0) + 1;
+      const delay = config.__retryCount * 2000;
+      await new Promise((r) => setTimeout(r, delay));
+      return client(config);
+    }
+
     if (error.response?.status === 401 || error.response?.status === 403) {
       forceLogout();
       clearChatCache();
