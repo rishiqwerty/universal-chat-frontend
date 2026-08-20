@@ -46,15 +46,6 @@ function loadRazorpaySdk(): Promise<any> {
   return razorpaySdkPromise;
 }
 
-function cleanupRazorpayDom() {
-  try {
-    const elements = document.querySelectorAll(".razorpay-container, iframe[src*='razorpay'], iframe[name^='razorpay']");
-    elements.forEach((el) => el.remove());
-  } catch {
-    // ignore
-  }
-}
-
 export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
   const [plans, setPlans] = useState<CreditPlan[]>([]);
   const [loading, setLoading] = useState<string | number | null>(null);
@@ -62,12 +53,6 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { user, refreshProfile } = useAuth();
-
-  useEffect(() => {
-    return () => {
-      cleanupRazorpayDom();
-    };
-  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -79,8 +64,6 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
           console.error("Failed to load plans", err);
           setErrorMessage("Failed to load credit plans. Please try again.");
         });
-    } else {
-      cleanupRazorpayDom();
     }
   }, [isOpen]);
 
@@ -137,16 +120,18 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
               razorpay_signature: response.razorpay_signature,
             });
 
+            // Refresh user profile and broadcast balance-update immediately across all UI components
+            window.dispatchEvent(new Event("balance-update"));
             await refreshProfile();
+
             setSuccessMessage(
               verifyRes.message || `Successfully added ${verifyRes.credits_added || plan.amount} credits!`
             );
 
             setTimeout(() => {
-              cleanupRazorpayDom();
               onClose();
               setSuccessMessage(null);
-            }, 2500);
+            }, 1800);
           } catch (err: any) {
             console.error("Payment verification failed", err);
             setErrorMessage(
@@ -160,7 +145,6 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
         modal: {
           ondismiss: function () {
             setLoading(null);
-            cleanupRazorpayDom();
           },
         },
       };
@@ -172,7 +156,6 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
           response?.error?.description || "Payment failed or was cancelled by user."
         );
         setLoading(null);
-        cleanupRazorpayDom();
       });
 
       rzpInstance.open();
@@ -182,7 +165,6 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
         err?.response?.data?.detail || err?.message || "Failed to initiate payment. Please try again."
       );
       setLoading(null);
-      cleanupRazorpayDom();
     }
   }
 

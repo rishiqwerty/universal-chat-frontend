@@ -418,24 +418,14 @@ export async function sendTempChatMessageStream(
   if (!reader) return;
 
   const decoder = new TextDecoder();
-  let buffer = "";
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = "";
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (i === lines.length - 1 && line !== "" && !line.endsWith("\n") && lines.length > 1) {
-        buffer = lines[i];
-        break;
-      }
-      if (!line) continue;
-      onChunk(line);
+    const chunk = decoder.decode(value, { stream: true });
+    if (chunk) {
+      onChunk(chunk);
     }
   }
 }

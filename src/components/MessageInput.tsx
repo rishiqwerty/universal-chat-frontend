@@ -10,6 +10,7 @@ type MessageInputProps = {
   onStop?: () => void;
   disabled?: boolean;
   isStreaming?: boolean;
+  isLoadingModels?: boolean;
   availableModels: ProviderModels[];
   selectedProvider: string | null;
   selectedModel: string | null;
@@ -31,6 +32,7 @@ export default function MessageInput({
   onStop,
   disabled,
   isStreaming,
+  isLoadingModels,
   availableModels,
   selectedProvider,
   selectedModel,
@@ -45,6 +47,8 @@ export default function MessageInput({
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const isInputBlocked = disabled || isStreaming || (Boolean(isLoadingModels) && !isTempMode);
 
   useEffect(() => {
     if (outerRef) {
@@ -129,40 +133,53 @@ export default function MessageInput({
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    onSend();
+                    if (!isInputBlocked && value.trim()) {
+                      onSend();
+                    }
                   }
                 }}
-                placeholder="Message Neural Architect..."
-                disabled={disabled || isStreaming}
-                className="h-12 w-full rounded-input border border-border/50 bg-surface pl-4 pr-32 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40 disabled:opacity-50"
+                placeholder={
+                  isLoadingModels && !isTempMode
+                    ? "Loading neural models..."
+                    : "Message Neural Architect..."
+                }
+                disabled={isInputBlocked}
+                className="h-12 w-full rounded-input border border-border/50 bg-surface pl-4 pr-32 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </motion.div>
             
             {/* Model Selector Trigger */}
             {!isTempMode && (
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-                <button
-                  type="button"
-                  onClick={() => setShowPicker(!showPicker)}
-                  disabled={isStreaming || availableModels.length === 0}
-                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all duration-300 ${
-                    isImageModel 
-                      ? 'bg-primary/10 text-primary ring-1 ring-primary/30 hover:bg-primary/20' 
-                      : 'bg-elevated/50 text-textSecondary hover:bg-elevated hover:text-textPrimary'
-                  } disabled:opacity-30`}
-                >
-                  {isImageModel && (
-                    <svg className="h-3 w-3 animate-pulse text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <polyline points="21 15 16 10 5 21" />
+                {isLoadingModels ? (
+                  <div className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-semibold text-textMuted bg-elevated/40 border border-border/30">
+                    <div className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    <span>Loading...</span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowPicker(!showPicker)}
+                    disabled={isStreaming || availableModels.length === 0}
+                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all duration-300 ${
+                      isImageModel 
+                        ? 'bg-primary/10 text-primary ring-1 ring-primary/30 hover:bg-primary/20' 
+                        : 'bg-elevated/50 text-textSecondary hover:bg-elevated hover:text-textPrimary'
+                    } disabled:opacity-30`}
+                  >
+                    {isImageModel && (
+                      <svg className="h-3 w-3 animate-pulse text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                      </svg>
+                    )}
+                    <span className="max-w-[80px] truncate">{selectedModel || "Select Model"}</span>
+                    <svg className={`h-3 w-3 transition-transform ${showPicker ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
                     </svg>
-                  )}
-                  <span className="max-w-[80px] truncate">{selectedModel || "Select Model"}</span>
-                  <svg className={`h-3 w-3 transition-transform ${showPicker ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                  </svg>
-                </button>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -181,7 +198,7 @@ export default function MessageInput({
             <button
               type="button"
               onClick={onSend}
-              disabled={disabled || !value.trim()}
+              disabled={isInputBlocked || !value.trim()}
               className="shrink-0 rounded-input bg-primary px-5 text-sm font-semibold text-background shadow-[0_0_16px_rgba(217,255,0,0.2)] transition-colors hover:bg-primaryHover disabled:cursor-not-allowed disabled:opacity-40"
             >
               Send

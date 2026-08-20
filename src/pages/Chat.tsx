@@ -1,24 +1,24 @@
 import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  createConversation, 
-  updateConversationTitle, 
-  getRecentConversations, 
+import {
+  createConversation,
+  updateConversationTitle,
+  getRecentConversations,
   getConversations,
-  getConversationDetails, 
-  getConversationMessages, 
+  getConversationDetails,
+  getConversationMessages,
   starConversation,
   unstarConversation,
   archiveConversation,
   unarchiveConversation,
-  sendMessageStream, 
-  sendTempChatMessageStream, 
-  deleteConversation, 
-  deleteMessage, 
-  getAvailableModels, 
-  type Conversation, 
-  type ProviderModels 
+  sendMessageStream,
+  sendTempChatMessageStream,
+  deleteConversation,
+  deleteMessage,
+  getAvailableModels,
+  type Conversation,
+  type ProviderModels
 } from "../api/api";
 import { type UnifiedMessage } from "../api/api";
 import ChatWindow, { type ChatMessage } from "../components/ChatWindow";
@@ -61,6 +61,7 @@ export default function Chat() {
   const [chatFilter, setChatFilter] = useState<ChatFilterMode>("all");
 
   const [availableModels, setAvailableModels] = useState<ProviderModels[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
 
@@ -308,8 +309,8 @@ export default function Chat() {
     const targetId = id || activeChatId;
     if (!targetId) return;
 
-    const isCurrentlyStarred = currentlyStarred !== undefined 
-      ? currentlyStarred 
+    const isCurrentlyStarred = currentlyStarred !== undefined
+      ? currentlyStarred
       : activeChatMeta?.id === targetId ? !!activeChatMeta.is_starred : false;
 
     // Optimistic update
@@ -328,7 +329,7 @@ export default function Chat() {
       }
     } catch (e) {
       console.error("Failed to toggle star", e);
-      getConversations({ limit: 50 }).then(setRecentChats).catch(() => {});
+      getConversations({ limit: 50 }).then(setRecentChats).catch(() => { });
     }
   }, [activeChatId, activeChatMeta]);
 
@@ -356,7 +357,7 @@ export default function Chat() {
       }
     } catch (e) {
       console.error("Failed to toggle archive", e);
-      getConversations({ limit: 50 }).then(setRecentChats).catch(() => {});
+      getConversations({ limit: 50 }).then(setRecentChats).catch(() => { });
     }
   }, [activeChatId, activeChatMeta]);
 
@@ -481,8 +482,10 @@ export default function Chat() {
               msg.id === assistantMsgId
                 ? {
                   ...msg,
-                  content: displayContent.trim() === "" ? "" : displayContent,
+                  content: displayContent,
                   images: foundImages.length > 0 ? [...(msg.images || []), ...foundImages] : msg.images,
+                  provider: "AI",
+                  model: selectedModel || "Fast",
                   provider_metadata: parsedMeta || msg.provider_metadata,
                 }
                 : msg
@@ -711,43 +714,48 @@ export default function Chat() {
         .then((chats) => setRecentChats(chats))
         .catch(() => { })
         .finally(() => setLoadingRecentChats(false));
+
+      setLoadingModels(true);
+      getAvailableModels()
+        .then((models) => {
+          setAvailableModels(models);
+
+          // Pro Nudge flyer disabled for now
+          // if (isAuthenticated && !isTempMode && models.length === 1 && models[0].is_free) {
+          //   const lastSeenStr = localStorage.getItem("lastSeenUpgradeFlyer");
+          //   const lastSeen = lastSeenStr ? parseInt(lastSeenStr, 10) : 0;
+          //   const now = Date.now();
+          //   const cooldown = 10 * 60 * 1000;
+          //   if (now - lastSeen > cooldown) {
+          //     setTimeout(() => setShowUpgradeFlyer(true), 2000);
+          //   }
+          // }
+
+          // Set initial selection if none exists
+          if (!selectedModel && models.length > 0) {
+            const savedDefault = localStorage.getItem("default_model_config");
+            if (savedDefault) {
+              const { provider, model } = JSON.parse(savedDefault);
+              setSelectedProvider(provider);
+              setSelectedModel(model);
+            } else {
+              // Default to absolute latest (last provider, first available model)
+              const lastProv = models[models.length - 1];
+              const lastMod = lastProv.text_models?.[0] || lastProv.image_models?.[0];
+              setSelectedProvider(lastProv.provider);
+              setSelectedModel(lastMod || null);
+            }
+          }
+        })
+        .catch(() => { })
+        .finally(() => {
+          setLoadingModels(false);
+        });
     } else {
       setRecentChats([]);
       setLoadingRecentChats(false);
+      setLoadingModels(false);
     }
-
-    getAvailableModels()
-      .then((models) => {
-        setAvailableModels(models);
-
-        // Pro Nudge flyer disabled for now
-        // if (isAuthenticated && !isTempMode && models.length === 1 && models[0].is_free) {
-        //   const lastSeenStr = localStorage.getItem("lastSeenUpgradeFlyer");
-        //   const lastSeen = lastSeenStr ? parseInt(lastSeenStr, 10) : 0;
-        //   const now = Date.now();
-        //   const cooldown = 10 * 60 * 1000;
-        //   if (now - lastSeen > cooldown) {
-        //     setTimeout(() => setShowUpgradeFlyer(true), 2000);
-        //   }
-        // }
-
-        // Set initial selection if none exists
-        if (!selectedModel && models.length > 0) {
-          const savedDefault = localStorage.getItem("default_model_config");
-          if (savedDefault) {
-            const { provider, model } = JSON.parse(savedDefault);
-            setSelectedProvider(provider);
-            setSelectedModel(model);
-          } else {
-            // Default to absolute latest (last provider, first available model)
-            const lastProv = models[models.length - 1];
-            const lastMod = lastProv.text_models?.[0] || lastProv.image_models?.[0];
-            setSelectedProvider(lastProv.provider);
-            setSelectedModel(lastMod || null);
-          }
-        }
-      })
-      .catch(() => { });
   }, [isAuthenticated]);
 
   const renderChatHistorySkeleton = () => {
@@ -889,6 +897,7 @@ export default function Chat() {
                       onStop={cancelActiveStream}
                       disabled={true}
                       isStreaming={false}
+                      isLoadingModels={!isTempMode && (loadingModels || availableModels.length === 0)}
                       availableModels={availableModels}
                       selectedProvider={selectedProvider}
                       selectedModel={selectedModel}
@@ -950,6 +959,7 @@ export default function Chat() {
                       onStop={cancelActiveStream}
                       disabled={pending}
                       isStreaming={pending}
+                      isLoadingModels={!isTempMode && (loadingModels || availableModels.length === 0)}
                       availableModels={availableModels}
                       selectedProvider={selectedProvider}
                       selectedModel={selectedModel}
@@ -968,6 +978,34 @@ export default function Chat() {
                 transition={{ duration: 0.3 }}
                 className="flex min-h-0 flex-1 flex-col"
               >
+                {isTempMode && (
+                  <div className="mx-auto w-full max-w-4xl px-6 pt-3">
+                    <div className="flex items-center justify-between rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2 text-xs text-amber-200 backdrop-blur-md">
+                      <div className="flex items-center gap-2">
+                        <svg className="h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                        </svg>
+                        <span>
+                          <b>Temporary Mode:</b> Messages are ephemeral and will not be saved{isAuthenticated ? " in your account history." : ". "}
+                          {!isAuthenticated && (
+                            <>
+                              <button type="button" onClick={() => navigate("/login")} className="font-bold text-amber-300 underline underline-offset-2 hover:text-amber-100">Log in</button> to save your history.
+                            </>
+                          )}
+                        </span>
+                      </div>
+                      {!isAuthenticated && (
+                        <button
+                          type="button"
+                          onClick={() => navigate("/login")}
+                          className="rounded-input bg-amber-400 px-3 py-1 text-[11px] font-bold text-black hover:bg-amber-300 transition-colors shadow"
+                        >
+                          Log In
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {!isTempMode && activeChatMeta?.is_archived && (
                   <div className="mx-auto w-full max-w-4xl px-6 pt-3">
                     <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-200 backdrop-blur-md">
@@ -1031,6 +1069,7 @@ export default function Chat() {
                       onStop={cancelActiveStream}
                       disabled={pending}
                       isStreaming={pending}
+                      isLoadingModels={!isTempMode && (loadingModels || availableModels.length === 0)}
                       availableModels={availableModels}
                       selectedProvider={selectedProvider}
                       selectedModel={selectedModel}
@@ -1086,13 +1125,13 @@ export default function Chat() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
                   </svg>
                 </div>
-                
+
                 <div className="flex-1">
                   <h4 className="text-sm font-black text-textPrimary font-headline tracking-wide uppercase">MCP Server Support Live!</h4>
                   <p className="text-xs text-textSecondary mt-1 leading-relaxed">
                     Connect local workflows to Claude Desktop or web platforms like ChatGPT Actions using standard API keys and OAuth 2.0.
                   </p>
-                  
+
                   <div className="mt-4 flex items-center justify-between gap-3 pt-3 border-t border-border/10">
                     <button
                       type="button"
