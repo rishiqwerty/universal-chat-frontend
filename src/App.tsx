@@ -1,5 +1,4 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
 import Chat from "./pages/Chat";
 import Library from "./pages/Library";
 import Login from "./pages/Login";
