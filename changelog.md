@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Top Brand Logo**: Added a refined 4-point neon spark accent to the `LogoMark` in `Sidebar.tsx`, `WelcomeScreen.tsx`, `Login.tsx`, and `SignupForm.tsx`.
 
 ### Fixed
+- **Image Studio Navigation & Route Transition**: Removed blocking root `AnimatePresence mode="wait"` wrapper around `<Routes>` in `App.tsx` that was freezing route transitions, and added resilient fallback studio models in `ImageStudio.tsx`.
 - **Input Field Bidirectional Auto-Resize**: Fixed input container not collapsing back into single-line mode when text is deleted or reduced; preserved last measured model selector width across layout switches in `MessageInput.tsx`.
 - **Input Field Expansion for Logged-In Users**: Integrated dynamic DOM measurement (`modelSelectorRef`) and `window.getComputedStyle` typography calculation in `MessageInput.tsx` to ensure seamless single-to-multiline expansion regardless of selected model pill width or authentication state.
 - **Mobile Textarea Oscillation & Scrolling**: Implemented hysteresis text width measurement with canvas calculation to eliminate flickering/jittering at the multiline transition boundary in `MessageInput.tsx`.
