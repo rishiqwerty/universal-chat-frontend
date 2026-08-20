@@ -163,7 +163,6 @@ export default function Topbar({
   }, []);
 
   const fetchBalance = useCallback(async () => {
-    if (typeof document !== "undefined" && document.hidden) return;
     if (isAuthenticated && !isTempMode) {
       try {
         const data = await getCreditBalance();
@@ -180,8 +179,11 @@ export default function Topbar({
     // Listen for manual balance update requests
     window.addEventListener("balance-update", fetchBalance);
 
-    // Poll for balance updates (e.g. from chat deductions)
-    const interval = setInterval(fetchBalance, getBalanceCheckInterval() * 1000);
+    // Poll for balance updates when active
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      fetchBalance();
+    }, getBalanceCheckInterval() * 1000);
     
     return () => {
       window.removeEventListener("balance-update", fetchBalance);
