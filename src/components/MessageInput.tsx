@@ -16,6 +16,7 @@ type MessageInputProps = {
   selectedModel: string | null;
   onModelChange: (provider: string, model: string) => void;
   isTempMode?: boolean;
+  showDisclaimer?: boolean;
 };
 
 export interface MessageInputHandle {
@@ -38,6 +39,7 @@ export default function MessageInput({
   selectedModel,
   onModelChange,
   isTempMode,
+  showDisclaimer = false,
 }: MessageInputProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [isGlowing, setIsGlowing] = useState(false);
@@ -50,26 +52,89 @@ export default function MessageInput({
 
   const [isMultiline, setIsMultiline] = useState(false);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const singleLineWidthRef = useRef<number>(220);
+
+  // Helper to measure text pixel width accurately
+  const measureTextWidth = (text: string): number => {
+    if (typeof document === "undefined") return text.length * 8;
+    const canvas = (measureTextWidth as any).canvas || ((measureTextWidth as any).canvas = document.createElement("canvas"));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return text.length * 8;
+    ctx.font = "14px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    return ctx.measureText(text).width;
+  };
+
   const isInputBlocked = disabled || isStreaming || (Boolean(isLoadingModels) && !isTempMode);
 
-  // Auto-resize textarea height: single line in inline mode, multi-line in stacked mode
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      const scrollHeight = textareaRef.current.scrollHeight;
-      const hasNewline = value.includes("\n");
-      const multiline = hasNewline || scrollHeight > 34;
-      setIsMultiline(multiline);
-
-      if (multiline) {
-        textareaRef.current.style.height = `${Math.min(scrollHeight, 180)}px`;
-      } else {
-        textareaRef.current.style.height = "26px";
-      }
-    } else {
+  // Auto-resize textarea height with hysteresis to prevent rapid oscillating/fluttering
+  const updateHeightAndMultiline = useCallback((val: string) => {
+    if (!textareaRef.current) {
       setIsMultiline(false);
+      return;
     }
-  }, [value]);
+
+    if (!val || val.length === 0) {
+      setIsMultiline(false);
+      textareaRef.current.style.height = "26px";
+      return;
+    }
+
+    const hasNewline = val.includes("\n");
+    if (hasNewline) {
+      setIsMultiline(true);
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+      return;
+    }
+
+    // Calculate available width for single-line input
+    if (containerRef.current) {
+      const containerW = containerRef.current.clientWidth;
+      const modelW = isTempMode ? 0 : 95;
+      const sendW = 40;
+      const paddingW = 25;
+      singleLineWidthRef.current = Math.max(containerW - modelW - sendW - paddingW, 140);
+    }
+
+    const singleLineWidth = singleLineWidthRef.current;
+    const textWidth = measureTextWidth(val);
+
+    // Hysteresis thresholding:
+    // Expand when textWidth exceeds single-line capacity
+    // Collapse back ONLY when textWidth is safely below single-line capacity (25px hysteresis buffer)
+    setIsMultiline((prev) => {
+      let nextMultiline = prev;
+      if (!prev) {
+        // In single-line mode: expand if text exceeds available single-line width
+        if (textWidth >= singleLineWidth - 10) {
+          nextMultiline = true;
+        }
+      } else {
+        // In multiline mode: collapse ONLY if text comfortably fits in single line with hysteresis buffer
+        if (textWidth < singleLineWidth - 25) {
+          nextMultiline = false;
+        }
+      }
+
+      // Update height accordingly
+      if (textareaRef.current) {
+        if (nextMultiline) {
+          textareaRef.current.style.height = "auto";
+          const sH = textareaRef.current.scrollHeight;
+          textareaRef.current.style.height = `${Math.min(Math.max(sH, 46), 180)}px`;
+        } else {
+          textareaRef.current.style.height = "26px";
+        }
+      }
+
+      return nextMultiline;
+    });
+  }, [isTempMode]);
+
+  useEffect(() => {
+    updateHeightAndMultiline(value);
+  }, [value, updateHeightAndMultiline]);
 
   useEffect(() => {
     if (outerRef) {
@@ -205,6 +270,7 @@ export default function MessageInput({
     <div className="border-t border-border/30 bg-background px-2.5 py-1.5 sm:px-4 sm:py-2.5">
       <div className="mx-auto flex max-w-4xl flex-col gap-1.5 relative">
         <motion.div
+          ref={containerRef}
           animate={isGlowing ? { 
             boxShadow: [
               "0 0 0 0px rgba(217, 255, 0, 0)",
@@ -230,7 +296,10 @@ export default function MessageInput({
               ref={textareaRef}
               rows={1}
               value={value}
-              onChange={(e) => onChange(e.target.value)}
+              onChange={(e) => {
+                onChange(e.target.value);
+                updateHeightAndMultiline(e.target.value);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   if (window.innerWidth >= 640) {
@@ -247,10 +316,11 @@ export default function MessageInput({
                   : "Message Neural Architect..."
               }
               disabled={isInputBlocked}
-              className={isMultiline
-                ? "min-h-[46px] max-h-[180px] w-full resize-none bg-transparent text-[14px] sm:text-sm text-textPrimary placeholder:text-textMuted focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed leading-relaxed custom-scrollbar py-0.5"
-                : "h-[26px] min-h-[26px] max-h-[180px] w-full resize-none bg-transparent px-1 py-0.5 text-[14px] sm:text-sm text-textPrimary placeholder:text-textMuted focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed leading-snug custom-scrollbar"
-              }
+              className={`max-h-[180px] min-h-[26px] w-full resize-none bg-transparent text-[14px] sm:text-sm text-textPrimary placeholder:text-textMuted focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
+                isMultiline
+                  ? "overflow-y-auto custom-scrollbar leading-relaxed py-0.5"
+                  : "overflow-hidden h-[26px] leading-snug px-1 py-0.5"
+              }`}
             />
           </div>
 
@@ -464,6 +534,13 @@ export default function MessageInput({
             </>
           )}
         </AnimatePresence>
+
+        {/* Disclaimer (only shown on initial empty state before first message) */}
+        {showDisclaimer && (
+          <p className="mt-1 text-center text-[10px] sm:text-[11px] text-textMuted/60 leading-tight select-none">
+            AI can make mistakes. Chats with free models and temporary guest chats may be used by model providers for training purposes.
+          </p>
+        )}
       </div>
     </div>
   );

@@ -873,7 +873,7 @@ export default function Chat() {
 
   return (
     <PageTransition>
-      <div className="flex h-screen min-h-0 overflow-hidden bg-background">
+      <div className="flex h-screen h-[100dvh] min-h-0 overflow-hidden bg-background">
         <Sidebar
           activeNav="chat"
           onNewChat={handleNewChat}
@@ -1000,6 +1000,7 @@ export default function Chat() {
                       selectedModel={selectedModel}
                       onModelChange={handleModelChange}
                       isTempMode={isTempMode}
+                      showDisclaimer={true}
                     />
                   </div>
                 </motion.div>
