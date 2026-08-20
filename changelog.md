@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased] - 2026-08-21
 
 ### Added
+- **Free Server Cold-Start & Verification Handling**: Added progressive status timers (`"Waking up cloud server..."`, `"Connecting to database..."`, `"Backend online! Redirecting..."`), increased auth timeouts to 45s, and enforced verified session confirmation prior to workspace navigation in `api.ts`, `Login.tsx`, and `SignupForm.tsx`.
 - **Google Login Loading & Processing States**: Added real-time authorization indicators, animated spinners, and modern authentication progress overlays during Google OAuth redirect/verification in `GoogleAuthButton.tsx`, `Login.tsx`, and `SignupForm.tsx`.
 - **Electric Spark Logo in Refuel Modal**: Added animated energy spark particles, neon pulsing halo, and ambient lighting around the lightning icon in `TopupModal.tsx`.
 - **Three-Dots Action Menu in Topbar**: Consolidated Star/Unstar, Archive/Unarchive, and Delete Conversation options into a sleek single `•••` dropdown button in `Topbar.tsx`.

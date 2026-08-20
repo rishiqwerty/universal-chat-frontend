@@ -6,7 +6,7 @@ const apiRoot = `${getApiBaseUrl().replace(/\/+$/, "")}/api/v1`;
 
 const client = axios.create({
   baseURL: apiRoot,
-  timeout: 10000,
+  timeout: 35000,
   withCredentials: true,
 });
 
@@ -29,6 +29,21 @@ client.interceptors.response.use(
   }
 );
 
+export async function pingServerHealth(): Promise<boolean> {
+  const root = getApiBaseUrl().replace(/\/+$/, "");
+  try {
+    await axios.get(`${root}/health`, { timeout: 8000 });
+    return true;
+  } catch {
+    try {
+      await axios.get(`${root}/api/v1/models`, { timeout: 8000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
 export async function mockChatReply(prompt: string): Promise<string> {
   await new Promise((r) => setTimeout(r, 400));
   return `Echo: ${prompt}`;
@@ -40,26 +55,26 @@ export type SignupPayload = {
 };
 
 export async function signupAccount(payload: SignupPayload): Promise<void> {
-  await client.post("/auth/register", payload);
+  await client.post("/auth/register", payload, { timeout: 45000 });
 }
 
 export async function loginAccount(payload: SignupPayload): Promise<string> {
-  const { data } = await client.post("/auth/login", payload);
+  const { data } = await client.post("/auth/login", payload, { timeout: 45000 });
   return data.access_token;
 }
 
 export async function googleLoginAccount(credential: string): Promise<string> {
-  const { data } = await client.post("/auth/google", { credential });
+  const { data } = await client.post("/auth/google", { credential }, { timeout: 45000 });
   return data.access_token;
 }
 
 export async function requestOtpApi(email: string, purpose: string = "login"): Promise<{ message: string; email: string }> {
-  const { data } = await client.post("/auth/request-otp", { email, purpose });
+  const { data } = await client.post("/auth/request-otp", { email, purpose }, { timeout: 45000 });
   return data;
 }
 
 export async function verifyOtpApi(email: string, code: string): Promise<string> {
-  const { data } = await client.post("/auth/verify-otp", { email, code });
+  const { data } = await client.post("/auth/verify-otp", { email, code }, { timeout: 45000 });
   return data.access_token;
 }
 

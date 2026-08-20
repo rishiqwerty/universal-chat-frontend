@@ -47,20 +47,43 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [authStatus, setAuthStatus] = useState("");
 
+  const startProgressTimer = (initialMsg: string) => {
+    setAuthStatus(initialMsg);
+    const t1 = setTimeout(() => {
+      setAuthStatus("Connecting to cloud server & database...");
+    }, 2200);
+    const t2 = setTimeout(() => {
+      setAuthStatus("Please wait a moment...");
+    }, 6000);
+    const t3 = setTimeout(() => {
+      setAuthStatus("Almost ready, initializing secure workspace session...");
+    }, 12000);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  };
+
   async function handleGoogleSuccess(credential: string) {
     setLoading(true);
-    setAuthStatus("Verifying Google account and initializing workspace...");
     setError("");
+    const stopTimer = startProgressTimer("Verifying Google account with backend...");
     try {
       const token = await googleLoginAccount(credential);
+      stopTimer();
+      setAuthStatus("Backend online! Redirecting to workspace...");
+      await new Promise((r) => setTimeout(r, 350));
       localStorage.clear();
       clearChatCache();
       login(token);
       navigate("/");
     } catch (err: any) {
+      stopTimer();
       console.error("Google sign-in error:", err);
       const detail = err.response?.data?.detail;
-      setError(typeof detail === "string" ? detail : "Google Sign-In failed. Please try again.");
+      setError(typeof detail === "string" ? detail : "Authentication server is currently unavailable. Please retry in a moment.");
     } finally {
       setLoading(false);
       setAuthStatus("");
@@ -77,15 +100,19 @@ export default function Login() {
     setError("");
     setSuccessMsg("");
     setLoading(true);
-    setAuthStatus("Verifying credentials...");
+    const stopTimer = startProgressTimer("Verifying credentials with server...");
 
     try {
       const token = await loginAccount({ email, password });
+      stopTimer();
+      setAuthStatus("Credentials verified! Opening workspace...");
+      await new Promise((r) => setTimeout(r, 350));
       localStorage.clear();
       clearChatCache();
       login(token);
       navigate("/");
     } catch (err: any) {
+      stopTimer();
       console.error(err);
       const detail = err.response?.data?.detail;
       setError(typeof detail === "string" ? detail : "Invalid email or password. Please verify credentials.");
@@ -104,13 +131,15 @@ export default function Login() {
     setError("");
     setSuccessMsg("");
     setLoading(true);
-    setAuthStatus("Sending access code...");
+    const stopTimer = startProgressTimer("Connecting to server to dispatch code...");
 
     try {
       await requestOtpApi(email);
+      stopTimer();
       setSuccessMsg(`A 6-digit access code was dispatched to ${email}.`);
       setOtpStep("verify");
     } catch (err: any) {
+      stopTimer();
       console.error(err);
       const detail = err.response?.data?.detail;
       setError(typeof detail === "string" ? detail : "Failed to generate security code. Please retry.");
@@ -125,15 +154,19 @@ export default function Login() {
     setError("");
     setSuccessMsg("");
     setLoading(true);
-    setAuthStatus("Verifying access code...");
+    const stopTimer = startProgressTimer("Verifying passcode with backend...");
 
     try {
       const token = await verifyOtpApi(email, code);
+      stopTimer();
+      setAuthStatus("Passcode confirmed! Redirecting...");
+      await new Promise((r) => setTimeout(r, 350));
       localStorage.clear();
       clearChatCache();
       login(token);
       navigate("/");
     } catch (err: any) {
+      stopTimer();
       console.error(err);
       const detail = err.response?.data?.detail;
       setError(typeof detail === "string" ? detail : "Invalid or expired passcode. Please try again.");
