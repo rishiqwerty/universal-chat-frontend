@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { resolveImagePath } from "../api/api";
-import { extractBrowserCode, isBrowserLanguage } from "../utils/codeDetector";
+import { extractBrowserCode, extractExecutableSnippet, isBrowserLanguage } from "../utils/codeDetector";
 import CodeRunnerModal from "./CodeRunnerModal";
 
 type MessageBubbleProps = {
@@ -23,6 +23,19 @@ type MessageBubbleProps = {
     };
   };
 };
+
+function extractTextContent(node: any): string {
+  if (!node) return "";
+  if (typeof node === "string") return node;
+  if (typeof node === "number") return String(node);
+  if (Array.isArray(node)) {
+    return node.map(extractTextContent).join("");
+  }
+  if (typeof node === "object" && node.props) {
+    return extractTextContent(node.props.children);
+  }
+  return "";
+}
 
 function CodeBlock({
   rawCode,
@@ -119,11 +132,12 @@ function CodeBlock({
 const MessageBubble = memo(function MessageBubble({ id, role, content, images, onDelete, provider, model, isComplete, providerMetadata }: MessageBubbleProps) {
   const isUser = role === "user";
   const [isRunnerOpen, setIsRunnerOpen] = useState(false);
+  const [runnerData, setRunnerData] = useState<{ fullHtml: string; langSummary: string } | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   // Automatically analyze markdown content for executable browser code
   const browserCode = useMemo(() => {
-    if (isUser) return { isBrowserCode: false, fullHtml: "", langSummary: "", hasHtml: false, hasJs: false, hasCss: false };
+    if (isUser) return { isBrowserCode: false, fullHtml: "", langSummary: "", hasHtml: false, hasJs: false, hasCss: false, hasPython: false };
     return extractBrowserCode(content);
   }, [content, isUser]);
 
@@ -239,7 +253,7 @@ const MessageBubble = memo(function MessageBubble({ id, role, content, images, o
                   let lang = "";
                   if (children && typeof children === "object" && "props" in (children as any)) {
                     const codeProps = (children as any).props;
-                    rawCode = String(codeProps.children || "").replace(/\n$/, "");
+                    rawCode = extractTextContent(codeProps.children || "").replace(/\n$/, "");
                     const cls = codeProps.className || "";
                     const langMatch = cls.match(/language-([a-zA-Z0-9_-]+)/);
                     if (langMatch) lang = langMatch[1];
@@ -253,7 +267,11 @@ const MessageBubble = memo(function MessageBubble({ id, role, content, images, o
                       rawCode={rawCode}
                       lang={lang}
                       showRunButton={showRunButton}
-                      onRun={() => setIsRunnerOpen(true)}
+                      onRun={() => {
+                        const snippetData = extractExecutableSnippet(rawCode, lang);
+                        setRunnerData(snippetData);
+                        setIsRunnerOpen(true);
+                      }}
                       onCopy={() => handleCopyText(rawCode, 1)}
                       isCopied={copiedIndex === 1}
                     >
@@ -330,9 +348,12 @@ const MessageBubble = memo(function MessageBubble({ id, role, content, images, o
       {/* Live Sandbox Execution Modal */}
       <CodeRunnerModal
         isOpen={isRunnerOpen}
-        onClose={() => setIsRunnerOpen(false)}
-        codeHtml={browserCode.fullHtml}
-        langSummary={browserCode.langSummary}
+        onClose={() => {
+          setIsRunnerOpen(false);
+          setRunnerData(null);
+        }}
+        codeHtml={runnerData?.fullHtml || browserCode.fullHtml}
+        langSummary={runnerData?.langSummary || browserCode.langSummary}
       />
     </div>
   );
