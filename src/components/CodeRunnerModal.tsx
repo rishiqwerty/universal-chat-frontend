@@ -21,8 +21,11 @@ export default function CodeRunnerModal({ isOpen, onClose, codeHtml, langSummary
   const [copied, setCopied] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Listen for console logs posted from iframe sandbox
+  // Listen for console logs posted from iframe sandbox with throttling & buffer limits
   useEffect(() => {
+    let logBuffer: ConsoleLog[] = [];
+    let flushTimer: any = null;
+
     function handleMessage(event: MessageEvent) {
       if (event.data && event.data.type === "CONSOLE_LOG") {
         const newLog: ConsoleLog = {
@@ -30,11 +33,25 @@ export default function CodeRunnerModal({ isOpen, onClose, codeHtml, langSummary
           message: event.data.message || "",
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         };
-        setLogs((prev) => [...prev, newLog]);
+        logBuffer.push(newLog);
+
+        if (!flushTimer) {
+          flushTimer = setTimeout(() => {
+            if (logBuffer.length > 0) {
+              const toAppend = [...logBuffer];
+              logBuffer = [];
+              setLogs((prev) => [...prev, ...toAppend].slice(-500));
+            }
+            flushTimer = null;
+          }, 50);
+        }
       }
     }
     window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      if (flushTimer) clearTimeout(flushTimer);
+    };
   }, []);
 
   // Reset logs when iframe restarts or modal opens
@@ -127,7 +144,11 @@ export default function CodeRunnerModal({ isOpen, onClose, codeHtml, langSummary
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-textMuted">Executing web code directly inside isolated browser environment</p>
+                <p className="text-[11px] text-textMuted">
+                  {langSummary?.includes("Python")
+                    ? "Executing Python client-side inside WebAssembly runtime"
+                    : "Executing code directly inside isolated browser environment"}
+                </p>
               </div>
             </div>
 

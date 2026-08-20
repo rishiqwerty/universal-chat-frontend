@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased] - 2026-08-21
 
 ### Added
+- **Sandbox Safety & Resource Guardrails**: Added output buffer truncation (capped at 1,000 lines / 250 console logs) to prevent DOM memory leaks, log throttling in `CodeRunnerModal.tsx` to maintain 60fps UI, and global unhandled error listeners in `codeDetector.ts` to intercept malformed code gracefully.
+- **Client-Side Python WebAssembly Code Runner (Pyodide)**: Integrated Pyodide WebAssembly in `codeDetector.ts` and `MessageBubble.tsx`, allowing users to execute Python code blocks client-side in the browser with `stdout`, `stderr`, interactive in-terminal CLI input (`input()`), execution timers, and live output without requiring any browser popups or backend resources.
 - **Silent Background Server Wake-Up & Keep-Alive (`useSilentKeepAlive`)**: Added invisible tab-return wake-up and periodic background heartbeat in `App.tsx` alongside transparent Axios auto-retry on 502/503/504 errors in `api.ts`, keeping the free-tier backend ready with zero UI interruptions or sleep badges.
 - **Free Server Cold-Start & Verification Handling**: Added progressive status timers, increased auth timeouts to 45s, and enforced verified session confirmation prior to workspace navigation in `api.ts`, `Login.tsx`, and `SignupForm.tsx`.
 - **Google Login Loading & Processing States**: Added real-time authorization indicators, animated spinners, and modern authentication progress overlays during Google OAuth redirect/verification in `GoogleAuthButton.tsx`, `Login.tsx`, and `SignupForm.tsx`.
@@ -22,6 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Top Brand Logo**: Added a refined 4-point neon spark accent to the `LogoMark` in `Sidebar.tsx`, `WelcomeScreen.tsx`, `Login.tsx`, and `SignupForm.tsx`.
 
 ### Fixed
+- **Comprehensive AST Async Transformer for In-Terminal Input**: Updated `codeDetector.ts` with `_FullAsyncRewriter` which rewrites both function definitions (`def get_number()`, `def main()`) and calls into async structures, allowing nested functions to resolve in-terminal interactive console inputs without `TypeError: float() argument must be a string or a real number, not 'coroutine'` or unawaited coroutine warnings.
+- **Code Runner & Copy Text Extraction**: Fixed `[object Object]` syntax error caused by stringifying React Markdown AST nodes by implementing recursive `extractTextContent` in `MessageBubble.tsx`.
 - **Thinking Animation & Stop Generation Cleanup**: Corrected `isComplete` evaluation in `MessageBubble.tsx` and `Chat.tsx` so the 3-dot bouncing animation reliably displays while awaiting AI stream responses, and cleanly vanishes with zero ghost artifacts when generation is finished or manually stopped.
 - **Image Studio Navigation & Route Transition**: Removed blocking root `AnimatePresence mode="wait"` wrapper around `<Routes>` in `App.tsx` that was freezing route transitions, and added resilient fallback studio models in `ImageStudio.tsx`.
 - **Input Field Bidirectional Auto-Resize**: Fixed input container not collapsing back into single-line mode when text is deleted or reduced; preserved last measured model selector width across layout switches in `MessageInput.tsx`.
