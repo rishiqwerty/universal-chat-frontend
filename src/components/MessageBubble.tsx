@@ -201,6 +201,9 @@ const MessageBubble = memo(function MessageBubble({ id, role, content, images, o
 
   // Show thinking animation while waiting for stream or images
   if (!content && (!images || images.length === 0)) {
+    if (isComplete === true) {
+      return null;
+    }
     return (
       <div className="flex w-full justify-start">
         <div className="flex items-center gap-1.5 rounded-card bg-surface px-4 py-3">

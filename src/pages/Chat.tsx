@@ -102,14 +102,18 @@ export default function Chat() {
       streamControllerRef.current = null;
       setPending(false);
       setMessages((prev) =>
-        prev.map((msg, i) =>
-          i === prev.length - 1 && msg.role === "assistant" ? { ...msg, isComplete: true } : msg
-        )
+        prev
+          .map((msg, i) =>
+            i === prev.length - 1 && msg.role === "assistant" ? { ...msg, isComplete: true } : msg
+          )
+          .filter((msg) => msg.role !== "assistant" || (msg.content && msg.content.trim() !== "") || (msg.images && msg.images.length > 0))
       );
       setTempMessages((prev) =>
-        prev.map((msg, i) =>
-          i === prev.length - 1 && msg.role === "assistant" ? { ...msg, isComplete: true } : msg
-        )
+        prev
+          .map((msg, i) =>
+            i === prev.length - 1 && msg.role === "assistant" ? { ...msg, isComplete: true } : msg
+          )
+          .filter((msg) => msg.role !== "assistant" || (msg.content && msg.content.trim() !== "") || (msg.images && msg.images.length > 0))
       );
     }
   }, []);
@@ -456,7 +460,7 @@ export default function Chat() {
     if (isTempMode) {
       // Temporary mode logic: use shared system endpoint
       const assistantMsgId = `a-${Date.now()}`;
-      setTempMessages((m) => [...m, { id: assistantMsgId, role: "assistant", content: "" }]);
+      setTempMessages((m) => [...m, { id: assistantMsgId, role: "assistant", content: "", isComplete: false }]);
 
       const controller = new AbortController();
       streamControllerRef.current = controller;
@@ -536,7 +540,9 @@ export default function Chat() {
         setPending(false);
         streamControllerRef.current = null;
         setTempMessages((m) =>
-          m.map((msg) => (msg.id === assistantMsgId ? { ...msg, isComplete: true } : msg))
+          m
+            .map((msg) => (msg.id === assistantMsgId ? { ...msg, isComplete: true } : msg))
+            .filter((msg) => msg.role !== "assistant" || (msg.content && msg.content.trim() !== "") || (msg.images && msg.images.length > 0))
         );
       }
       return;
@@ -577,7 +583,7 @@ export default function Chat() {
     }
 
     const assistantMsgId = `a-${Date.now()}`;
-    setMessages((m) => [...m, { id: assistantMsgId, role: "assistant", content: "" }]);
+    setMessages((m) => [...m, { id: assistantMsgId, role: "assistant", content: "", isComplete: false }]);
 
     const controller = new AbortController();
     streamControllerRef.current = controller;
@@ -667,9 +673,11 @@ export default function Chat() {
         streamControllerRef.current = null;
         setPending(false);
 
-        // Mark the assistant message as complete in local state
+        // Mark the assistant message as complete in local state and clean up if empty
         setMessages((m) =>
-          m.map((msg) => (msg.id === assistantMsgId ? { ...msg, isComplete: true } : msg))
+          m
+            .map((msg) => (msg.id === assistantMsgId ? { ...msg, isComplete: true } : msg))
+            .filter((msg) => msg.role !== "assistant" || (msg.content && msg.content.trim() !== "") || (msg.images && msg.images.length > 0))
         );
 
         // ONLY sync if no error occurred. Syncing on error causes the 
