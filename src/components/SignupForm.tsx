@@ -41,25 +41,51 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
+
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authStatus, setAuthStatus] = useState("");
+
+  const startProgressTimer = (initialMsg: string) => {
+    setAuthStatus(initialMsg);
+    const t1 = setTimeout(() => {
+      setAuthStatus("Connecting to cloud server & database...");
+    }, 2200);
+    const t2 = setTimeout(() => {
+      setAuthStatus("Please wait a moment...");
+    }, 6000);
+    const t3 = setTimeout(() => {
+      setAuthStatus("Almost ready, initializing secure workspace session...");
+    }, 12000);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  };
 
   async function handleGoogleSuccess(credential: string) {
     setLoading(true);
     setError("");
+    const stopTimer = startProgressTimer("Verifying Google account with backend...");
     try {
       const token = await googleLoginAccount(credential);
+      stopTimer();
+      setAuthStatus("Backend online! Opening chat workspace...");
+      await new Promise((r) => setTimeout(r, 350));
       localStorage.clear();
       clearChatCache();
       login(token);
       if (onSuccess) onSuccess();
       navigate("/chat");
     } catch (err: any) {
-      setError(err.response?.data?.message || err.response?.data?.detail || "Google authentication failed.");
+      stopTimer();
+      setError(err.response?.data?.message || err.response?.data?.detail || "Authentication server is currently unavailable. Please retry in a moment.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
@@ -75,20 +101,26 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
       return;
     }
     setLoading(true);
+    const stopTimer = startProgressTimer("Creating your account on server...");
     try {
       await signupAccount({ email, password });
+      stopTimer();
+      setAuthStatus("Account created! Redirecting to login...");
+      await new Promise((r) => setTimeout(r, 350));
       localStorage.clear();
       clearChatCache();
-      
+
       if (onSuccess) {
         onSuccess();
       }
       navigate("/login");
     } catch (err: any) {
+      stopTimer();
       const serverMessage = err.response?.data?.message || err.response?.data?.detail;
-      setError(serverMessage || "Could not create account. Try again.");
+      setError(serverMessage || "Could not create account. Please retry in a moment.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
@@ -99,34 +131,44 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
       return;
     }
     setLoading(true);
+    const stopTimer = startProgressTimer("Connecting to server to send code...");
     setError("");
     setSuccessMsg("");
     try {
       const res = await requestOtpApi(email, "register");
+      stopTimer();
       setSuccessMsg(res.message || `Verification code sent to ${email}`);
       setOtpStep("verify");
     } catch (err: any) {
+      stopTimer();
       setError(err.response?.data?.message || err.response?.data?.detail || "Failed to send verification code.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
   async function handleVerifyOtp(code: string) {
     setLoading(true);
+    const stopTimer = startProgressTimer("Verifying code & establishing database session...");
     setError("");
     setSuccessMsg("");
     try {
       const token = await verifyOtpApi(email, code);
+      stopTimer();
+      setAuthStatus("Session verified! Entering workspace...");
+      await new Promise((r) => setTimeout(r, 350));
       localStorage.clear();
       clearChatCache();
       login(token);
       if (onSuccess) onSuccess();
       navigate("/chat");
     } catch (err: any) {
+      stopTimer();
       setError(err.response?.data?.message || err.response?.data?.detail || "Invalid or expired verification code.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
@@ -146,8 +188,27 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
         </div>
       )}
 
-      <div className={`${isModal ? "" : "rounded-card bg-surface p-8 shadow-2xl ring-1 ring-border/40 backdrop-blur-xl"}`}>
-        
+      <div className={`relative overflow-hidden ${isModal ? "" : "rounded-card bg-surface p-8 shadow-2xl ring-1 ring-border/40 backdrop-blur-xl"}`}>
+        {/* Loading / Auth Processing Overlay */}
+        {loading && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-surface/95 backdrop-blur-md p-6 text-center">
+            <div className="relative mb-4 flex h-14 w-14 items-center justify-center">
+              <div className="absolute inset-0 animate-spin rounded-full border-2 border-primary/30 border-t-primary shadow-[0_0_20px_rgba(217,255,0,0.35)]" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <svg className="h-5 w-5 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+            </div>
+            <h3 className="font-headline text-sm sm:text-base font-bold text-textPrimary tracking-tight">
+              {authStatus || "Processing Authentication..."}
+            </h3>
+            <p className="mt-1 text-xs text-textMuted max-w-xs">
+              Initializing secure session and preparing your workspace...
+            </p>
+          </div>
+        )}
+
         {!showEmailSignUp && (
           <div className="mb-6 text-center">
             <h2 className="text-xl font-headline font-bold text-textPrimary">
@@ -167,11 +228,13 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
               Recommended • 1-Click Signup
             </div>
           )}
-          
+
           <GoogleAuthButton
             onSuccess={handleGoogleSuccess}
             onError={handleGoogleError}
             disabled={loading}
+            loading={loading}
+            loadingText={authStatus || "Authenticating with Google..."}
             text="Sign up with Google"
           />
         </div>
@@ -215,22 +278,20 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
                 <button
                   type="button"
                   onClick={() => { setMethod("standard"); setError(""); setSuccessMsg(""); }}
-                  className={`flex-1 pb-3 text-center transition-colors border-b-2 ${
-                    method === "standard"
+                  className={`flex-1 pb-3 text-center transition-colors border-b-2 ${method === "standard"
                       ? "border-primary text-primary"
                       : "border-transparent text-textMuted hover:text-textSecondary"
-                  }`}
+                    }`}
                 >
                   Password Signup
                 </button>
                 <button
                   type="button"
                   onClick={() => { setMethod("otp"); setError(""); setSuccessMsg(""); setOtpStep("request"); }}
-                  className={`flex-1 pb-3 text-center transition-colors border-b-2 ${
-                    method === "otp"
+                  className={`flex-1 pb-3 text-center transition-colors border-b-2 ${method === "otp"
                       ? "border-primary text-primary"
                       : "border-transparent text-textMuted hover:text-textSecondary"
-                  }`}
+                    }`}
                 >
                   OTP Signup
                 </button>

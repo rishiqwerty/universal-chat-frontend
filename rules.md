@@ -134,6 +134,12 @@ The final UI should:
 Extracting logic into hooks/services
 Introducing state management
 Adding more pages
-15. Final Rule
+15. Documentation & Maintenance Rules (MANDATORY FOR ALL IDEs / AGENTS)
+- Always maintain and update `changelog.md` with every change.
+- New changes must be added at the top as new entries under a date/version header without removing or truncating previous historical entries.
+- Always maintain and update `architecture.md` whenever components, routes, state management, design tokens, or API integrations are created or modified.
+- Keep documentation concise, accurate, and structured.
+
+16. Final Rule
 When in doubt:
 Follow screenshot > follow rules > avoid complexity

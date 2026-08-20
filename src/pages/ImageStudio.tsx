@@ -129,21 +129,41 @@ export default function ImageStudio() {
   useEffect(() => {
     getStudioModels()
       .then((data) => {
-        setModels(data);
-        const providers = Object.keys(data);
-        if (providers.length > 0) {
-          setSelectedProvider(providers[0]);
-          const providerModels = data[providers[0]];
-          if (providerModels && providerModels.length > 0) {
-            setSelectedModel(providerModels[0]);
+        if (data && typeof data === "object" && Object.keys(data).length > 0) {
+          setModels(data);
+          const providers = Object.keys(data);
+          if (providers.length > 0) {
+            setSelectedProvider(providers[0]);
+            const providerModels = data[providers[0]];
+            if (providerModels && providerModels.length > 0) {
+              setSelectedModel(providerModels[0]);
+            }
           }
+        } else {
+          const defaults: StudioModels = {
+            "Flux": ["flux-schnell", "flux-dev", "flux-realism"],
+            "Stable Diffusion": ["sdxl-turbo", "stable-diffusion-xl"]
+          };
+          setModels(defaults);
+          setSelectedProvider("Flux");
+          setSelectedModel("flux-schnell");
         }
       })
-      .catch(() => { });
+      .catch(() => {
+        const defaults: StudioModels = {
+          "Flux": ["flux-schnell", "flux-dev", "flux-realism"],
+          "Stable Diffusion": ["sdxl-turbo", "stable-diffusion-xl"]
+        };
+        setModels(defaults);
+        setSelectedProvider("Flux");
+        setSelectedModel("flux-schnell");
+      });
 
     getQueueStatus().then(setQueueStatus).catch(() => { });
     getStudioPresets()
-      .then(setPresets)
+      .then((data) => {
+        if (Array.isArray(data)) setPresets(data);
+      })
       .catch(() => { })
       .finally(() => setLoadingPresets(false));
   }, []);

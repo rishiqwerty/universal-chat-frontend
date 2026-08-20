@@ -45,22 +45,48 @@ export default function Login() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authStatus, setAuthStatus] = useState("");
+
+  const startProgressTimer = (initialMsg: string) => {
+    setAuthStatus(initialMsg);
+    const t1 = setTimeout(() => {
+      setAuthStatus("Connecting to cloud server & database...");
+    }, 2200);
+    const t2 = setTimeout(() => {
+      setAuthStatus("Please wait a moment...");
+    }, 6000);
+    const t3 = setTimeout(() => {
+      setAuthStatus("Almost ready, initializing secure workspace session...");
+    }, 12000);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  };
 
   async function handleGoogleSuccess(credential: string) {
     setLoading(true);
     setError("");
+    const stopTimer = startProgressTimer("Verifying Google account with backend...");
     try {
       const token = await googleLoginAccount(credential);
+      stopTimer();
+      setAuthStatus("Backend online! Redirecting to workspace...");
+      await new Promise((r) => setTimeout(r, 350));
       localStorage.clear();
       clearChatCache();
       login(token);
       navigate("/");
     } catch (err: any) {
+      stopTimer();
       console.error("Google sign-in error:", err);
       const detail = err.response?.data?.detail;
-      setError(typeof detail === "string" ? detail : "Google Sign-In failed. Please try again.");
+      setError(typeof detail === "string" ? detail : "Authentication server is currently unavailable. Please retry in a moment.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
@@ -74,19 +100,25 @@ export default function Login() {
     setError("");
     setSuccessMsg("");
     setLoading(true);
+    const stopTimer = startProgressTimer("Verifying credentials with server...");
 
     try {
       const token = await loginAccount({ email, password });
+      stopTimer();
+      setAuthStatus("Credentials verified! Opening workspace...");
+      await new Promise((r) => setTimeout(r, 350));
       localStorage.clear();
       clearChatCache();
       login(token);
       navigate("/");
     } catch (err: any) {
+      stopTimer();
       console.error(err);
       const detail = err.response?.data?.detail;
       setError(typeof detail === "string" ? detail : "Invalid email or password. Please verify credentials.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
@@ -99,17 +131,21 @@ export default function Login() {
     setError("");
     setSuccessMsg("");
     setLoading(true);
+    const stopTimer = startProgressTimer("Connecting to server to dispatch code...");
 
     try {
       await requestOtpApi(email);
+      stopTimer();
       setSuccessMsg(`A 6-digit access code was dispatched to ${email}.`);
       setOtpStep("verify");
     } catch (err: any) {
+      stopTimer();
       console.error(err);
       const detail = err.response?.data?.detail;
       setError(typeof detail === "string" ? detail : "Failed to generate security code. Please retry.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
@@ -118,19 +154,25 @@ export default function Login() {
     setError("");
     setSuccessMsg("");
     setLoading(true);
+    const stopTimer = startProgressTimer("Verifying passcode with backend...");
 
     try {
       const token = await verifyOtpApi(email, code);
+      stopTimer();
+      setAuthStatus("Passcode confirmed! Redirecting...");
+      await new Promise((r) => setTimeout(r, 350));
       localStorage.clear();
       clearChatCache();
       login(token);
       navigate("/");
     } catch (err: any) {
+      stopTimer();
       console.error(err);
       const detail = err.response?.data?.detail;
       setError(typeof detail === "string" ? detail : "Invalid or expired passcode. Please try again.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
@@ -150,7 +192,26 @@ export default function Login() {
             </p>
           </div>
 
-          <div className="rounded-card bg-surface p-8 shadow-2xl ring-1 ring-border/40 backdrop-blur-xl">
+          <div className="relative rounded-card bg-surface p-8 shadow-2xl ring-1 ring-border/40 backdrop-blur-xl overflow-hidden">
+            {/* Loading / Auth Processing Overlay */}
+            {loading && (
+              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-surface/95 backdrop-blur-md p-6 text-center">
+                <div className="relative mb-4 flex h-14 w-14 items-center justify-center">
+                  <div className="absolute inset-0 animate-spin rounded-full border-2 border-primary/30 border-t-primary shadow-[0_0_20px_rgba(217,255,0,0.35)]" />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <svg className="h-5 w-5 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="font-headline text-sm sm:text-base font-bold text-textPrimary tracking-tight">
+                  {authStatus || "Processing Sign-In..."}
+                </h3>
+                <p className="mt-1 text-xs text-textMuted max-w-xs">
+                  Establishing secure neural session and loading your workspace...
+                </p>
+              </div>
+            )}
 
             {!showEmailSignIn && (
               <div className="mb-6 text-center">
@@ -175,6 +236,8 @@ export default function Login() {
                 onSuccess={handleGoogleSuccess}
                 onError={handleGoogleError}
                 disabled={loading}
+                loading={loading}
+                loadingText={authStatus || "Authenticating with Google..."}
                 text="Continue with Google"
               />
             </div>
