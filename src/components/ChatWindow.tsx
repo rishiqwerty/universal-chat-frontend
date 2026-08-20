@@ -56,10 +56,33 @@ export default function ChatWindow({ messages, onDeleteMessage }: ChatWindowProp
     }
   }, [isNearBottom]);
 
-  // Scroll to bottom when new messages arrive (only if user hasn't scrolled up)
+  // Scroll to bottom on initial mount
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "auto" });
+  }, []);
+
+  // Scroll to bottom when visual viewport resizes (e.g. mobile keyboard opens/closes)
+  useEffect(() => {
+    const handleViewportResize = () => {
+      if (!userScrolledUp) {
+        bottomRef.current?.scrollIntoView({ behavior: "auto" });
+      }
+    };
+
+    if (typeof window !== "undefined" && window.visualViewport) {
+      window.visualViewport.addEventListener("resize", handleViewportResize);
+      window.visualViewport.addEventListener("scroll", handleViewportResize);
+      return () => {
+        window.visualViewport?.removeEventListener("resize", handleViewportResize);
+        window.visualViewport?.removeEventListener("scroll", handleViewportResize);
+      };
+    }
+  }, [userScrolledUp]);
+
+  // Scroll to bottom when new messages arrive or stream updates
   useEffect(() => {
     if (!userScrolledUp) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      bottomRef.current?.scrollIntoView({ behavior: messages.length <= 2 ? "auto" : "smooth" });
     }
   }, [messages, userScrolledUp]);
 
@@ -68,9 +91,9 @@ export default function ChatWindow({ messages, onDeleteMessage }: ChatWindowProp
       <div 
         ref={scrollRef}
         onScroll={handleScroll}
-        className="h-full overflow-y-auto px-6 py-6 custom-scrollbar"
+        className="h-full overflow-y-auto px-3 py-3 sm:px-6 sm:py-6 custom-scrollbar"
       >
-        <div className="mx-auto flex max-w-4xl flex-col gap-6">
+        <div className="mx-auto flex min-h-full max-w-4xl flex-col justify-end gap-3.5 sm:gap-6 pb-2">
           {messages.map((m) => (
             <MessageBubble 
               key={m.id} 
