@@ -1000,6 +1000,7 @@ export default function Chat() {
                       selectedModel={selectedModel}
                       onModelChange={handleModelChange}
                       isTempMode={isTempMode}
+                      showDisclaimer={true}
                     />
                   </div>
                 </motion.div>

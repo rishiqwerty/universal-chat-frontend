@@ -171,38 +171,166 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4">
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-background/80 backdrop-blur-md"
           />
+
+          {/* Modal Card */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-border/50 bg-elevated p-8 shadow-2xl"
+            exit={{ opacity: 0, scale: 0.95, y: 15 }}
+            transition={{ type: "spring", stiffness: 350, damping: 25 }}
+            className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto custom-scrollbar rounded-3xl border border-border/60 bg-surface/95 p-5 sm:p-7 shadow-[0_0_50px_rgba(0,0,0,0.5)] backdrop-blur-2xl"
           >
-            <div className="mb-6 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            {/* Ambient Background Glow */}
+            <div className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 h-40 w-64 rounded-full bg-primary/15 blur-3xl" />
+
+            {/* Top Close Button for Mobile & Desktop */}
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading !== null || verifying}
+              className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-elevated/60 text-textMuted transition-all hover:bg-elevated hover:text-textPrimary hover:scale-105 active:scale-95 disabled:opacity-50"
+              aria-label="Close modal"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+
+            {/* Header */}
+            <div className="relative mb-5 text-center">
+              {/* Lightning Logo with Electric Spark Animations */}
+              <div className="relative mx-auto mb-3 flex h-16 w-16 items-center justify-center">
+                {/* Electric Pulsing Halo Background */}
+                <motion.div
+                  animate={{
+                    scale: [1, 1.25, 1],
+                    opacity: [0.35, 0.75, 0.35],
+                  }}
+                  transition={{
+                    duration: 2.2,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                  className="absolute inset-0 rounded-2xl bg-primary/25 blur-xl pointer-events-none"
+                />
+
+                {/* Sparkling Mini Particles */}
+                <motion.span
+                  animate={{
+                    scale: [0, 1.2, 0],
+                    opacity: [0, 1, 0],
+                    x: [0, 8],
+                    y: [0, -8],
+                  }}
+                  transition={{
+                    duration: 1.8,
+                    repeat: Infinity,
+                    ease: "easeOut",
+                    delay: 0.2,
+                  }}
+                  className="absolute -top-1 right-1 text-primary text-xs pointer-events-none select-none"
+                >
+                  ✦
+                </motion.span>
+                <motion.span
+                  animate={{
+                    scale: [0, 1, 0],
+                    opacity: [0, 1, 0],
+                    x: [0, -8],
+                    y: [0, 6],
+                  }}
+                  transition={{
+                    duration: 2.2,
+                    repeat: Infinity,
+                    ease: "easeOut",
+                    delay: 0.9,
+                  }}
+                  className="absolute bottom-1 -left-1 text-primary text-[10px] pointer-events-none select-none"
+                >
+                  ✦
+                </motion.span>
+                <motion.span
+                  animate={{
+                    scale: [0, 1, 0],
+                    opacity: [0, 1, 0],
+                    y: [0, -10],
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    ease: "easeOut",
+                    delay: 0.6,
+                  }}
+                  className="absolute -top-2 left-3 text-primary text-[8px] pointer-events-none select-none"
+                >
+                  ★
+                </motion.span>
+
+                {/* Central Electric Lightning Container */}
+                <motion.div
+                  animate={{
+                    boxShadow: [
+                      "0 0 15px rgba(217, 255, 0, 0.2), inset 0 0 10px rgba(217, 255, 0, 0.1)",
+                      "0 0 30px rgba(217, 255, 0, 0.5), inset 0 0 15px rgba(217, 255, 0, 0.25)",
+                      "0 0 15px rgba(217, 255, 0, 0.2), inset 0 0 10px rgba(217, 255, 0, 0.1)",
+                    ],
+                  }}
+                  transition={{
+                    duration: 1.8,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                  className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/40 bg-gradient-to-b from-primary/20 to-primary/5 text-primary backdrop-blur-md"
+                >
+                  <motion.svg
+                    animate={{
+                      scale: [1, 1.08, 1],
+                      filter: [
+                        "drop-shadow(0 0 4px rgba(217, 255, 0, 0.4))",
+                        "drop-shadow(0 0 12px rgba(217, 255, 0, 0.9))",
+                        "drop-shadow(0 0 4px rgba(217, 255, 0, 0.4))",
+                      ],
+                    }}
+                    transition={{
+                      duration: 1.8,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                    className="h-7 w-7 text-primary fill-primary/30"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </motion.svg>
+                </motion.div>
               </div>
-              <h2 className="font-headline text-2xl font-bold text-textPrimary">Refuel Your Credits</h2>
-              <p className="mt-2 text-sm text-textMuted">
-                Instant delivery. Credits are used for <b>Image generations</b> & Pro models.
+              <h2 className="font-headline text-xl sm:text-2xl font-bold text-textPrimary tracking-tight">Refuel Neural Credits</h2>
+              <p className="mt-1 text-xs sm:text-sm text-textMuted max-w-sm mx-auto">
+                Credits fuel AI image syntheses & specialized models with zero subscriptions.
               </p>
             </div>
 
             {/* Status Messages */}
             {successMessage && (
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
+                initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center text-xs font-semibold text-emerald-400"
+                className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center text-xs font-semibold text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
               >
                 ✓ {successMessage}
               </motion.div>
@@ -210,7 +338,7 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
 
             {errorMessage && (
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
+                initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-center text-xs font-medium text-rose-400"
               >
@@ -219,19 +347,21 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
             )}
 
             {verifying && (
-              <div className="mb-4 flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 p-3 text-xs font-semibold text-primary">
+              <div className="mb-4 flex items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 p-3 text-xs font-semibold text-primary shadow-[0_0_15px_rgba(217,255,0,0.1)]">
                 <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                 <span>Verifying payment with bank & adding credits...</span>
               </div>
             )}
 
-            <div className="space-y-3">
+            {/* Credit Plans List */}
+            <div className="space-y-2.5 sm:space-y-3">
               {plans.length === 0 ? (
-                <div className="py-8 text-center text-sm text-textMuted">
-                  Loading credit plans...
+                <div className="py-8 text-center text-xs sm:text-sm text-textMuted flex flex-col items-center justify-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  <span>Loading credit packages...</span>
                 </div>
               ) : (
-                plans.map((opt) => {
+                plans.map((opt, idx) => {
                   let priceLabel = "";
                   if (Number(opt.price) === 0) {
                     priceLabel = "FREE";
@@ -241,41 +371,66 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
                   }
 
                   const isCurrentLoading = loading === opt.id || loading === opt.amount;
+                  const isPopular = idx === 1 || opt.amount >= 200;
 
                   return (
                     <button
                       key={opt.id}
                       disabled={loading !== null || verifying}
                       onClick={() => handleCheckout(opt)}
-                      className="group relative flex w-full items-center gap-4 rounded-2xl border border-border/40 bg-surface/50 p-4 transition-all hover:scale-[1.02] hover:border-primary/50 hover:bg-surface disabled:opacity-50"
+                      className={`group relative flex w-full items-center gap-3 sm:gap-4 rounded-2xl border p-3.5 sm:p-4 text-left transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 ${isPopular
+                          ? "border-primary/40 bg-gradient-to-r from-primary/10 via-elevated/80 to-elevated/40 hover:border-primary shadow-[0_0_20px_rgba(217,255,0,0.06)]"
+                          : "border-border/50 bg-elevated/50 hover:border-primary/50 hover:bg-elevated"
+                        }`}
                     >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-elevated font-headline text-lg font-bold text-primary group-hover:scale-110 transition-transform">
-                        {opt.amount}
-                      </div>
-                      <div className="flex-1 text-left">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-textPrimary">{opt.label}</span>
-                          <span className="text-xs font-bold text-primary uppercase tracking-widest">{priceLabel}</span>
+                      {/* Popular Pill */}
+                      {isPopular && (
+                        <div className="absolute -top-2.5 right-4 rounded-full bg-primary px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-background shadow-[0_0_10px_rgba(217,255,0,0.3)]">
+                          Popular
                         </div>
-                        <p className="text-xs text-textMuted">{opt.description}</p>
-                      </div>
-                      {isCurrentLoading && (
-                        <div className="ml-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                       )}
+
+                      {/* Amount Token Icon */}
+                      <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 flex-col items-center justify-center rounded-xl border border-primary/30 bg-primary/10 font-headline font-black text-primary transition-all group-hover:scale-105 group-hover:border-primary group-hover:bg-primary group-hover:text-background">
+                        <span className="text-sm sm:text-base leading-none">{opt.amount}</span>
+                        <span className="text-[8px] font-bold uppercase tracking-tighter opacity-80">CR</span>
+                      </div>
+
+                      {/* Plan Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-xs sm:text-sm text-textPrimary truncate">{opt.label}</span>
+                          <span className="shrink-0 text-xs sm:text-sm font-bold text-primary tracking-wide">{priceLabel}</span>
+                        </div>
+                        <p className="mt-0.5 text-[11px] text-textMuted truncate">{opt.description}</p>
+                      </div>
+
+                      {/* Loading Spinner or Arrow */}
+                      <div className="shrink-0 flex items-center justify-center">
+                        {isCurrentLoading ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                        ) : (
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface/60 text-textMuted group-hover:bg-primary group-hover:text-background transition-colors">
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <path d="M5 12h14M12 5l7 7-7 7" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
                     </button>
                   );
                 })
               )}
             </div>
 
-            {/* Legal & Razorpay Compliance */}
-            <div className="mt-6 border-t border-border/30 pt-4 text-center text-[11px] text-textMuted">
-              <div className="flex items-center justify-center gap-2.5">
+            {/* Legal & Razorpay Compliance Footer */}
+            <div className="mt-5 border-t border-border/30 pt-3.5 text-center text-[10px] sm:text-[11px] text-textMuted">
+              <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
                 <a
                   href="/refund-policy"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-textMuted hover:text-primary transition-colors underline underline-offset-2"
+                  className="hover:text-primary transition-colors underline underline-offset-2"
                 >
                   Refund Policy
                 </a>
@@ -284,7 +439,7 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
                   href="/terms"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-textMuted hover:text-primary transition-colors underline underline-offset-2"
+                  className="hover:text-primary transition-colors underline underline-offset-2"
                 >
                   Terms
                 </a>
@@ -293,7 +448,7 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
                   href="/privacy"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-textMuted hover:text-primary transition-colors underline underline-offset-2"
+                  className="hover:text-primary transition-colors underline underline-offset-2"
                 >
                   Privacy
                 </a>
@@ -302,27 +457,19 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
                   href="/contact-us"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-textMuted hover:text-primary transition-colors underline underline-offset-2"
+                  className="hover:text-primary transition-colors underline underline-offset-2"
                 >
                   Support
                 </a>
               </div>
-              <div className="mt-2 flex items-center justify-center gap-1.5 text-[10px] text-textMuted/70">
-                <svg className="h-3 w-3 text-primary/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <div className="mt-2 flex items-center justify-center gap-1.5 text-[9px] sm:text-[10px] text-textMuted/70">
+                <svg className="h-3 w-3 text-primary/70 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
-                <span>Secured by Razorpay Standard Checkout • Instant credit delivery</span>
+                <span>Secured Razorpay Checkout • Instant Balance Refuel</span>
               </div>
             </div>
-
-            <button
-              onClick={onClose}
-              disabled={loading !== null || verifying}
-              className="mt-4 w-full py-2 text-xs font-medium text-textMuted hover:text-textPrimary hover:scale-[1.02] transition-all disabled:opacity-50"
-            >
-              Maybe later
-            </button>
           </motion.div>
         </div>
       )}

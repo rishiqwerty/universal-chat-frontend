@@ -122,6 +122,7 @@ export default function Topbar({
   const { logout, user } = useAuth();
   const [editingTitle, setEditingTitle] = useState("");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showChatActionsMenu, setShowChatActionsMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [showTopupModal, setShowTopupModal] = useState(false);
@@ -141,6 +142,7 @@ export default function Topbar({
   }, [credits]);
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const chatActionsMenuRef = useRef<HTMLDivElement>(null);
   const [showHamburger, setShowHamburger] = useState(true);
 
   useEffect(() => {
@@ -195,6 +197,9 @@ export default function Topbar({
     function handleClickOutside(event: MouseEvent) {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
         setShowProfileMenu(false);
+      }
+      if (chatActionsMenuRef.current && !chatActionsMenuRef.current.contains(event.target as Node)) {
+        setShowChatActionsMenu(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -259,65 +264,103 @@ export default function Topbar({
         )}
       </div>
       <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-        {activeChatTitle != null && onToggleStar && (
-          <button
-            type="button"
-            onClick={onToggleStar}
-            className={`flex h-9 w-9 items-center justify-center rounded-input transition-colors ${
-              isStarred
-                ? "text-yellow-400 hover:text-yellow-300 bg-yellow-500/15 border border-yellow-500/30 shadow-[0_0_12px_rgba(234,179,8,0.25)]"
-                : "text-textMuted hover:text-textPrimary hover:bg-surface"
-            }`}
-            aria-label={isStarred ? "Unstar Chat" : "Star Chat"}
-            title={isStarred ? "Starred (Click to remove star)" : "Star this conversation"}
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill={isStarred ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.75">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-            </svg>
-          </button>
-        )}
-
-        {activeChatTitle != null && onToggleArchive && (
-          <button
-            type="button"
-            onClick={onToggleArchive}
-            className={`flex h-9 w-9 items-center justify-center rounded-input transition-colors ${
-              isArchived
-                ? "text-amber-400 hover:text-amber-300 bg-amber-500/15 border border-amber-500/30"
-                : "text-textMuted hover:text-textPrimary hover:bg-surface"
-            }`}
-            aria-label={isArchived ? "Unarchive Chat" : "Archive Chat"}
-            title={isArchived ? "Unarchive conversation" : "Archive conversation"}
-          >
-            {isArchived ? (
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-                <polyline points="21 8 21 21 3 21 3 8" />
-                <rect x="1" y="3" width="22" height="5" />
-                <polyline points="10 12 12 10 14 12" />
-                <line x1="12" y1="10" x2="12" y2="17" />
+        {/* Chat Actions 3-Dots Menu (Star, Archive, Delete) */}
+        {activeChatTitle != null && (onToggleStar || onToggleArchive || onDeleteChat) && (
+          <div className="relative" ref={chatActionsMenuRef}>
+            <button
+              type="button"
+              onClick={() => setShowChatActionsMenu(!showChatActionsMenu)}
+              className={`flex h-9 w-9 items-center justify-center rounded-full transition-all ${
+                showChatActionsMenu
+                  ? "bg-surface text-textPrimary ring-1 ring-border shadow-sm"
+                  : isStarred
+                    ? "text-yellow-400 bg-yellow-500/10 hover:bg-surface hover:text-yellow-300"
+                    : "text-textMuted hover:text-textPrimary hover:bg-surface"
+              }`}
+              aria-label="Conversation Options"
+              title="Conversation options"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="12" r="2" />
+                <circle cx="19" cy="12" r="2" />
+                <circle cx="5" cy="12" r="2" />
               </svg>
-            ) : (
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-                <polyline points="21 8 21 21 3 21 3 8" />
-                <rect x="1" y="3" width="22" height="5" />
-                <line x1="10" y1="12" x2="14" y2="12" />
-              </svg>
-            )}
-          </button>
-        )}
+            </button>
 
-        {activeChatTitle != null && onDeleteChat && (
-          <button
-            type="button"
-            onClick={onDeleteChat}
-            className="flex h-9 w-9 items-center justify-center rounded-input text-textMuted transition-colors hover:bg-surface hover:text-red-500"
-            aria-label="Delete Chat"
-            title="Delete Chat"
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-            </svg>
-          </button>
+            <AnimatePresence>
+              {showChatActionsMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                  transition={{ duration: 0.15, ease: "easeOut" }}
+                  className="absolute right-0 mt-2 w-48 overflow-hidden rounded-xl border border-border/60 bg-elevated/95 p-1.5 shadow-2xl backdrop-blur-xl z-50"
+                >
+                  {onToggleStar && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowChatActionsMenu(false);
+                        onToggleStar();
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
+                    >
+                      <svg className={`h-4 w-4 ${isStarred ? "text-yellow-400 fill-yellow-400" : "text-textMuted"}`} viewBox="0 0 24 24" fill={isStarred ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.75">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                      </svg>
+                      <span>{isStarred ? "Unstar Chat" : "Star Chat"}</span>
+                    </button>
+                  )}
+
+                  {onToggleArchive && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowChatActionsMenu(false);
+                        onToggleArchive();
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
+                    >
+                      {isArchived ? (
+                        <svg className="h-4 w-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                          <polyline points="21 8 21 21 3 21 3 8" />
+                          <rect x="1" y="3" width="22" height="5" />
+                          <polyline points="10 12 12 10 14 12" />
+                          <line x1="12" y1="10" x2="12" y2="17" />
+                        </svg>
+                      ) : (
+                        <svg className="h-4 w-4 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                          <polyline points="21 8 21 21 3 21 3 8" />
+                          <rect x="1" y="3" width="22" height="5" />
+                          <line x1="10" y1="12" x2="14" y2="12" />
+                        </svg>
+                      )}
+                      <span>{isArchived ? "Unarchive Chat" : "Archive Chat"}</span>
+                    </button>
+                  )}
+
+                  {onDeleteChat && (
+                    <>
+                      <div className="my-1 h-px bg-border/20" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowChatActionsMenu(false);
+                          onDeleteChat();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                      >
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                        </svg>
+                        <span>Delete Chat</span>
+                      </button>
+                    </>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         )}
         {isAuthenticated && !isTempMode && (
           <div className="flex items-center gap-1.5 px-2 relative group">
@@ -444,13 +487,11 @@ export default function Topbar({
             </AnimatePresence>
           </div>
         )}
-        {!hideIncognito && (
+        {isAuthenticated && !hideIncognito && (
           <button
             type="button"
             onClick={() => {
-              if (!isAuthenticated) {
-                setShowSignupModal(true);
-              } else if (onToggleTempMode) {
+              if (onToggleTempMode) {
                 onToggleTempMode();
               }
             }}
@@ -459,13 +500,13 @@ export default function Topbar({
               : "text-textSecondary hover:bg-surface hover:text-textPrimary"
               }`}
             aria-label="Temporary Mode"
-            title={!isAuthenticated ? "Login to save chats" : (isTempMode ? "Exit Temporary Mode" : "Start Temporary Chat")}
+            title={isTempMode ? "Exit Temporary Mode" : "Start Temporary Chat"}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11V7a4 4 0 118 0v4c0 1.28.192 2.515.547 3.672M12 11c1.744 2.772 2.753 6.054 2.753 9.571m-9.643-.513c-.322-.135-.351-.303-.351-.488V11a4 4 0 118 0v4c0 .185-.029.353-.351.488m-9.292-2.128a13.916 13.916 0 0113.111-9.444" />
             </svg>
             <span className="text-[10px] font-bold uppercase tracking-widest">
-              {!isAuthenticated ? "Guest Mode" : (isTempMode ? "Go Public" : "Incognito")}
+              {isTempMode ? "Go Public" : "Incognito"}
             </span>
           </button>
         )}
@@ -487,21 +528,21 @@ export default function Topbar({
               scale: { type: "spring", stiffness: 400, damping: 15 },
               default: { duration: 2, repeat: Infinity, ease: "easeInOut" }
             }}
-            className="framer-btn flex h-9 items-center gap-2 rounded-input bg-primary px-4 text-xs font-bold uppercase tracking-wider text-background hover:bg-primaryHover"
+            className="framer-btn flex h-9 items-center gap-2 rounded-full bg-primary px-4 text-xs font-bold uppercase tracking-wider text-background hover:bg-primaryHover shadow-[0_0_15px_rgba(217,255,0,0.3)] transition-all"
           >
-            Join / Sign In
+            Join
           </motion.button>
         )}
-        <div className="relative" ref={profileMenuRef}>
-          <button
-            type="button"
-            onClick={() => setShowProfileMenu(!showProfileMenu)}
-            className={`flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-elevated ring-1 transition-all ${showProfileMenu ? "ring-primary shadow-[0_0_15px_rgba(217,255,0,0.3)]" : "ring-border/50 hover:ring-border hover:shadow-[0_0_10px_rgba(255,255,255,0.05)]"
-              }`}
-            aria-label="Profile"
-          >
-            {isAuthenticated ? (
-              user?.avatar_url ? (
+        {isAuthenticated && (
+          <div className="relative" ref={profileMenuRef}>
+            <button
+              type="button"
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className={`flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-elevated ring-1 transition-all ${showProfileMenu ? "ring-primary shadow-[0_0_15px_rgba(217,255,0,0.3)]" : "ring-border/50 hover:ring-border hover:shadow-[0_0_10px_rgba(255,255,255,0.05)]"
+                }`}
+              aria-label="Profile"
+            >
+              {user?.avatar_url ? (
                 <img
                   src={resolveImagePath(user.avatar_url)}
                   alt={user.full_name || "User Avatar"}
@@ -511,72 +552,27 @@ export default function Topbar({
                 <span className="text-xs font-bold text-textPrimary uppercase">
                   {user?.full_name ? user.full_name.slice(0, 2) : (user?.email ? user.email.slice(0, 2) : "OP")}
                 </span>
-              )
-            ) : (
-              <motion.div
-                className="relative h-full w-full flex items-center justify-center p-0.5"
-                initial="initial"
-                animate="guiding"
-              >
-                {/* Subtle background glow */}
-                <div className="absolute inset-0 bg-primary/10 blur-md rounded-full" />
+              )}
+            </button>
 
-                {/* The Mascot */}
-                <motion.img
-                  src="/mascot_avatar.png"
-                  alt="Assistant"
-                  className="h-full w-full object-cover rounded-full relative z-10"
-                  variants={{
-                    initial: { rotate: 0, scale: 1 },
-                    guiding: {
-                      rotateX: [0, 15, 0, 0, 0],
-                      rotateY: [0, -25, 0, 0, 0],
-                      scale: [1, 1.05, 1, 1, 1],
-                      transition: {
-                        duration: 6,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                        times: [0, 0.2, 0.4, 0.8, 1]
-                      }
-                    }
-                  }}
-                />
-
-                {/* Continuous Wave Layer */}
+            <AnimatePresence>
+              {showProfileMenu && (
                 <motion.div
-                  className="absolute inset-0 pointer-events-none z-20"
-                  animate={{
-                    rotate: [-2, 2, -2],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                />
-              </motion.div>
-            )}
-          </button>
+                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="absolute right-0 mt-2 w-60 overflow-hidden rounded-xl border border-border/60 bg-elevated/95 p-1.5 shadow-2xl backdrop-blur-xl z-50"
+                >
+                  <div className="px-3 py-2 border-b border-border/20 mb-1">
+                    <p className="text-xs font-bold text-textPrimary truncate" title={user?.full_name || user?.email || "Operative"}>
+                      {user?.full_name || (user?.email ? user.email.split('@')[0] : "Operative")}
+                    </p>
+                    <p className="text-[10px] text-textMuted font-medium truncate mt-0.5" title={user?.email || "Account"}>
+                      {user?.email || "Active Operative"}
+                    </p>
+                  </div>
 
-          <AnimatePresence>
-            {showProfileMenu && (
-              <motion.div
-                initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className="absolute right-0 mt-2 w-60 overflow-hidden rounded-xl border border-border/60 bg-elevated/95 p-1.5 shadow-2xl backdrop-blur-xl z-50"
-              >
-                <div className="px-3 py-2 border-b border-border/20 mb-1">
-                  <p className="text-xs font-bold text-textPrimary truncate" title={user?.full_name || user?.email || "Operative"}>
-                    {user?.full_name || (user?.email ? user.email.split('@')[0] : "Operative")}
-                  </p>
-                  <p className="text-[10px] text-textMuted font-medium truncate mt-0.5" title={user?.email || "Account"}>
-                    {user?.email || (isAuthenticated ? "Active Operative" : "Guest Session")}
-                  </p>
-                </div>
-
-                {isAuthenticated && (
                   <button
                     type="button"
                     onClick={() => {
@@ -590,8 +586,7 @@ export default function Topbar({
                     </svg>
                     Profile Settings
                   </button>
-                )}
-                {isAuthenticated && (
+
                   <button
                     type="button"
                     onClick={() => {
@@ -607,24 +602,23 @@ export default function Topbar({
                     </svg>
                     Image Library
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    setShowSignupModal(true);
-                  }}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
-                >
-                  <svg className="h-4 w-4 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                  </svg>
-                  {isAuthenticated ? "Add Account" : "Sign In / Join"}
-                </button>
 
-                <div className="my-1 h-px bg-border/20" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      setShowSignupModal(true);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-textSecondary transition-colors hover:bg-surface hover:text-textPrimary"
+                  >
+                    <svg className="h-4 w-4 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                    Add Account
+                  </button>
 
-                {isAuthenticated && (
+                  <div className="my-1 h-px bg-border/20" />
+
                   <button
                     type="button"
                     onClick={() => {
@@ -638,11 +632,11 @@ export default function Topbar({
                     </svg>
                     Log out
                   </button>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </div>
 
       <ConfirmModal

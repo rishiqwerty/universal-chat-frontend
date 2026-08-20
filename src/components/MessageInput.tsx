@@ -16,6 +16,7 @@ type MessageInputProps = {
   selectedModel: string | null;
   onModelChange: (provider: string, model: string) => void;
   isTempMode?: boolean;
+  showDisclaimer?: boolean;
 };
 
 export interface MessageInputHandle {
@@ -38,6 +39,7 @@ export default function MessageInput({
   selectedModel,
   onModelChange,
   isTempMode,
+  showDisclaimer = false,
 }: MessageInputProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [isGlowing, setIsGlowing] = useState(false);
@@ -532,6 +534,13 @@ export default function MessageInput({
             </>
           )}
         </AnimatePresence>
+
+        {/* Disclaimer (only shown on initial empty state before first message) */}
+        {showDisclaimer && (
+          <p className="mt-1 text-center text-[10px] sm:text-[11px] text-textMuted/60 leading-tight select-none">
+            AI can make mistakes. Chats with free models and temporary guest chats may be used by model providers for training purposes.
+          </p>
+        )}
       </div>
     </div>
   );
