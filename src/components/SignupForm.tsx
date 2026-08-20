@@ -45,9 +45,11 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authStatus, setAuthStatus] = useState("");
 
   async function handleGoogleSuccess(credential: string) {
     setLoading(true);
+    setAuthStatus("Verifying Google account and initializing workspace...");
     setError("");
     try {
       const token = await googleLoginAccount(credential);
@@ -60,6 +62,7 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
       setError(err.response?.data?.message || err.response?.data?.detail || "Google authentication failed.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
@@ -75,6 +78,7 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
       return;
     }
     setLoading(true);
+    setAuthStatus("Creating your account...");
     try {
       await signupAccount({ email, password });
       localStorage.clear();
@@ -89,6 +93,7 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
       setError(serverMessage || "Could not create account. Try again.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
@@ -99,6 +104,7 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
       return;
     }
     setLoading(true);
+    setAuthStatus("Sending verification code...");
     setError("");
     setSuccessMsg("");
     try {
@@ -109,11 +115,13 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
       setError(err.response?.data?.message || err.response?.data?.detail || "Failed to send verification code.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
   async function handleVerifyOtp(code: string) {
     setLoading(true);
+    setAuthStatus("Verifying code & setting up workspace...");
     setError("");
     setSuccessMsg("");
     try {
@@ -127,6 +135,7 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
       setError(err.response?.data?.message || err.response?.data?.detail || "Invalid or expired verification code.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
@@ -146,7 +155,26 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
         </div>
       )}
 
-      <div className={`${isModal ? "" : "rounded-card bg-surface p-8 shadow-2xl ring-1 ring-border/40 backdrop-blur-xl"}`}>
+      <div className={`relative overflow-hidden ${isModal ? "" : "rounded-card bg-surface p-8 shadow-2xl ring-1 ring-border/40 backdrop-blur-xl"}`}>
+        {/* Loading / Auth Processing Overlay */}
+        {loading && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-surface/95 backdrop-blur-md p-6 text-center">
+            <div className="relative mb-4 flex h-14 w-14 items-center justify-center">
+              <div className="absolute inset-0 animate-spin rounded-full border-2 border-primary/30 border-t-primary shadow-[0_0_20px_rgba(217,255,0,0.35)]" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <svg className="h-5 w-5 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+            </div>
+            <h3 className="font-headline text-sm sm:text-base font-bold text-textPrimary tracking-tight">
+              {authStatus || "Processing Authentication..."}
+            </h3>
+            <p className="mt-1 text-xs text-textMuted max-w-xs">
+              Initializing secure session and preparing your workspace...
+            </p>
+          </div>
+        )}
         
         {!showEmailSignUp && (
           <div className="mb-6 text-center">
@@ -172,6 +200,8 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
             onSuccess={handleGoogleSuccess}
             onError={handleGoogleError}
             disabled={loading}
+            loading={loading}
+            loadingText={authStatus || "Authenticating with Google..."}
             text="Sign up with Google"
           />
         </div>

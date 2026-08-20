@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased] - 2026-08-21
 
 ### Added
+- **Google Login Loading & Processing States**: Added real-time authorization indicators, animated spinners, and modern authentication progress overlays during Google OAuth redirect/verification in `GoogleAuthButton.tsx`, `Login.tsx`, and `SignupForm.tsx`.
 - **Electric Spark Logo in Refuel Modal**: Added animated energy spark particles, neon pulsing halo, and ambient lighting around the lightning icon in `TopupModal.tsx`.
 - **Three-Dots Action Menu in Topbar**: Consolidated Star/Unstar, Archive/Unarchive, and Delete Conversation options into a sleek single `•••` dropdown button in `Topbar.tsx`.
 - **Training Purpose Disclaimer**: Added AI model training and data usage disclaimer under the input field on the initial empty chat screen in `MessageInput.tsx` and `Chat.tsx`.
@@ -19,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Top Brand Logo**: Added a refined 4-point neon spark accent to the `LogoMark` in `Sidebar.tsx`, `WelcomeScreen.tsx`, `Login.tsx`, and `SignupForm.tsx`.
 
 ### Fixed
+- **Input Field Bidirectional Auto-Resize**: Fixed input container not collapsing back into single-line mode when text is deleted or reduced; preserved last measured model selector width across layout switches in `MessageInput.tsx`.
+- **Input Field Expansion for Logged-In Users**: Integrated dynamic DOM measurement (`modelSelectorRef`) and `window.getComputedStyle` typography calculation in `MessageInput.tsx` to ensure seamless single-to-multiline expansion regardless of selected model pill width or authentication state.
 - **Mobile Textarea Oscillation & Scrolling**: Implemented hysteresis text width measurement with canvas calculation to eliminate flickering/jittering at the multiline transition boundary in `MessageInput.tsx`.
 - **Virtual Keyboard Visibility**: Fixed first messages becoming hidden under the topbar when opening the mobile keyboard by integrating `window.visualViewport` resize/scroll listeners and dynamic `min-h-full justify-end` layout in `ChatWindow.tsx`.
 

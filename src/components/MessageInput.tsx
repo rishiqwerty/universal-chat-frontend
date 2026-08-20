@@ -53,21 +53,28 @@ export default function MessageInput({
   const [isMultiline, setIsMultiline] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const modelSelectorRef = useRef<HTMLDivElement>(null);
+  const lastModelWidthRef = useRef<number>(120);
   const singleLineWidthRef = useRef<number>(220);
 
-  // Helper to measure text pixel width accurately
+  // Helper to measure text pixel width accurately matching textarea typography
   const measureTextWidth = (text: string): number => {
     if (typeof document === "undefined") return text.length * 8;
     const canvas = (measureTextWidth as any).canvas || ((measureTextWidth as any).canvas = document.createElement("canvas"));
     const ctx = canvas.getContext("2d");
     if (!ctx) return text.length * 8;
-    ctx.font = "14px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    if (textareaRef.current) {
+      const computed = window.getComputedStyle(textareaRef.current);
+      ctx.font = `${computed.fontSize || "14px"} ${computed.fontFamily || "system-ui, sans-serif"}`;
+    } else {
+      ctx.font = "14px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    }
     return ctx.measureText(text).width;
   };
 
   const isInputBlocked = disabled || isStreaming || (Boolean(isLoadingModels) && !isTempMode);
 
-  // Auto-resize textarea height with hysteresis to prevent rapid oscillating/fluttering
+  // Auto-resize textarea height with smooth bidirectional expansion/reduction
   const updateHeightAndMultiline = useCallback((val: string) => {
     if (!textareaRef.current) {
       setIsMultiline(false);
@@ -84,35 +91,41 @@ export default function MessageInput({
     if (hasNewline) {
       setIsMultiline(true);
       textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+      textareaRef.current.style.height = `${Math.min(Math.max(textareaRef.current.scrollHeight, 44), 180)}px`;
       return;
     }
 
-    // Calculate available width for single-line input
+    // Capture model selector width when mounted
+    if (modelSelectorRef.current && modelSelectorRef.current.offsetWidth > 0) {
+      lastModelWidthRef.current = modelSelectorRef.current.offsetWidth;
+    }
+
+    // Calculate dynamic available single-line width using live DOM measurements
     if (containerRef.current) {
       const containerW = containerRef.current.clientWidth;
-      const modelW = isTempMode ? 0 : 95;
+      const modelW = isTempMode 
+        ? 0 
+        : (modelSelectorRef.current?.offsetWidth || lastModelWidthRef.current || (window.innerWidth < 640 ? 110 : 160));
       const sendW = 40;
-      const paddingW = 25;
-      singleLineWidthRef.current = Math.max(containerW - modelW - sendW - paddingW, 140);
+      const paddingW = 24;
+      singleLineWidthRef.current = Math.max(containerW - modelW - sendW - paddingW, 100);
     }
 
     const singleLineWidth = singleLineWidthRef.current;
     const textWidth = measureTextWidth(val);
 
-    // Hysteresis thresholding:
-    // Expand when textWidth exceeds single-line capacity
-    // Collapse back ONLY when textWidth is safely below single-line capacity (25px hysteresis buffer)
     setIsMultiline((prev) => {
       let nextMultiline = prev;
+
       if (!prev) {
-        // In single-line mode: expand if text exceeds available single-line width
-        if (textWidth >= singleLineWidth - 10) {
+        // In single-line mode: expand if text exceeds single-line capacity, wraps, or has newline
+        const scrollH = textareaRef.current ? textareaRef.current.scrollHeight : 0;
+        if (hasNewline || scrollH > 28 || textWidth >= singleLineWidth - 6) {
           nextMultiline = true;
         }
       } else {
-        // In multiline mode: collapse ONLY if text comfortably fits in single line with hysteresis buffer
-        if (textWidth < singleLineWidth - 25) {
+        // In multiline mode: collapse back to single line when text fits with small hysteresis buffer
+        if (!hasNewline && textWidth < singleLineWidth - 18) {
           nextMultiline = false;
         }
       }
@@ -122,7 +135,7 @@ export default function MessageInput({
         if (nextMultiline) {
           textareaRef.current.style.height = "auto";
           const sH = textareaRef.current.scrollHeight;
-          textareaRef.current.style.height = `${Math.min(Math.max(sH, 46), 180)}px`;
+          textareaRef.current.style.height = `${Math.min(Math.max(sH, 44), 180)}px`;
         } else {
           textareaRef.current.style.height = "26px";
         }
@@ -134,7 +147,7 @@ export default function MessageInput({
 
   useEffect(() => {
     updateHeightAndMultiline(value);
-  }, [value, updateHeightAndMultiline]);
+  }, [value, selectedModel, isTempMode, updateHeightAndMultiline]);
 
   useEffect(() => {
     if (outerRef) {
@@ -285,7 +298,7 @@ export default function MessageInput({
         >
           {/* When single-line: Model selector on the left */}
           {!isMultiline && (
-            <div className="shrink-0 flex items-center">
+            <div ref={modelSelectorRef} className="shrink-0 flex items-center">
               {renderModelSelector(true)}
             </div>
           )}

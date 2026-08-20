@@ -45,9 +45,11 @@ export default function Login() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [authStatus, setAuthStatus] = useState("");
 
   async function handleGoogleSuccess(credential: string) {
     setLoading(true);
+    setAuthStatus("Verifying Google account and initializing workspace...");
     setError("");
     try {
       const token = await googleLoginAccount(credential);
@@ -61,6 +63,7 @@ export default function Login() {
       setError(typeof detail === "string" ? detail : "Google Sign-In failed. Please try again.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
@@ -74,6 +77,7 @@ export default function Login() {
     setError("");
     setSuccessMsg("");
     setLoading(true);
+    setAuthStatus("Verifying credentials...");
 
     try {
       const token = await loginAccount({ email, password });
@@ -87,6 +91,7 @@ export default function Login() {
       setError(typeof detail === "string" ? detail : "Invalid email or password. Please verify credentials.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
@@ -99,6 +104,7 @@ export default function Login() {
     setError("");
     setSuccessMsg("");
     setLoading(true);
+    setAuthStatus("Sending access code...");
 
     try {
       await requestOtpApi(email);
@@ -110,6 +116,7 @@ export default function Login() {
       setError(typeof detail === "string" ? detail : "Failed to generate security code. Please retry.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
@@ -118,6 +125,7 @@ export default function Login() {
     setError("");
     setSuccessMsg("");
     setLoading(true);
+    setAuthStatus("Verifying access code...");
 
     try {
       const token = await verifyOtpApi(email, code);
@@ -131,6 +139,7 @@ export default function Login() {
       setError(typeof detail === "string" ? detail : "Invalid or expired passcode. Please try again.");
     } finally {
       setLoading(false);
+      setAuthStatus("");
     }
   }
 
@@ -150,7 +159,26 @@ export default function Login() {
             </p>
           </div>
 
-          <div className="rounded-card bg-surface p-8 shadow-2xl ring-1 ring-border/40 backdrop-blur-xl">
+          <div className="relative rounded-card bg-surface p-8 shadow-2xl ring-1 ring-border/40 backdrop-blur-xl overflow-hidden">
+            {/* Loading / Auth Processing Overlay */}
+            {loading && (
+              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-surface/95 backdrop-blur-md p-6 text-center">
+                <div className="relative mb-4 flex h-14 w-14 items-center justify-center">
+                  <div className="absolute inset-0 animate-spin rounded-full border-2 border-primary/30 border-t-primary shadow-[0_0_20px_rgba(217,255,0,0.35)]" />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <svg className="h-5 w-5 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="font-headline text-sm sm:text-base font-bold text-textPrimary tracking-tight">
+                  {authStatus || "Processing Sign-In..."}
+                </h3>
+                <p className="mt-1 text-xs text-textMuted max-w-xs">
+                  Establishing secure neural session and loading your workspace...
+                </p>
+              </div>
+            )}
 
             {!showEmailSignIn && (
               <div className="mb-6 text-center">
@@ -175,6 +203,8 @@ export default function Login() {
                 onSuccess={handleGoogleSuccess}
                 onError={handleGoogleError}
                 disabled={loading}
+                loading={loading}
+                loadingText={authStatus || "Authenticating with Google..."}
                 text="Continue with Google"
               />
             </div>

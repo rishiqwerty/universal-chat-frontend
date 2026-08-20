@@ -8,11 +8,11 @@ type SignupModalProps = {
   subtitle?: string;
 };
 
-export default function SignupModal({ 
-  isOpen, 
-  onClose, 
-  title = "Add New Operative", 
-  subtitle = "Initialize Account" 
+export default function SignupModal({
+  isOpen,
+  onClose,
+  title = "Sign Up",
+  subtitle = "Initialize Account"
 }: SignupModalProps) {
   return (
     <AnimatePresence>
@@ -26,7 +26,7 @@ export default function SignupModal({
             onClick={onClose}
             className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-md"
           />
-          
+
           {/* Modal Content */}
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 pointer-events-none">
             <motion.div
