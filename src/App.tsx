@@ -9,6 +9,7 @@ import Documentation from "./pages/Documentation";
 import Legal from "./pages/Legal";
 import { useTheme } from "./hooks/useTheme";
 import { useAuth } from "./context/AuthContext";
+import { useSilentKeepAlive } from "./hooks/useSilentKeepAlive";
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { isAuthenticated } = useAuth();
@@ -23,6 +24,7 @@ function GuestRoute({ children }: { children: JSX.Element }) {
 export default function App() {
   const location = useLocation();
   useTheme(); // Initialize global accent theme
+  useSilentKeepAlive(); // Silent background server wake-up & keep-alive without any UI hints
 
   return (
     <Routes location={location}>

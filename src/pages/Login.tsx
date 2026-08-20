@@ -50,13 +50,13 @@ export default function Login() {
   const startProgressTimer = (initialMsg: string) => {
     setAuthStatus(initialMsg);
     const t1 = setTimeout(() => {
-      setAuthStatus("Connecting to cloud server & database...");
+      setAuthStatus("Authenticating...");
     }, 2200);
     const t2 = setTimeout(() => {
       setAuthStatus("Please wait a moment...");
     }, 6000);
     const t3 = setTimeout(() => {
-      setAuthStatus("Almost ready, initializing secure workspace session...");
+      setAuthStatus("Setting up your workspace...");
     }, 12000);
 
     return () => {
@@ -69,12 +69,12 @@ export default function Login() {
   async function handleGoogleSuccess(credential: string) {
     setLoading(true);
     setError("");
-    const stopTimer = startProgressTimer("Verifying Google account with backend...");
+    const stopTimer = startProgressTimer("Authenticating with Google...");
     try {
       const token = await googleLoginAccount(credential);
       stopTimer();
-      setAuthStatus("Backend online! Redirecting to workspace...");
-      await new Promise((r) => setTimeout(r, 350));
+      setAuthStatus("Success! Redirecting...");
+      await new Promise((r) => setTimeout(r, 300));
       localStorage.clear();
       clearChatCache();
       login(token);
@@ -83,7 +83,7 @@ export default function Login() {
       stopTimer();
       console.error("Google sign-in error:", err);
       const detail = err.response?.data?.detail;
-      setError(typeof detail === "string" ? detail : "Authentication server is currently unavailable. Please retry in a moment.");
+      setError(typeof detail === "string" ? detail : "Authentication service is temporarily busy. Please retry.");
     } finally {
       setLoading(false);
       setAuthStatus("");
@@ -100,13 +100,13 @@ export default function Login() {
     setError("");
     setSuccessMsg("");
     setLoading(true);
-    const stopTimer = startProgressTimer("Verifying credentials with server...");
+    const stopTimer = startProgressTimer("Verifying credentials...");
 
     try {
       const token = await loginAccount({ email, password });
       stopTimer();
-      setAuthStatus("Credentials verified! Opening workspace...");
-      await new Promise((r) => setTimeout(r, 350));
+      setAuthStatus("Success! Redirecting...");
+      await new Promise((r) => setTimeout(r, 300));
       localStorage.clear();
       clearChatCache();
       login(token);
