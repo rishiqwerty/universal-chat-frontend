@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { loginAccount, googleLoginAccount, requestOtpApi, verifyOtpApi, clearChatCache } from "../api/api";
+import { loginAccount, googleLoginAccount, requestOtpApi, verifyOtpApi } from "../api/api";
 import PageTransition from "../components/PageTransition";
 import GoogleAuthButton from "../components/GoogleAuthButton";
 import OtpInput from "../components/OtpInput";
@@ -26,7 +26,7 @@ export default function Login() {
   });
 
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, setAuthenticating } = useAuth();
   const showPasswordLogin = isEmailPasswordSignInEnabled();
   const showOtpLogin = isEmailOtpSignInEnabled();
   const showEmailSignIn = showPasswordLogin || showOtpLogin;
@@ -88,11 +88,12 @@ export default function Login() {
       const token = await googleLoginAccount(credential);
       stopTimer();
       setAuthStatus("Success! Redirecting...");
-      await new Promise((r) => setTimeout(r, 300));
-      localStorage.clear();
-      clearChatCache();
+      setAuthenticating(true, "Success! Loading workspace...");
       login(token);
       navigate("/");
+      setTimeout(() => {
+        setAuthenticating(false);
+      }, 400);
     } catch (err: any) {
       stopTimer();
       console.error("Google sign-in error:", err);
@@ -120,11 +121,12 @@ export default function Login() {
       const token = await loginAccount({ email, password });
       stopTimer();
       setAuthStatus("Success! Redirecting...");
-      await new Promise((r) => setTimeout(r, 300));
-      localStorage.clear();
-      clearChatCache();
+      setAuthenticating(true, "Success! Loading workspace...");
       login(token);
       navigate("/");
+      setTimeout(() => {
+        setAuthenticating(false);
+      }, 400);
     } catch (err: any) {
       stopTimer();
       console.error(err);
@@ -174,11 +176,12 @@ export default function Login() {
       const token = await verifyOtpApi(email, code);
       stopTimer();
       setAuthStatus("Passcode confirmed! Redirecting...");
-      await new Promise((r) => setTimeout(r, 350));
-      localStorage.clear();
-      clearChatCache();
+      setAuthenticating(true, "Passcode confirmed! Loading workspace...");
       login(token);
       navigate("/");
+      setTimeout(() => {
+        setAuthenticating(false);
+      }, 400);
     } catch (err: any) {
       stopTimer();
       console.error(err);

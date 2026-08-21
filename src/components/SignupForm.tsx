@@ -24,7 +24,7 @@ type SignupFormProps = {
 
 export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, setAuthenticating } = useAuth();
   const showPasswordSignup = isEmailPasswordSignUpEnabled();
   const showOtpSignup = isEmailOtpSignUpEnabled();
   const showEmailSignUp = showPasswordSignup || showOtpSignup;
@@ -88,12 +88,13 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
       const token = await googleLoginAccount(credential);
       stopTimer();
       setAuthStatus("Success! Redirecting...");
-      await new Promise((r) => setTimeout(r, 300));
-      localStorage.clear();
-      clearChatCache();
+      setAuthenticating(true, "Success! Loading workspace...");
       login(token);
       if (onSuccess) onSuccess();
       navigate("/chat");
+      setTimeout(() => {
+        setAuthenticating(false);
+      }, 400);
     } catch (err: any) {
       stopTimer();
       setError(err.response?.data?.message || err.response?.data?.detail || "Authentication service is temporarily busy. Please retry.");
@@ -171,12 +172,13 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
       const token = await verifyOtpApi(email, code);
       stopTimer();
       setAuthStatus("Session verified! Entering workspace...");
-      await new Promise((r) => setTimeout(r, 350));
-      localStorage.clear();
-      clearChatCache();
+      setAuthenticating(true, "Session verified! Entering workspace...");
       login(token);
       if (onSuccess) onSuccess();
       navigate("/chat");
+      setTimeout(() => {
+        setAuthenticating(false);
+      }, 400);
     } catch (err: any) {
       stopTimer();
       setError(err.response?.data?.message || err.response?.data?.detail || "Invalid or expired verification code.");

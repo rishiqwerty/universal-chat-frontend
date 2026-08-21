@@ -25,6 +25,39 @@ export default function App() {
   const location = useLocation();
   useTheme(); // Initialize global accent theme
   useSilentKeepAlive(); // Silent background server wake-up & keep-alive without any UI hints
+  const { isAuthenticating, authStatusMessage } = useAuth();
+
+  if (isAuthenticating) {
+    return (
+      <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background p-6 text-center select-none">
+        {/* Ambient background glow */}
+        <div className="pointer-events-none absolute h-72 w-72 rounded-full bg-primary/15 blur-3xl animate-pulse" />
+        
+        <div className="relative mb-6 flex h-16 w-16 items-center justify-center">
+          <div className="absolute inset-0 animate-spin rounded-full border-2 border-primary/20 border-t-primary shadow-[0_0_30px_rgba(217,255,0,0.35)]" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/30 shadow-[0_0_20px_rgba(217,255,0,0.15)]">
+            <svg className="h-5 w-5 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+        </div>
+
+        <h3 className="font-headline text-lg sm:text-xl font-bold tracking-tight text-textPrimary">
+          {authStatusMessage || "Authenticating with Google..."}
+        </h3>
+        <p className="mt-2 text-xs sm:text-sm text-textMuted max-w-sm leading-relaxed">
+          Establishing secure neural session and preparing your workspace...
+        </p>
+
+        <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-border/50 bg-surface/80 px-3.5 py-1.5 backdrop-blur-md shadow-lg">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary animate-ping" />
+          <span className="text-[11px] font-semibold text-textSecondary uppercase tracking-widest">
+            Neural Architect Ingress
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Routes location={location}>
