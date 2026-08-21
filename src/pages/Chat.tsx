@@ -79,6 +79,7 @@ export default function Chat() {
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [chatIdToArchive, setChatIdToArchive] = useState<string | null>(null);
   const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
+  const [isGuestLimitReached, setIsGuestLimitReached] = useState(false);
   const [showUpgradeFlyer, setShowUpgradeFlyer] = useState(false);
   const [showMcpNotification, setShowMcpNotification] = useState(false);
 
@@ -141,6 +142,7 @@ export default function Chat() {
       setDraft("");
       setStreamError(null);
       setIsTempMode(true);
+      setIsGuestLimitReached(false);
       loadedChatIdRef.current = null;
     };
     window.addEventListener("app:user-logged-out", handleReset);
@@ -158,6 +160,12 @@ export default function Chat() {
       setDraft("");
     }
   }, [location.pathname, isTempMode]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setIsGuestLimitReached(false);
+    }
+  }, [isAuthenticated]);
 
   // Auto-refocus input field as soon as AI response finishes generating
   const prevPendingRef = useRef(pending);
@@ -497,7 +505,8 @@ export default function Chat() {
     const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: "user", content: text };
 
     if (isTempMode) {
-      if (!isAuthenticated && tempMessages.length >= 30) {
+      if (!isAuthenticated && (tempMessages.length >= 30 || isGuestLimitReached)) {
+        setIsGuestLimitReached(true);
         setIsSignupModalOpen(true);
         return;
       }
@@ -587,7 +596,24 @@ export default function Chat() {
       } catch (e: any) {
         if (e.name === "AbortError") return;
         setTempMessages((m) => m.filter((msg) => msg.id !== assistantMsgId));
-        setStreamError(e.message || "Temporary chat failed. Please try again.");
+        const errorMsg = e.message || "";
+        const isLimit =
+          errorMsg.toLowerCase().includes("limit") ||
+          errorMsg.toLowerCase().includes("429") ||
+          errorMsg.toLowerCase().includes("account") ||
+          errorMsg.toLowerCase().includes("register") ||
+          errorMsg.toLowerCase().includes("sign up") ||
+          tempMessages.length >= 28;
+
+        if (isLimit) {
+          setIsGuestLimitReached(true);
+          setIsSignupModalOpen(true);
+          setStreamError(null);
+          setLastFailedText(null);
+        } else {
+          setStreamError(errorMsg || "Temporary chat failed. Please try again.");
+          setLastFailedText(text);
+        }
       } finally {
         setPending(false);
         streamControllerRef.current = null;
@@ -946,6 +972,92 @@ export default function Chat() {
     );
   };
 
+  const renderArchivedDock = () => (
+    <div className="relative overflow-hidden rounded-2xl border border-amber-500/25 bg-surface/90 p-4 sm:p-5 shadow-[0_4px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all">
+      <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber-500/10 blur-2xl" />
+      <div className="pointer-events-none absolute -left-10 -bottom-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
+
+      <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5 text-center sm:text-left">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)]">
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+            </svg>
+          </div>
+          <div>
+            <h4 className="text-sm font-semibold text-textPrimary tracking-tight">This conversation is archived</h4>
+            <p className="text-xs text-textMuted mt-0.5 leading-relaxed">
+              Messaging is disabled. Would you like to unarchive this chat to send messages?
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            handleToggleArchive(activeChatId!, true);
+            setTimeout(() => messageInputRef.current?.focus(), 100);
+          }}
+          className="group relative inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-primary/50 bg-primary px-5 py-2.5 text-xs font-bold text-background shadow-[0_0_20px_rgba(217,255,0,0.25)] transition-all hover:bg-primaryHover hover:scale-[1.02] active:scale-[0.98]"
+        >
+          <svg className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
+          </svg>
+          <span>Unarchive Chat</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderGuestLimitDock = () => (
+    <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-surface/95 p-4 sm:p-5 shadow-[0_4px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all text-center sm:text-left">
+      <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/15 blur-2xl" />
+      <div className="pointer-events-none absolute -left-10 -bottom-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
+
+      <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5 text-center sm:text-left">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 text-primary shadow-[0_0_20px_rgba(217,255,0,0.15)]">
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+          </div>
+          <div>
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary mb-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              Free Guest Limit Reached
+            </div>
+            <h4 className="text-sm font-semibold text-textPrimary tracking-tight">
+              Unlock Unlimited Messaging
+            </h4>
+            <p className="text-xs text-textMuted mt-0.5 leading-relaxed">
+              Join Neural Architect or Sign In to continue chatting, access specialized neural models, and save your conversation history.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-2.5 shrink-0 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setIsSignupModalOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-primary/50 bg-primary px-5 py-2.5 text-xs font-bold text-background shadow-[0_0_20px_rgba(217,255,0,0.25)] transition-all hover:bg-primaryHover hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span>Join / Sign Up</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/login")}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-border/60 bg-elevated/70 px-4 py-2.5 text-xs font-semibold text-textPrimary transition-all hover:bg-elevated hover:border-border hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <span>Sign In</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   const displayedMessages = isTempMode ? tempMessages : messages;
   const isEmpty = displayedMessages.length === 0;
 
@@ -1032,16 +1144,23 @@ export default function Chat() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
-                className="flex min-h-0 flex-1 flex-col items-center justify-center bg-background px-6"
+                className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4 sm:px-6 py-6 sm:py-8 scrollbar-hide"
               >
-                <WelcomeScreen isAuthenticated={isAuthenticated} isTempMode={isTempMode} />
+                <WelcomeScreen
+                  isAuthenticated={isAuthenticated}
+                  isTempMode={isTempMode}
+                  onSelectPrompt={(promptText) => {
+                    setDraft(promptText);
+                    setTimeout(() => messageInputRef.current?.focus(), 60);
+                  }}
+                />
                 <motion.div
                   layoutId="chat-input-container"
                   transition={{ type: "spring", stiffness: 260, damping: 30 }}
-                  className="mt-4 sm:mt-6 w-full max-w-2xl"
+                  className="mt-4 sm:mt-6 w-full max-w-2xl shrink-0"
                 >
                   <div className="mx-auto flex w-full flex-col gap-4">
-                    {streamError && (
+                    {streamError && !(isTempMode && isGuestLimitReached) && (
                       <div className="flex items-center gap-3 animate-fade-in">
                         <p className="flex-1 rounded-input bg-primary/10 px-4 py-2 text-sm text-primary ring-1 ring-primary/50">
                           {streamError}
@@ -1068,42 +1187,10 @@ export default function Chat() {
                         )}
                       </div>
                     )}
-                    {!isTempMode && activeChatMeta?.is_archived ? (
-                      <div className="relative overflow-hidden rounded-2xl border border-amber-500/25 bg-surface/90 p-4 sm:p-5 shadow-[0_4px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all">
-                        {/* Ambient radial glow */}
-                        <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber-500/10 blur-2xl" />
-                        <div className="pointer-events-none absolute -left-10 -bottom-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
-
-                        <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-                          <div className="flex items-center gap-3.5 text-center sm:text-left">
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)]">
-                              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                              </svg>
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-semibold text-textPrimary tracking-tight">This conversation is archived</h4>
-                              <p className="text-xs text-textMuted mt-0.5 leading-relaxed">
-                                Messaging is disabled. Would you like to unarchive this chat to send messages?
-                              </p>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleToggleArchive(activeChatId!, true);
-                              setTimeout(() => messageInputRef.current?.focus(), 100);
-                            }}
-                            className="group relative inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-primary/50 bg-primary px-5 py-2.5 text-xs font-bold text-background shadow-[0_0_20px_rgba(217,255,0,0.25)] transition-all hover:bg-primaryHover hover:scale-[1.02] active:scale-[0.98]"
-                          >
-                            <svg className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
-                            </svg>
-                            <span>Unarchive Chat</span>
-                          </button>
-                        </div>
-                      </div>
+                    {isTempMode && !isAuthenticated && (isGuestLimitReached || tempMessages.length >= 30) ? (
+                      renderGuestLimitDock()
+                    ) : !isTempMode && activeChatMeta?.is_archived ? (
+                      renderArchivedDock()
                     ) : (
                       <MessageInput
                         inputRef={messageInputRef}
@@ -1142,7 +1229,7 @@ export default function Chat() {
                   className="w-full shrink-0 pt-1 pb-2 sm:pb-3"
                 >
                   <div className="mx-auto w-full max-w-4xl px-3 sm:px-6">
-                    {streamError && (
+                    {streamError && !(isTempMode && isGuestLimitReached) && (
                       <div className="mb-4 flex items-center gap-3 animate-fade-in">
                         <p className="flex-1 rounded-input bg-primary/10 px-4 py-2 text-sm text-primary ring-1 ring-primary/50">
                           {streamError}
@@ -1169,42 +1256,10 @@ export default function Chat() {
                         )}
                       </div>
                     )}
-                    {!isTempMode && activeChatMeta?.is_archived ? (
-                      <div className="relative overflow-hidden rounded-2xl border border-amber-500/25 bg-surface/90 p-4 sm:p-5 shadow-[0_4px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all">
-                        {/* Ambient radial glow */}
-                        <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber-500/10 blur-2xl" />
-                        <div className="pointer-events-none absolute -left-10 -bottom-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
-
-                        <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-                          <div className="flex items-center gap-3.5 text-center sm:text-left">
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)]">
-                              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                              </svg>
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-semibold text-textPrimary tracking-tight">This conversation is archived</h4>
-                              <p className="text-xs text-textMuted mt-0.5 leading-relaxed">
-                                Messaging is disabled. Would you like to unarchive this chat to send messages?
-                              </p>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleToggleArchive(activeChatId!, true);
-                              setTimeout(() => messageInputRef.current?.focus(), 100);
-                            }}
-                            className="group relative inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-primary/50 bg-primary px-5 py-2.5 text-xs font-bold text-background shadow-[0_0_20px_rgba(217,255,0,0.25)] transition-all hover:bg-primaryHover hover:scale-[1.02] active:scale-[0.98]"
-                          >
-                            <svg className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
-                            </svg>
-                            <span>Unarchive Chat</span>
-                          </button>
-                        </div>
-                      </div>
+                    {isTempMode && !isAuthenticated && (isGuestLimitReached || tempMessages.length >= 30) ? (
+                      renderGuestLimitDock()
+                    ) : !isTempMode && activeChatMeta?.is_archived ? (
+                      renderArchivedDock()
                     ) : (
                       <MessageInput
                         inputRef={messageInputRef}
