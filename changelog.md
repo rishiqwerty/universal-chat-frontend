@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Architecture and Maintenance Documentation**: Created `architecture.md` and added mandatory changelog and architecture maintenance rules in `rules.md`.
 
 ### Changed
+- **Google One Tap & In-Page Card Popup (`GoogleAuthButton.tsx`)**: Replaced browser window popups with Google Identity Services' native card popup overlay and auto One-Tap account prompt (`google.accounts.id.prompt()`), rendering the account chooser inside a seamless card prompt while retaining graceful fallback.
 - **Unified Clean Logo Styling**: Removed artificial neon shadow glow from `LogoMark` in `Login.tsx` and `SignupForm.tsx`, aligning logo size, border, typography, and hover animations with the sidebar brand header.
 - **Redesigned Confirm & Logout Dialog (`ConfirmModal.tsx`)**: Rebuilt the confirmation modal with a modern dark neon glassmorphism layout, featuring animated ambient radial halos, neon spark accents (`✦`), centered glowing hero badges, and cohesive neon action buttons for account logout and deletion.
 - **Production Domain Sitemap & Robots Sync**: Updated `scripts/prerender.js`, `public/sitemap.xml`, and `public/robots.txt` to default to `https://www.neurarch.in`, preventing Vercel build-time prerendering scripts from overwriting `sitemap.xml` with old deployment URLs.

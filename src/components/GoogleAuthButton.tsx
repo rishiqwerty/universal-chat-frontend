@@ -32,6 +32,7 @@ export default function GoogleAuthButton({
   const [isPressed, setIsPressed] = useState(false);
   const [cursorPos, setCursorPos] = useState({ x: 100, y: 20 });
   const callbackRef = useRef<{ onSuccess: typeof onSuccess; onError: typeof onError }>({ onSuccess, onError });
+  const gsiContainerRef = useRef<HTMLDivElement>(null);
 
   // Keep callback ref current
   callbackRef.current = { onSuccess, onError };
@@ -57,7 +58,7 @@ export default function GoogleAuthButton({
     document.body.appendChild(script);
   }, [clientId]);
 
-  // Initialize GSI (for the credential callback), but do NOT render a button overlay
+  // Initialize GSI and render Google native card button overlay
   useEffect(() => {
     if (!scriptLoaded || !clientId || !window.google?.accounts?.id) return;
 
@@ -65,32 +66,58 @@ export default function GoogleAuthButton({
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: (response: any) => {
+          setIsAuthorizing(false);
           if (response.credential) {
             callbackRef.current.onSuccess(response.credential);
           } else {
             callbackRef.current.onError("Google Sign-In credential not received");
           }
         },
+        auto_select: false,
+        cancel_on_tap_outside: true,
+        itp_support: true,
       });
+
+      // Display Google One Tap card prompt on screen
+      try {
+        window.google.accounts.id.prompt();
+      } catch {
+        // Prompt ignore
+      }
+
+      // Render Google's native button as an invisible overlay on top of our custom 3D glass button
+      if (gsiContainerRef.current) {
+        gsiContainerRef.current.innerHTML = "";
+        window.google.accounts.id.renderButton(gsiContainerRef.current, {
+          type: "standard",
+          theme: "outline",
+          size: "large",
+          width: gsiContainerRef.current.offsetWidth || 380,
+          text: "continue_with",
+          shape: "rectangular",
+          logo_alignment: "left",
+        });
+      }
     } catch (err: any) {
       console.error("Google Auth initialization error:", err);
     }
   }, [scriptLoaded, clientId]);
 
-  // Primary click handler: open Google OAuth popup directly from our origin
-  const handleClick = useCallback(() => {
+  // Fallback click handler if GSI overlay is blocked or not available
+  const handleFallbackClick = useCallback(() => {
     if (!clientId || disabled || loading || isAuthorizing) return;
 
-    setIsAuthorizing(true);
-
-    // Try GSI prompt first (if available and called from user gesture, it may work)
+    // Try GSI prompt first for card popup
     if (window.google?.accounts?.id?.prompt) {
       try {
         window.google.accounts.id.prompt();
+        return;
       } catch {
-        // GSI prompt failed, continue to direct popup
+        // Continue to OAuth popup fallback
       }
     }
+
+    setIsAuthorizing(true);
 
     // Direct OAuth popup fallback
     const nonce = crypto.randomUUID?.() || Math.random().toString(36).slice(2);
@@ -129,7 +156,6 @@ export default function GoogleAuthButton({
           setIsAuthorizing(false);
           return;
         }
-        // Check if popup has redirected back to our origin
         if (popup.location?.origin === window.location.origin) {
           const hash = popup.location.hash;
           popup.close();
@@ -150,11 +176,10 @@ export default function GoogleAuthButton({
           }
         }
       } catch {
-        // Cross-origin — popup still on Google's domain, keep polling
+        // Cross-origin polling
       }
     }, 400);
 
-    // Safety: stop polling after 5 minutes
     setTimeout(() => {
       clearInterval(pollTimer);
       setIsAuthorizing(false);
@@ -199,7 +224,7 @@ export default function GoogleAuthButton({
   return (
     <div
       className={`relative w-full overflow-hidden rounded-input select-none ${isBusy ? "cursor-wait opacity-90" : "cursor-pointer"}`}
-      onClick={handleClick}
+      onClick={handleFallbackClick}
       onMouseEnter={(e) => {
         if (isBusy) return;
         const rect = e.currentTarget.getBoundingClientRect();
@@ -221,9 +246,16 @@ export default function GoogleAuthButton({
       }}
       onMouseUp={() => setIsPressed(false)}
     >
+      {/* Invisible GSI Card Popup Overlay (activates Google's native in-page Card Picker when clicked) */}
+      <div
+        ref={gsiContainerRef}
+        className="absolute inset-0 z-20 flex items-center justify-center opacity-0 cursor-pointer overflow-hidden [&_iframe]:!w-full [&_iframe]:!h-full [&_iframe]:!cursor-pointer"
+        aria-hidden="true"
+      />
+
       {/* Visual Custom 3D Glass Button */}
       <div
-        className={`relative flex h-11 w-full items-center justify-center gap-3 rounded-input border border-black/20 bg-gradient-to-b from-[#e5ff33] via-primary to-[#b8da00] px-4 text-sm font-black text-background transition-all duration-200 ease-out ${
+        className={`relative z-10 flex h-11 w-full items-center justify-center gap-3 rounded-input border border-black/20 bg-gradient-to-b from-[#e5ff33] via-primary to-[#b8da00] px-4 text-sm font-black text-background transition-all duration-200 ease-out ${
           isPressed
             ? "scale-[0.96] shadow-[inset_0_2px_4px_rgba(0,0,0,0.35)]"
             : isHovered && !isBusy
