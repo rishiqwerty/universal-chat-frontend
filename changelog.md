@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Architecture and Maintenance Documentation**: Created `architecture.md` and added mandatory changelog and architecture maintenance rules in `rules.md`.
 
 ### Changed
+- **Production Domain Sitemap & Robots Sync**: Updated `scripts/prerender.js`, `public/sitemap.xml`, and `public/robots.txt` to default to `https://www.neurarch.in`, preventing Vercel build-time prerendering scripts from overwriting `sitemap.xml` with old deployment URLs.
 - **Continuous Alpha Mask Dissolve & Floating Input**: Replaced artificial backdrop-blur overlays with native CSS `maskImage` gradient fading in `ChatWindow.tsx`, removing harsh blur boundary lines and allowing chat messages to dissolve seamlessly into 0% opacity as they scroll toward the top bar and floating message input.
 - **Mobile-First Code Runner Header Layout**: Redesigned `CodeRunnerModal.tsx` header with a 2-tier responsive layout on mobile, keeping the close button (`✕`) and restart button prominently pinned on the top right while moving the Preview/Console/Code tabs into a full-width touch-friendly segmented pill bar.
 - **Mobile Refuel Modal Redesign**: Redesigned `TopupModal.tsx` with a modern dark glassmorphism card, touch-friendly top-right close (`✕`) button, and responsive layout.
