@@ -229,7 +229,7 @@ export default function Topbar({
       : "#D9FF00";
 
   return (
-    <header className="flex h-[60px] shrink-0 items-center gap-4 border-b border-border/30 bg-background px-6">
+    <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center gap-4 bg-background/70 backdrop-blur-xl px-4 sm:px-6 shadow-sm shadow-black/10 transition-all">
       {showHamburger && (
         <button
           onClick={() => window.dispatchEvent(new Event("sidebar-toggle"))}

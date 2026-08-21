@@ -929,9 +929,9 @@ export default function Chat() {
                 <motion.div
                   layoutId="chat-input-container"
                   transition={{ type: "spring", stiffness: 260, damping: 30 }}
-                  className="w-full"
+                  className="w-full shrink-0 pt-1 pb-2 sm:pb-3"
                 >
-                  <div className="mx-auto w-full max-w-4xl px-3 pb-3 pt-1 sm:px-6 sm:pb-4">
+                  <div className="mx-auto w-full max-w-4xl px-3 sm:px-6">
                     <MessageInput
                       inputRef={messageInputRef}
                       value={draft}
@@ -1048,9 +1048,9 @@ export default function Chat() {
                 <motion.div
                   layoutId="chat-input-container"
                   transition={{ type: "spring", stiffness: 260, damping: 30 }}
-                  className="w-full"
+                  className="w-full shrink-0 pt-1 pb-2 sm:pb-3"
                 >
-                  <div className="mx-auto w-full max-w-4xl px-3 pb-3 pt-1 sm:px-6 sm:pb-4">
+                  <div className="mx-auto w-full max-w-4xl px-3 sm:px-6">
                     {streamError && (
                       <div className="mb-4 flex items-center gap-3 animate-fade-in">
                         <p className="flex-1 rounded-input bg-primary/10 px-4 py-2 text-sm text-primary ring-1 ring-primary/50">

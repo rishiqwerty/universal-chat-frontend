@@ -91,7 +91,11 @@ export default function ChatWindow({ messages, onDeleteMessage }: ChatWindowProp
       <div 
         ref={scrollRef}
         onScroll={handleScroll}
-        className="h-full overflow-y-auto px-3 py-3 sm:px-6 sm:py-6 custom-scrollbar"
+        style={{
+          maskImage: "linear-gradient(to bottom, transparent 0%, black 24px, black calc(100% - 20px), transparent 100%)",
+          WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 24px, black calc(100% - 20px), transparent 100%)",
+        }}
+        className="h-full overflow-y-auto px-3 py-2 sm:px-6 sm:py-4 custom-scrollbar"
       >
         <div className="mx-auto flex min-h-full max-w-4xl flex-col justify-end gap-3.5 sm:gap-6 pb-2">
           {messages.map((m) => (
