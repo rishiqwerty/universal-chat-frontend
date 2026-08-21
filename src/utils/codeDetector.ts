@@ -39,24 +39,29 @@ export function buildPythonRunnerHtml(pythonCode: string): string {
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <style>
     * { box-sizing: border-box; }
-    body {
+    html, body {
+      height: 100%;
       margin: 0;
-      padding: 16px;
+      padding: 12px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       background-color: #0d0d0e;
       color: #f3f4f6;
       font-size: 13px;
       line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
     .py-header {
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 14px;
-      padding-bottom: 10px;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
     .py-badge {
@@ -74,12 +79,12 @@ export function buildPythonRunnerHtml(pythonCode: string): string {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     .py-terminal {
+      flex: 1;
       background: #09090b;
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 8px;
-      padding: 14px;
-      min-height: 220px;
-      max-height: 72vh;
+      padding: 12px;
+      min-height: 0;
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-word;
@@ -192,7 +197,14 @@ export function buildPythonRunnerHtml(pythonCode: string): string {
           term.appendChild(inputWrapper);
           term.scrollTop = term.scrollHeight;
 
-          setTimeout(() => inputEl.focus(), 25);
+          setTimeout(() => {
+            try {
+              inputEl.focus({ preventScroll: true });
+            } catch(e) {
+              inputEl.focus();
+            }
+            term.scrollTop = term.scrollHeight;
+          }, 25);
 
           const handleKeyDown = (e) => {
             if (e.key === "Enter") {

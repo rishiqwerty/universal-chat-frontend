@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Top Brand Logo**: Added a refined 4-point neon spark accent to the `LogoMark` in `Sidebar.tsx`, `WelcomeScreen.tsx`, `Login.tsx`, and `SignupForm.tsx`.
 
 ### Fixed
+- **Mobile Code Runner Virtual Keyboard Adaptation**: Fixed modal header and controls being pushed off-screen when the mobile keyboard opens by integrating `window.visualViewport` dynamic height tracking, `sticky top-0` header pinning in `CodeRunnerModal.tsx`, and `preventScroll: true` input focus handling in `codeDetector.ts`.
 - **Comprehensive AST Async Transformer for In-Terminal Input**: Updated `codeDetector.ts` with `_FullAsyncRewriter` which rewrites both function definitions (`def get_number()`, `def main()`) and calls into async structures, allowing nested functions to resolve in-terminal interactive console inputs without `TypeError: float() argument must be a string or a real number, not 'coroutine'` or unawaited coroutine warnings.
 - **Code Runner & Copy Text Extraction**: Fixed `[object Object]` syntax error caused by stringifying React Markdown AST nodes by implementing recursive `extractTextContent` in `MessageBubble.tsx`.
 - **Thinking Animation & Stop Generation Cleanup**: Corrected `isComplete` evaluation in `MessageBubble.tsx` and `Chat.tsx` so the 3-dot bouncing animation reliably displays while awaiting AI stream responses, and cleanly vanishes with zero ghost artifacts when generation is finished or manually stopped.

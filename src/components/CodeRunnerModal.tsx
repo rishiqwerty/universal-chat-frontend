@@ -62,6 +62,29 @@ export default function CodeRunnerModal({ isOpen, onClose, codeHtml, langSummary
     }
   }, [isOpen, codeHtml]);
 
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+
+  // Track visual viewport dynamically when mobile keyboard opens/closes
+  useEffect(() => {
+    if (!isOpen) return;
+    const updateViewport = () => {
+      if (window.visualViewport) {
+        setViewportHeight(window.visualViewport.height);
+      } else {
+        setViewportHeight(window.innerHeight);
+      }
+    };
+    updateViewport();
+    window.visualViewport?.addEventListener("resize", updateViewport);
+    window.visualViewport?.addEventListener("scroll", updateViewport);
+    window.addEventListener("resize", updateViewport);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateViewport);
+      window.visualViewport?.removeEventListener("scroll", updateViewport);
+      window.removeEventListener("resize", updateViewport);
+    };
+  }, [isOpen]);
+
   const handleRefresh = () => {
     setLogs([]);
     setIframeKey((k) => k + 1);
@@ -119,32 +142,42 @@ export default function CodeRunnerModal({ isOpen, onClose, codeHtml, langSummary
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 md:p-6 backdrop-blur-md">
+      <div 
+        className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 p-0 sm:p-3 md:p-6 backdrop-blur-md overflow-hidden"
+        style={{
+          height: viewportHeight ? `${viewportHeight}px` : "100dvh",
+          maxHeight: viewportHeight ? `${viewportHeight}px` : "100dvh",
+        }}
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
           transition={{ duration: 0.25 }}
-          className="flex h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border/40 bg-sidebar shadow-2xl ring-1 ring-white/10"
+          style={{
+            maxHeight: viewportHeight ? `${viewportHeight}px` : "85vh",
+            height: viewportHeight && viewportHeight < 650 ? `${viewportHeight}px` : undefined,
+          }}
+          className="flex h-full sm:h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-none sm:rounded-2xl border-0 sm:border border-border/40 bg-sidebar shadow-2xl ring-0 sm:ring-1 sm:ring-white/10"
         >
-          {/* Header */}
-          <div className="flex shrink-0 items-center justify-between border-b border-border/30 bg-surface px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          {/* Header (Sticky at top, shrink-0 so it never scrolls off) */}
+          <div className="flex shrink-0 sticky top-0 z-30 items-center justify-between border-b border-border/30 bg-surface px-3 sm:px-4 py-2.5 sm:py-3">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <svg className="h-4 w-4 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polygon points="5 3 19 12 5 21 5 3" />
                 </svg>
               </div>
-              <div>
+              <div className="truncate">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-textPrimary">Live Code Sandbox</h3>
+                  <h3 className="text-xs sm:text-sm font-bold text-textPrimary truncate">Live Code Sandbox</h3>
                   {langSummary && (
-                    <span className="rounded-md bg-primary/15 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-primary ring-1 ring-primary/30">
+                    <span className="shrink-0 rounded-md bg-primary/15 px-1.5 sm:px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-primary ring-1 ring-primary/30">
                       {langSummary}
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-textMuted">
+                <p className="text-[10px] sm:text-[11px] text-textMuted truncate hidden xs:block">
                   {langSummary?.includes("Python")
                     ? "Executing Python client-side inside WebAssembly runtime"
                     : "Executing code directly inside isolated browser environment"}
