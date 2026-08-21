@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased] - 2026-08-21
 
 ### Added
+- **Live AI Provider & Per-Model Reachability Status**: Added `status`, `reachable`, `latency_ms`, and `reachable_models` to `ProviderModels`, implemented `fetchModelHealth()` in `src/api/api.ts`, and added live color-coded status indicator dots (green = operational, amber = degraded, red = offline) with latency tooltips for providers and individual model items in the model picker in `MessageInput.tsx`.
 - **Sandbox Safety & Resource Guardrails**: Added output buffer truncation (capped at 1,000 lines / 250 console logs) to prevent DOM memory leaks, log throttling in `CodeRunnerModal.tsx` to maintain 60fps UI, and global unhandled error listeners in `codeDetector.ts` to intercept malformed code gracefully.
 - **Client-Side Python WebAssembly Code Runner (Pyodide)**: Integrated Pyodide WebAssembly in `codeDetector.ts` and `MessageBubble.tsx`, allowing users to execute Python code blocks client-side in the browser with `stdout`, `stderr`, interactive in-terminal CLI input (`input()`), execution timers, and live output without requiring any browser popups or backend resources.
 - **Silent Background Server Wake-Up & Keep-Alive (`useSilentKeepAlive`)**: Added invisible tab-return wake-up and periodic background heartbeat in `App.tsx` alongside transparent Axios auto-retry on 502/503/504 errors in `api.ts`, keeping the free-tier backend ready with zero UI interruptions or sleep badges.

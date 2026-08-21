@@ -211,7 +211,30 @@ export type ProviderModels = {
   is_free?: boolean;
   text_models: string[];
   image_models?: string[];
+  status?: "online" | "degraded" | "offline";
+  reachable?: boolean;
+  latency_ms?: number;
+  reachable_models?: string[];
 };
+
+export type ModelHealthResponse = {
+  status: "operational" | "degraded" | "offline";
+  checked_at: string;
+  providers: Record<
+    string,
+    {
+      status: "online" | "degraded" | "offline";
+      reachable: boolean;
+      latency_ms: number;
+      error?: string;
+    }
+  >;
+};
+
+export async function fetchModelHealth(): Promise<ModelHealthResponse> {
+  const { data } = await client.get("/models/health");
+  return data;
+}
 
 export async function getAvailableModels(): Promise<ProviderModels[]> {
   const { data } = await client.get("/chat/models");
