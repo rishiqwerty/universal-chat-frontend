@@ -15,8 +15,8 @@ if (!fs.existsSync(TEMPLATE_PATH)) {
 
 const template = fs.readFileSync(TEMPLATE_PATH, 'utf-8');
 
-// Use process.env.SITE_URL (set in Vercel dashboard) or default to the current Vercel URL
-const SITE_URL = (process.env.SITE_URL || 'https://universal-chat-frontend.vercel.app').replace(/\/$/, '');
+// Use process.env.SITE_URL (set in Vercel dashboard) or default to the production domain
+const SITE_URL = (process.env.SITE_URL || 'https://www.neurarch.in').replace(/\/$/, '');
 
 console.log(`Configuring pre-rendering with Base URL: ${SITE_URL}`);
 
