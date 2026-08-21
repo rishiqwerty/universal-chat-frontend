@@ -5,6 +5,9 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   user: UserProfile | null;
   loadingUser: boolean;
+  isAuthenticating: boolean;
+  authStatusMessage: string;
+  setAuthenticating: (authenticating: boolean, message?: string) => void;
   login: (token: string) => void;
   logout: () => void;
   refreshProfile: () => Promise<UserProfile | null>;
@@ -69,6 +72,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [loadingUser, setLoadingUser] = useState(false);
 
+  // Synchronously detect OAuth hash on initial load to eliminate temp-mode flicker
+  const [isAuthenticating, setIsAuthenticating] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const hash = window.location.hash;
+    return !!(hash && (hash.includes("id_token=") || hash.includes("access_token=")));
+  });
+  const [authStatusMessage, setAuthStatusMessage] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const hash = window.location.hash;
+    return hash && (hash.includes("id_token=") || hash.includes("access_token="))
+      ? "Authenticating with Google..."
+      : "";
+  });
+
+  const setAuthenticating = useCallback((authenticating: boolean, message?: string) => {
+    setIsAuthenticating(authenticating);
+    if (message !== undefined) {
+      setAuthStatusMessage(message);
+    }
+  }, []);
+
   const refreshProfile = useCallback(async (): Promise<UserProfile | null> => {
     if (!localStorage.getItem("access_token")) {
       setUser(null);
@@ -121,6 +145,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     wipeUserState();
     setIsAuthenticated(false);
     setUser(null);
+    setIsAuthenticating(false);
+    setAuthStatusMessage("");
   }, []);
 
   // Fetch profile on initial load if authenticated
@@ -137,6 +163,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return;
     const hash = window.location.hash;
     if (hash && (hash.includes("id_token=") || hash.includes("access_token="))) {
+      setIsAuthenticating(true);
+      setAuthStatusMessage("Authenticating with Google...");
+
+      const t1 = setTimeout(() => {
+        setAuthStatusMessage("Establishing secure neural session...");
+      }, 2200);
+      const t2 = setTimeout(() => {
+        setAuthStatusMessage("Setting up your workspace...");
+      }, 5500);
+
       try {
         const cleanHash = hash.startsWith("#") ? hash.substring(1) : hash;
         const params = new URLSearchParams(cleanHash);
@@ -145,18 +181,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
           googleLoginAccount(idToken)
             .then((token) => {
+              setAuthStatusMessage("Success! Loading workspace...");
               login(token);
-              if (window.location.pathname === "/login" || window.location.pathname === "/signup") {
-                window.location.href = "/";
-              }
+              setTimeout(() => {
+                setIsAuthenticating(false);
+                setAuthStatusMessage("");
+                if (window.location.pathname === "/login" || window.location.pathname === "/signup") {
+                  window.location.href = "/";
+                }
+              }, 400);
             })
             .catch((err) => {
               console.error("Global Google login error:", err);
+              setIsAuthenticating(false);
+              setAuthStatusMessage("");
             });
+        } else {
+          setIsAuthenticating(false);
+          setAuthStatusMessage("");
         }
       } catch (err) {
         console.error("Failed to parse OAuth redirect hash:", err);
+        setIsAuthenticating(false);
+        setAuthStatusMessage("");
       }
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
     }
   }, [login]);
 
@@ -166,6 +219,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       wipeUserState();
       setIsAuthenticated(false);
       setUser(null);
+      setIsAuthenticating(false);
+      setAuthStatusMessage("");
     };
     window.addEventListener("app:force-logout", handler);
     return () => window.removeEventListener("app:force-logout", handler);
@@ -176,13 +231,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated,
       user,
       loadingUser,
+      isAuthenticating,
+      authStatusMessage,
+      setAuthenticating,
       login,
       logout,
       refreshProfile,
       updateProfile,
       uploadAvatar,
     }),
-    [isAuthenticated, user, loadingUser, login, logout, refreshProfile, updateProfile, uploadAvatar]
+    [
+      isAuthenticated,
+      user,
+      loadingUser,
+      isAuthenticating,
+      authStatusMessage,
+      setAuthenticating,
+      login,
+      logout,
+      refreshProfile,
+      updateProfile,
+      uploadAvatar,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

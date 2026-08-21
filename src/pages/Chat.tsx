@@ -43,7 +43,7 @@ export default function Chat() {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isAuthenticating } = useAuth();
 
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
@@ -948,6 +948,10 @@ export default function Chat() {
 
   const displayedMessages = isTempMode ? tempMessages : messages;
   const isEmpty = displayedMessages.length === 0;
+
+  if (isAuthenticating) {
+    return null;
+  }
 
   return (
     <PageTransition>
