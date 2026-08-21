@@ -19,12 +19,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Architecture and Maintenance Documentation**: Created `architecture.md` and added mandatory changelog and architecture maintenance rules in `rules.md`.
 
 ### Changed
+- **Continuous Alpha Mask Dissolve & Floating Input**: Replaced artificial backdrop-blur overlays with native CSS `maskImage` gradient fading in `ChatWindow.tsx`, removing harsh blur boundary lines and allowing chat messages to dissolve seamlessly into 0% opacity as they scroll toward the top bar and floating message input.
+- **Mobile-First Code Runner Header Layout**: Redesigned `CodeRunnerModal.tsx` header with a 2-tier responsive layout on mobile, keeping the close button (`✕`) and restart button prominently pinned on the top right while moving the Preview/Console/Code tabs into a full-width touch-friendly segmented pill bar.
 - **Mobile Refuel Modal Redesign**: Redesigned `TopupModal.tsx` with a modern dark glassmorphism card, touch-friendly top-right close (`✕`) button, and responsive layout.
 - **Unified Unauthenticated CTA**: Replaced "Join / Sign In" button with a rounded-full neon **"Join"** pill in `Topbar.tsx` and removed the redundant "Guest Mode" toggle for unauthenticated users.
 - **Top Brand Logo**: Added a refined 4-point neon spark accent to the `LogoMark` in `Sidebar.tsx`, `WelcomeScreen.tsx`, `Login.tsx`, and `SignupForm.tsx`.
 
 ### Fixed
-- **Mobile Code Runner Virtual Keyboard Adaptation**: Fixed modal header and controls being pushed off-screen when the mobile keyboard opens by integrating `window.visualViewport` dynamic height tracking, `sticky top-0` header pinning in `CodeRunnerModal.tsx`, and `preventScroll: true` input focus handling in `codeDetector.ts`.
+- **Mobile Code Runner Visual Viewport Anchoring**: Fixed modal header disappearing when typing on mobile keyboards by dynamically pinning the modal container overlay directly to `visualViewport.offsetTop` and `visualViewport.height` in `CodeRunnerModal.tsx`, locking document body scroll, and enforcing `window.scrollTo(0,0)` scroll guards inside `codeDetector.ts`.
 - **Comprehensive AST Async Transformer for In-Terminal Input**: Updated `codeDetector.ts` with `_FullAsyncRewriter` which rewrites both function definitions (`def get_number()`, `def main()`) and calls into async structures, allowing nested functions to resolve in-terminal interactive console inputs without `TypeError: float() argument must be a string or a real number, not 'coroutine'` or unawaited coroutine warnings.
 - **Code Runner & Copy Text Extraction**: Fixed `[object Object]` syntax error caused by stringifying React Markdown AST nodes by implementing recursive `extractTextContent` in `MessageBubble.tsx`.
 - **Thinking Animation & Stop Generation Cleanup**: Corrected `isComplete` evaluation in `MessageBubble.tsx` and `Chat.tsx` so the 3-dot bouncing animation reliably displays while awaiting AI stream responses, and cleanly vanishes with zero ghost artifacts when generation is finished or manually stopped.

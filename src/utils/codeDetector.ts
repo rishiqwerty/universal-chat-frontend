@@ -62,7 +62,8 @@ export function buildPythonRunnerHtml(pythonCode: string): string {
       justify-content: space-between;
       margin-bottom: 8px;
       padding-bottom: 8px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
     }
     .py-badge {
       display: inline-flex;
@@ -197,13 +198,21 @@ export function buildPythonRunnerHtml(pythonCode: string): string {
           term.appendChild(inputWrapper);
           term.scrollTop = term.scrollHeight;
 
+          const lockScroll = () => {
+            window.scrollTo(0, 0);
+            term.scrollTop = term.scrollHeight;
+          };
+
+          inputEl.addEventListener("focus", lockScroll);
+          inputEl.addEventListener("click", lockScroll);
+
           setTimeout(() => {
             try {
               inputEl.focus({ preventScroll: true });
             } catch(e) {
               inputEl.focus();
             }
-            term.scrollTop = term.scrollHeight;
+            lockScroll();
           }, 25);
 
           const handleKeyDown = (e) => {
@@ -219,6 +228,12 @@ export function buildPythonRunnerHtml(pythonCode: string): string {
           inputEl.addEventListener("keydown", handleKeyDown);
         });
       };
+
+      window.addEventListener("scroll", function() {
+        if (window.scrollY !== 0 || window.scrollX !== 0) {
+          window.scrollTo(0, 0);
+        }
+      });
 
       async function run() {
         const start = performance.now();

@@ -280,7 +280,7 @@ export default function MessageInput({
   };
 
   return (
-    <div className="border-t border-border/30 bg-background px-2.5 py-1.5 sm:px-4 sm:py-2.5">
+    <div className="w-full">
       <div className="mx-auto flex max-w-4xl flex-col gap-1.5 relative">
         <motion.div
           ref={containerRef}
