@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { loginAccount, googleLoginAccount, requestOtpApi, verifyOtpApi, clearChatCache } from "../api/api";
 import PageTransition from "../components/PageTransition";
@@ -65,6 +65,20 @@ export default function Login() {
       clearTimeout(t3);
     };
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash;
+    if (hash && (hash.includes("id_token=") || hash.includes("access_token="))) {
+      const cleanHash = hash.startsWith("#") ? hash.substring(1) : hash;
+      const params = new URLSearchParams(cleanHash);
+      const idToken = params.get("id_token");
+      if (idToken) {
+        window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+        handleGoogleSuccess(idToken);
+      }
+    }
+  }, []);
 
   async function handleGoogleSuccess(credential: string) {
     setLoading(true);
