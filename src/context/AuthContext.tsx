@@ -14,6 +14,44 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function wipeUserState() {
+  const preserveKeys = ["accent-color", "sidebar_collapsed", "hasSeenMcpNotification"];
+  const preserved: Record<string, string | null> = {};
+  preserveKeys.forEach((key) => {
+    try {
+      preserved[key] = localStorage.getItem(key);
+    } catch {
+      /* ignore */
+    }
+  });
+
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+  } catch {
+    /* ignore */
+  }
+
+  preserveKeys.forEach((key) => {
+    if (preserved[key] !== null) {
+      try {
+        localStorage.setItem(key, preserved[key]!);
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+
+  clearChatCache();
+  try {
+    window.dispatchEvent(new Event("app:user-logged-out"));
+    window.dispatchEvent(new Event("chat:reset"));
+    window.dispatchEvent(new Event("balance-update"));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(
     () => localStorage.getItem("isAuthenticated") === "true"
@@ -65,22 +103,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback((token: string) => {
+    wipeUserState();
     localStorage.setItem("access_token", token);
     localStorage.setItem("isAuthenticated", "true");
     setIsAuthenticated(true);
-    // Fetch profile immediately on login
     getUserProfile()
       .then((profile) => {
         setUser(profile);
         localStorage.setItem("user_profile", JSON.stringify(profile));
       })
-      .catch(() => {});
+      .catch(() => {
+        setUser(null);
+      });
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("isAuthenticated");
-    localStorage.removeItem("user_profile");
+    wipeUserState();
     setIsAuthenticated(false);
     setUser(null);
   }, []);
@@ -89,6 +127,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isAuthenticated) {
       refreshProfile();
+    } else {
+      setUser(null);
     }
   }, [isAuthenticated, refreshProfile]);
 
@@ -105,8 +145,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
           googleLoginAccount(idToken)
             .then((token) => {
-              localStorage.clear();
-              clearChatCache();
               login(token);
               if (window.location.pathname === "/login" || window.location.pathname === "/signup") {
                 window.location.href = "/";
@@ -125,9 +163,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Listen for imperative logout events fired from outside React (e.g. axios interceptor)
   useEffect(() => {
     const handler = () => {
+      wipeUserState();
       setIsAuthenticated(false);
       setUser(null);
-      localStorage.removeItem("user_profile");
     };
     window.addEventListener("app:force-logout", handler);
     return () => window.removeEventListener("app:force-logout", handler);

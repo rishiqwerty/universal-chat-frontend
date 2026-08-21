@@ -6,6 +6,7 @@ import Topbar from "../components/Topbar";
 import ConfirmModal from "../components/ConfirmModal";
 import PageTransition from "../components/PageTransition";
 import { useDocumentSEO } from "../hooks/useDocumentSEO";
+import { useAuth } from "../context/AuthContext";
 import { 
   getStudioGallery, 
   deleteStudioImage, 
@@ -25,6 +26,7 @@ export default function Library() {
   });
 
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
   const mainScrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -46,6 +48,11 @@ export default function Library() {
   const [imageToDelete, setImageToDelete] = useState<GeneratedImage | null>(null);
 
   const fetchGallery = useCallback(() => {
+    if (!isAuthenticated) {
+      setImages([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     getStudioGallery(300, 0)
       .then((data) => {
@@ -56,11 +63,25 @@ export default function Library() {
       })
       .catch((err) => console.error("Failed to load image library", err))
       .finally(() => setLoading(false));
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    const handleLogout = () => {
+      setImages([]);
+      setLightboxImage(null);
+    };
+    window.addEventListener("app:user-logged-out", handleLogout);
+    return () => window.removeEventListener("app:user-logged-out", handleLogout);
   }, []);
 
   useEffect(() => {
-    fetchGallery();
-  }, [fetchGallery]);
+    if (isAuthenticated) {
+      fetchGallery();
+    } else {
+      setImages([]);
+      setLoading(false);
+    }
+  }, [isAuthenticated, user?.id, fetchGallery]);
 
   // Extract unique providers for filter
   const availableProviders = useMemo(() => {

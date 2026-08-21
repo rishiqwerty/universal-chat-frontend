@@ -194,6 +194,17 @@ export default function Topbar({
   }, [fetchBalance]);
 
   useEffect(() => {
+    const handleLogout = () => {
+      setCredits(0);
+      setShowProfileMenu(false);
+      setShowChatActionsMenu(false);
+      setShowLogoutConfirm(false);
+    };
+    window.addEventListener("app:user-logged-out", handleLogout);
+    return () => window.removeEventListener("app:user-logged-out", handleLogout);
+  }, []);
+
+  useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
         setShowProfileMenu(false);

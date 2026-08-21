@@ -19,7 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Training Purpose Disclaimer**: Added AI model training and data usage disclaimer under the input field on the initial empty chat screen in `MessageInput.tsx` and `Chat.tsx`.
 - **Architecture and Maintenance Documentation**: Created `architecture.md` and added mandatory changelog and architecture maintenance rules in `rules.md`.
 
-### Changed
+### Added
+- **Archived Conversation Input Lock & Unarchive Prompt**: Disabled message input for archived conversations and replaced the input area with a dark glassmorphism action dock (`Chat.tsx`) prompting the user to unarchive the conversation to resume sending messages.
+- **Archived Chat Confirmation Dialog**: Added a dedicated confirmation modal with a custom glowing archive box hero icon (`ConfirmModal.tsx`) when archiving conversations from either `Topbar.tsx` or `Sidebar.tsx`, preventing accidental archiving while keeping unarchiving instantaneous.
 - **Google One Tap & In-Page Card Popup (`GoogleAuthButton.tsx`)**: Replaced browser window popups with Google Identity Services' native card popup overlay and auto One-Tap account prompt (`google.accounts.id.prompt()`), rendering the account chooser inside a seamless card prompt while retaining graceful fallback.
 - **Unified Clean Logo Styling**: Removed artificial neon shadow glow from `LogoMark` in `Login.tsx` and `SignupForm.tsx`, aligning logo size, border, typography, and hover animations with the sidebar brand header.
 - **Redesigned Confirm & Logout Dialog (`ConfirmModal.tsx`)**: Rebuilt the confirmation modal with a modern dark neon glassmorphism layout, featuring animated ambient radial halos, neon spark accents (`✦`), centered glowing hero badges, and cohesive neon action buttons for account logout and deletion.
@@ -31,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Top Brand Logo**: Added a refined 4-point neon spark accent to the `LogoMark` in `Sidebar.tsx`, `WelcomeScreen.tsx`, `Login.tsx`, and `SignupForm.tsx`.
 
 ### Fixed
+- **Complete User State & Cache Wipe on Logout/Switch**: Implemented `wipeUserState()` in `AuthContext.tsx` and attached `app:user-logged-out` listeners across `Chat.tsx`, `Library.tsx`, `ImageStudio.tsx`, and `Topbar.tsx`. All cached messages, conversation lists, active chat IDs, image galleries, and credit balances are cleanly wiped from React state, `localStorage`, `sessionStorage`, and memory caches when logging out or switching accounts.
 - **Google OAuth Redirect URI Alignment**: Fixed `Error 400: redirect_uri_mismatch` by standardizing the OAuth `redirect_uri` to `window.location.origin` (matching Google Cloud Console authorized origins/URIs) and adding a global `#id_token` listener in `AuthContext.tsx` for seamless returns across all routes.
 - **Mobile Google Sign-In & Direct Redirect OAuth Flow**: Fixed mobile Google login failure caused by transparent iframe touch interception and mobile popup blockers. Integrated responsive device detection in `GoogleAuthButton.tsx`, enabling direct tab OAuth redirection on mobile devices and automatic `#id_token` extraction on return across `Login.tsx` and `SignupForm.tsx`.
 - **Modal Viewport & Header Stacking Context (`createPortal`)**: Integrated `createPortal(..., document.body)` across `ConfirmModal.tsx`, `TopupModal.tsx`, and `SignupModal.tsx`, preventing fixed-position modal backdrops and dialog cards from being trapped inside `<header>` backdrop-blur stacking contexts which was causing half the screen to black out or clip.

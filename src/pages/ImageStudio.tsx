@@ -23,6 +23,7 @@ import {
   type StudioPreset,
 } from "../api/api";
 import { useDocumentSEO } from "../hooks/useDocumentSEO";
+import { useAuth } from "../context/AuthContext";
 
 const ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3"];
 
@@ -32,6 +33,7 @@ export default function ImageStudio() {
     description: "Generate high-fidelity artistic renders and presets using neural models.",
   });
 
+  const { isAuthenticated, user } = useAuth();
   const [models, setModels] = useState<StudioModels>({});
   const [selectedProvider, setSelectedProvider] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
@@ -211,8 +213,25 @@ export default function ImageStudio() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleLogout = () => {
+      setGallery([]);
+      setLightboxImage(null);
+      pollingRef.current.clear();
+    };
+    window.addEventListener("app:user-logged-out", handleLogout);
+    return () => window.removeEventListener("app:user-logged-out", handleLogout);
+  }, []);
+
   // Fetch gallery
   useEffect(() => {
+    if (!isAuthenticated) {
+      setGallery([]);
+      setLoadingGallery(false);
+      return;
+    }
+
+    setLoadingGallery(true);
     getStudioGallery()
       .then((images) => {
         setGallery(images);
@@ -225,7 +244,7 @@ export default function ImageStudio() {
       })
       .catch(() => { })
       .finally(() => setLoadingGallery(false));
-  }, [pollForCompletion]);
+  }, [isAuthenticated, user?.id, pollForCompletion]);
 
   // Update model when provider changes
   const handleProviderChange = (provider: string) => {

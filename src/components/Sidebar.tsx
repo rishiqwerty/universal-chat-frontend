@@ -10,6 +10,7 @@ import {
   type Conversation 
 } from "../api/api";
 import HelpModal from "./HelpModal";
+import ConfirmModal from "./ConfirmModal";
 
 export type NavKey = "chat" | "studio" | "library" | "models" | "settings";
 export type ChatFilterMode = "all" | "starred" | "archived";
@@ -119,6 +120,10 @@ export default function Sidebar({
   const [showAllStarred, setShowAllStarred] = useState(false);
   const [showAllRecent, setShowAllRecent] = useState(false);
 
+  // Standalone archive modal state
+  const [isInternalArchiveModalOpen, setIsInternalArchiveModalOpen] = useState(false);
+  const [internalArchiveChatId, setInternalArchiveChatId] = useState<string | null>(null);
+
   const [isOpen, setIsOpen] = useState(() => {
     const isMobile = window.innerWidth < 768;
     if (isMobile) return false;
@@ -226,18 +231,37 @@ export default function Sidebar({
       onToggleArchive(chatId, currentlyArchived);
       return;
     }
+    if (currentlyArchived) {
+      setInternalAllChats((prev) =>
+        prev.map((c) => (c.id === chatId ? { ...c, is_archived: false } : c))
+      );
+      try {
+        await unarchiveConversation(chatId);
+      } catch (err) {
+        console.error("Failed to unarchive", err);
+        loadAllChats();
+      }
+      return;
+    }
+
+    setInternalArchiveChatId(chatId);
+    setIsInternalArchiveModalOpen(true);
+  };
+
+  const handleConfirmInternalArchive = async () => {
+    if (!internalArchiveChatId) return;
+    const targetId = internalArchiveChatId;
     setInternalAllChats((prev) =>
-      prev.map((c) => (c.id === chatId ? { ...c, is_archived: !currentlyArchived } : c))
+      prev.map((c) => (c.id === targetId ? { ...c, is_archived: true } : c))
     );
     try {
-      if (currentlyArchived) {
-        await unarchiveConversation(chatId);
-      } else {
-        await archiveConversation(chatId);
-      }
+      await archiveConversation(targetId);
     } catch (err) {
-      console.error("Failed to toggle archive", err);
+      console.error("Failed to archive", err);
       loadAllChats();
+    } finally {
+      setInternalArchiveChatId(null);
+      setIsInternalArchiveModalOpen(false);
     }
   };
 
@@ -769,6 +793,19 @@ export default function Sidebar({
       <HelpModal 
         isOpen={isHelpModalOpen} 
         onClose={() => setIsHelpModalOpen(false)} 
+      />
+
+      <ConfirmModal
+        isOpen={isInternalArchiveModalOpen}
+        onClose={() => {
+          setIsInternalArchiveModalOpen(false);
+          setInternalArchiveChatId(null);
+        }}
+        onConfirm={handleConfirmInternalArchive}
+        title="Archive Conversation"
+        message="Are you sure you want to archive this conversation? It will be moved to your Archived Chats filter and hidden from your active list."
+        confirmText="Archive"
+        confirmVariant="primary"
       />
     </>
   );

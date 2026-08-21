@@ -24,6 +24,7 @@ export default function ConfirmModal({
 }: ConfirmModalProps) {
   const isLogout = title.toLowerCase().includes("log out") || title.toLowerCase().includes("logout") || title.toLowerCase().includes("sign out");
   const isDelete = title.toLowerCase().includes("delete") || title.toLowerCase().includes("remove") || title.toLowerCase().includes("cancel");
+  const isArchive = title.toLowerCase().includes("archive");
 
   if (typeof document === "undefined") return null;
 
@@ -52,7 +53,7 @@ export default function ConfirmModal({
             {/* Ambient Background Glow */}
             <div
               className={`pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2 h-36 w-56 rounded-full blur-3xl ${
-                isLogout
+                isLogout || isArchive
                   ? "bg-primary/15"
                   : isDelete
                   ? "bg-rose-500/15"
@@ -86,7 +87,7 @@ export default function ConfirmModal({
                   ease: "easeInOut",
                 }}
                 className={`absolute inset-0 rounded-2xl blur-xl pointer-events-none ${
-                  isLogout
+                  isLogout || isArchive
                     ? "bg-primary/25"
                     : isDelete
                     ? "bg-rose-500/25"
@@ -96,7 +97,7 @@ export default function ConfirmModal({
 
               {/* Spark Accent */}
               <span className={`absolute -top-1 right-0 text-[10px] select-none pointer-events-none ${
-                isLogout ? "text-primary" : isDelete ? "text-rose-400" : "text-primary"
+                isLogout || isArchive ? "text-primary" : isDelete ? "text-rose-400" : "text-primary"
               }`}>
                 ✦
               </span>
@@ -104,7 +105,7 @@ export default function ConfirmModal({
               {/* Icon Container */}
               <div
                 className={`flex h-12 w-12 items-center justify-center rounded-2xl border shadow-lg ${
-                  isLogout
+                  isLogout || isArchive
                     ? "border-primary/30 bg-primary/10 text-primary shadow-[0_0_20px_rgba(217,255,0,0.12)]"
                     : isDelete
                     ? "border-rose-500/30 bg-rose-500/10 text-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.15)]"
@@ -114,6 +115,10 @@ export default function ConfirmModal({
                 {isLogout ? (
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                  </svg>
+                ) : isArchive ? (
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                   </svg>
                 ) : isDelete ? (
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

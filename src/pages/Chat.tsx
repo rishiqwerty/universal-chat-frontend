@@ -43,7 +43,7 @@ export default function Chat() {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
@@ -76,6 +76,8 @@ export default function Chat() {
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [chatIdToDelete, setChatIdToDelete] = useState<string | null>(null);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [chatIdToArchive, setChatIdToArchive] = useState<string | null>(null);
   const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
   const [showUpgradeFlyer, setShowUpgradeFlyer] = useState(false);
   const [showMcpNotification, setShowMcpNotification] = useState(false);
@@ -123,6 +125,29 @@ export default function Chat() {
       cancelActiveStream();
       setTempMessages([]);
       setDraft("");
+    };
+  }, [cancelActiveStream]);
+
+  // Clean up all conversation and message states when user logs out or resets
+  useEffect(() => {
+    const handleReset = () => {
+      cancelActiveStream();
+      setActiveChatId(null);
+      setActiveChatTitle("Untitled Chat");
+      setActiveChatMeta(null);
+      setMessages([]);
+      setTempMessages([]);
+      setRecentChats([]);
+      setDraft("");
+      setStreamError(null);
+      setIsTempMode(true);
+      loadedChatIdRef.current = null;
+    };
+    window.addEventListener("app:user-logged-out", handleReset);
+    window.addEventListener("chat:reset", handleReset);
+    return () => {
+      window.removeEventListener("app:user-logged-out", handleReset);
+      window.removeEventListener("chat:reset", handleReset);
     };
   }, [cancelActiveStream]);
 
@@ -380,25 +405,52 @@ export default function Chat() {
       ? currentlyArchived
       : activeChatMeta?.id === targetId ? !!activeChatMeta.is_archived : false;
 
+    // If currently archived, unarchive directly without confirmation hurdle
+    if (isCurrentlyArchived) {
+      setRecentChats((prev) =>
+        prev.map((c) => (c.id === targetId ? { ...c, is_archived: false } : c))
+      );
+      if (activeChatMeta && activeChatMeta.id === targetId) {
+        setActiveChatMeta((prev) => (prev ? { ...prev, is_archived: false } : null));
+      }
+      try {
+        await unarchiveConversation(targetId);
+        getConversations({ limit: 50 }).then(setRecentChats).catch(() => { });
+      } catch (e) {
+        console.error("Failed to unarchive conversation", e);
+        getConversations({ limit: 50 }).then(setRecentChats).catch(() => { });
+      }
+      return;
+    }
+
+    // When archiving, prompt confirmation modal
+    setChatIdToArchive(targetId);
+    setIsArchiveModalOpen(true);
+  }, [activeChatId, activeChatMeta]);
+
+  const handleConfirmArchive = useCallback(async () => {
+    if (!chatIdToArchive) return;
+    const targetId = chatIdToArchive;
+
     // Optimistic update
     setRecentChats((prev) =>
-      prev.map((c) => (c.id === targetId ? { ...c, is_archived: !isCurrentlyArchived } : c))
+      prev.map((c) => (c.id === targetId ? { ...c, is_archived: true } : c))
     );
     if (activeChatMeta && activeChatMeta.id === targetId) {
-      setActiveChatMeta((prev) => (prev ? { ...prev, is_archived: !isCurrentlyArchived } : null));
+      setActiveChatMeta((prev) => (prev ? { ...prev, is_archived: true } : null));
     }
 
     try {
-      if (isCurrentlyArchived) {
-        await unarchiveConversation(targetId);
-      } else {
-        await archiveConversation(targetId);
-      }
-    } catch (e) {
-      console.error("Failed to toggle archive", e);
+      await archiveConversation(targetId);
       getConversations({ limit: 50 }).then(setRecentChats).catch(() => { });
+    } catch (e) {
+      console.error("Failed to archive conversation", e);
+      getConversations({ limit: 50 }).then(setRecentChats).catch(() => { });
+    } finally {
+      setChatIdToArchive(null);
+      setIsArchiveModalOpen(false);
     }
-  }, [activeChatId, activeChatMeta]);
+  }, [chatIdToArchive, activeChatMeta]);
 
   const handleDeleteConversation = useCallback(async (id?: string) => {
     const targetId = id || activeChatId;
@@ -751,55 +803,73 @@ export default function Chat() {
 
   useEffect(() => {
     setIsTempMode(!isAuthenticated);
-    if (isAuthenticated) {
-      setLoadingRecentChats(true);
-      getConversations({ limit: 50 })
-        .then((chats) => setRecentChats(chats))
-        .catch(() => { })
-        .finally(() => setLoadingRecentChats(false));
+    if (!isAuthenticated) {
+      setActiveChatId(null);
+      setActiveChatTitle("Untitled Chat");
+      setActiveChatMeta(null);
+      setMessages([]);
+      setTempMessages([]);
+      setRecentChats([]);
+      setLoadingRecentChats(false);
+      setLoadingModels(false);
+      loadedChatIdRef.current = null;
+      return;
+    }
 
-      setLoadingModels(true);
-      getAvailableModels()
-        .then((models) => {
-          setAvailableModels(models);
+    // When logging in / switching users:
+    setMessages([]);
+    setLoadingRecentChats(true);
+    getConversations({ limit: 50 })
+      .then((chats) => {
+        setRecentChats(chats);
+        // Only keep activeChatId if it exists in the new user's chat list
+        const savedChatId = localStorage.getItem("activeChatId");
+        if (savedChatId && chats.some((c) => c.id === savedChatId)) {
+          setActiveChatId(savedChatId);
+        } else {
+          setActiveChatId(null);
+          localStorage.removeItem("activeChatId");
+          setActiveChatTitle("Untitled Chat");
+          setActiveChatMeta(null);
+          setMessages([]);
+        }
+      })
+      .catch(() => { })
+      .finally(() => setLoadingRecentChats(false));
 
-          // Pro Nudge flyer disabled for now
-          // if (isAuthenticated && !isTempMode && models.length === 1 && models[0].is_free) {
-          //   const lastSeenStr = localStorage.getItem("lastSeenUpgradeFlyer");
-          //   const lastSeen = lastSeenStr ? parseInt(lastSeenStr, 10) : 0;
-          //   const now = Date.now();
-          //   const cooldown = 10 * 60 * 1000;
-          //   if (now - lastSeen > cooldown) {
-          //     setTimeout(() => setShowUpgradeFlyer(true), 2000);
-          //   }
-          // }
+    setLoadingModels(true);
+    getAvailableModels()
+      .then((models) => {
+        setAvailableModels(models);
 
-          // Set initial selection if none exists
-          if (!selectedModel && models.length > 0) {
-            const savedDefault = localStorage.getItem("default_model_config");
-            if (savedDefault) {
+        // Set initial selection if none exists
+        if (!selectedModel && models.length > 0) {
+          const savedDefault = localStorage.getItem("default_model_config");
+          if (savedDefault) {
+            try {
               const { provider, model } = JSON.parse(savedDefault);
               setSelectedProvider(provider);
               setSelectedModel(model);
-            } else {
-              // Default to absolute latest (last provider, first available model)
+            } catch {
               const lastProv = models[models.length - 1];
               const lastMod = lastProv.text_models?.[0] || lastProv.image_models?.[0];
               setSelectedProvider(lastProv.provider);
               setSelectedModel(lastMod || null);
             }
+          } else {
+            // Default to absolute latest (last provider, first available model)
+            const lastProv = models[models.length - 1];
+            const lastMod = lastProv.text_models?.[0] || lastProv.image_models?.[0];
+            setSelectedProvider(lastProv.provider);
+            setSelectedModel(lastMod || null);
           }
-        })
-        .catch(() => { })
-        .finally(() => {
-          setLoadingModels(false);
-        });
-    } else {
-      setRecentChats([]);
-      setLoadingRecentChats(false);
-      setLoadingModels(false);
-    }
-  }, [isAuthenticated]);
+        }
+      })
+      .catch(() => { })
+      .finally(() => {
+        setLoadingModels(false);
+      });
+  }, [isAuthenticated, user?.id]);
 
   const renderChatHistorySkeleton = () => {
     return (
@@ -994,22 +1064,60 @@ export default function Chat() {
                         )}
                       </div>
                     )}
-                    <MessageInput
-                      inputRef={messageInputRef}
-                      value={draft}
-                      onChange={setDraft}
-                      onSend={send}
-                      onStop={cancelActiveStream}
-                      disabled={pending}
-                      isStreaming={pending}
-                      isLoadingModels={!isTempMode && (loadingModels || availableModels.length === 0)}
-                      availableModels={availableModels}
-                      selectedProvider={selectedProvider}
-                      selectedModel={selectedModel}
-                      onModelChange={handleModelChange}
-                      isTempMode={isTempMode}
-                      showDisclaimer={true}
-                    />
+                    {!isTempMode && activeChatMeta?.is_archived ? (
+                      <div className="relative overflow-hidden rounded-2xl border border-amber-500/25 bg-surface/90 p-4 sm:p-5 shadow-[0_4px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all">
+                        {/* Ambient radial glow */}
+                        <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber-500/10 blur-2xl" />
+                        <div className="pointer-events-none absolute -left-10 -bottom-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
+
+                        <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <div className="flex items-center gap-3.5 text-center sm:text-left">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)]">
+                              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-semibold text-textPrimary tracking-tight">This conversation is archived</h4>
+                              <p className="text-xs text-textMuted mt-0.5 leading-relaxed">
+                                Messaging is disabled. Would you like to unarchive this chat to send messages?
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleToggleArchive(activeChatId!, true);
+                              setTimeout(() => messageInputRef.current?.focus(), 100);
+                            }}
+                            className="group relative inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-primary/50 bg-primary px-5 py-2.5 text-xs font-bold text-background shadow-[0_0_20px_rgba(217,255,0,0.25)] transition-all hover:bg-primaryHover hover:scale-[1.02] active:scale-[0.98]"
+                          >
+                            <svg className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
+                            </svg>
+                            <span>Unarchive Chat</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <MessageInput
+                        inputRef={messageInputRef}
+                        value={draft}
+                        onChange={setDraft}
+                        onSend={send}
+                        onStop={cancelActiveStream}
+                        disabled={pending}
+                        isStreaming={pending}
+                        isLoadingModels={!isTempMode && (loadingModels || availableModels.length === 0)}
+                        availableModels={availableModels}
+                        selectedProvider={selectedProvider}
+                        selectedModel={selectedModel}
+                        onModelChange={handleModelChange}
+                        isTempMode={isTempMode}
+                        showDisclaimer={true}
+                      />
+                    )}
                   </div>
                 </motion.div>
               </motion.div>
@@ -1023,27 +1131,6 @@ export default function Chat() {
                 className="flex min-h-0 flex-1 flex-col"
               >
 
-                {!isTempMode && activeChatMeta?.is_archived && (
-                  <div className="mx-auto w-full max-w-4xl px-6 pt-3">
-                    <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-200 backdrop-blur-md">
-                      <div className="flex items-center gap-2">
-                        <svg className="h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-                          <polyline points="21 8 21 21 3 21 3 8" />
-                          <rect x="1" y="3" width="22" height="5" />
-                          <line x1="10" y1="12" x2="14" y2="12" />
-                        </svg>
-                        <span>This conversation is archived.</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleArchive(activeChatId!, true)}
-                        className="rounded-input bg-amber-400 px-3 py-1 text-[11px] font-bold text-black hover:bg-amber-300 transition-colors shadow"
-                      >
-                        Unarchive
-                      </button>
-                    </div>
-                  </div>
-                )}
                 <ChatWindow messages={displayedMessages} onDeleteMessage={isTempMode ? undefined : handleDeleteMessage} />
                 <motion.div
                   layoutId="chat-input-container"
@@ -1078,21 +1165,59 @@ export default function Chat() {
                         )}
                       </div>
                     )}
-                    <MessageInput
-                      inputRef={messageInputRef}
-                      value={draft}
-                      onChange={setDraft}
-                      onSend={send}
-                      onStop={cancelActiveStream}
-                      disabled={pending}
-                      isStreaming={pending}
-                      isLoadingModels={!isTempMode && (loadingModels || availableModels.length === 0)}
-                      availableModels={availableModels}
-                      selectedProvider={selectedProvider}
-                      selectedModel={selectedModel}
-                      onModelChange={handleModelChange}
-                      isTempMode={isTempMode}
-                    />
+                    {!isTempMode && activeChatMeta?.is_archived ? (
+                      <div className="relative overflow-hidden rounded-2xl border border-amber-500/25 bg-surface/90 p-4 sm:p-5 shadow-[0_4px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all">
+                        {/* Ambient radial glow */}
+                        <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber-500/10 blur-2xl" />
+                        <div className="pointer-events-none absolute -left-10 -bottom-10 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
+
+                        <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <div className="flex items-center gap-3.5 text-center sm:text-left">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)]">
+                              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-semibold text-textPrimary tracking-tight">This conversation is archived</h4>
+                              <p className="text-xs text-textMuted mt-0.5 leading-relaxed">
+                                Messaging is disabled. Would you like to unarchive this chat to send messages?
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleToggleArchive(activeChatId!, true);
+                              setTimeout(() => messageInputRef.current?.focus(), 100);
+                            }}
+                            className="group relative inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-primary/50 bg-primary px-5 py-2.5 text-xs font-bold text-background shadow-[0_0_20px_rgba(217,255,0,0.25)] transition-all hover:bg-primaryHover hover:scale-[1.02] active:scale-[0.98]"
+                          >
+                            <svg className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
+                            </svg>
+                            <span>Unarchive Chat</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <MessageInput
+                        inputRef={messageInputRef}
+                        value={draft}
+                        onChange={setDraft}
+                        onSend={send}
+                        onStop={cancelActiveStream}
+                        disabled={pending}
+                        isStreaming={pending}
+                        isLoadingModels={!isTempMode && (loadingModels || availableModels.length === 0)}
+                        availableModels={availableModels}
+                        selectedProvider={selectedProvider}
+                        selectedModel={selectedModel}
+                        onModelChange={handleModelChange}
+                        isTempMode={isTempMode}
+                      />
+                    )}
                   </div>
                 </motion.div>
               </motion.div>
@@ -1106,6 +1231,19 @@ export default function Chat() {
           onConfirm={handleConfirmDelete}
           title="Delete Conversation"
           message="Are you sure you want to delete this conversation? This action cannot be undone and will remove all messages associated with it."
+        />
+
+        <ConfirmModal
+          isOpen={isArchiveModalOpen}
+          onClose={() => {
+            setIsArchiveModalOpen(false);
+            setChatIdToArchive(null);
+          }}
+          onConfirm={handleConfirmArchive}
+          title="Archive Conversation"
+          message="Are you sure you want to archive this conversation? It will be moved to your Archived Chats filter and hidden from your active list."
+          confirmText="Archive"
+          confirmVariant="primary"
         />
 
         <SignupModal
