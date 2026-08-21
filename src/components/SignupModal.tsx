@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
+import { createPortal } from "react-dom";
 import SignupForm from "./SignupForm";
 
 type SignupModalProps = {
@@ -14,7 +15,9 @@ export default function SignupModal({
   title = "Sign Up",
   subtitle = "Initialize Account"
 }: SignupModalProps) {
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -61,6 +64,7 @@ export default function SignupModal({
           </div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

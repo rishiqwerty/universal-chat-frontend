@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { createPortal } from "react-dom";
 import { fetchCreditPlans, createPaymentOrder, verifyPayment, type CreditPlan } from "../api/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -168,7 +169,9 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
     }
   }
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4">
@@ -473,6 +476,7 @@ export default function TopupModal({ isOpen, onClose }: TopupModalProps) {
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

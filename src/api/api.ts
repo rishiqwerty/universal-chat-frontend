@@ -214,6 +214,10 @@ export type ProviderModels = {
   status?: "online" | "degraded" | "offline";
   reachable?: boolean;
   latency_ms?: number;
+  speed_tier?: "fast" | "moderate" | "slow";
+  speed_label?: string;
+  est_tps?: number;
+  model_speeds?: Record<string, number>;
   reachable_models?: string[];
 };
 
