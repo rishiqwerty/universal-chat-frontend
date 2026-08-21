@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode } from "react";
-import { getUserProfile, updateUserProfile, uploadUserAvatar, type UserProfile, type UserProfileUpdate } from "../api/api";
+import { getUserProfile, updateUserProfile, uploadUserAvatar, googleLoginAccount, clearChatCache, type UserProfile, type UserProfileUpdate } from "../api/api";
 
 interface AuthContextValue {
   isAuthenticated: boolean;
@@ -91,6 +91,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshProfile();
     }
   }, [isAuthenticated, refreshProfile]);
+
+  // Global OAuth hash listener (for mobile redirect & direct return to origin)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash;
+    if (hash && (hash.includes("id_token=") || hash.includes("access_token="))) {
+      try {
+        const cleanHash = hash.startsWith("#") ? hash.substring(1) : hash;
+        const params = new URLSearchParams(cleanHash);
+        const idToken = params.get("id_token");
+        if (idToken) {
+          window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+          googleLoginAccount(idToken)
+            .then((token) => {
+              localStorage.clear();
+              clearChatCache();
+              login(token);
+              if (window.location.pathname === "/login" || window.location.pathname === "/signup") {
+                window.location.href = "/";
+              }
+            })
+            .catch((err) => {
+              console.error("Global Google login error:", err);
+            });
+        }
+      } catch (err) {
+        console.error("Failed to parse OAuth redirect hash:", err);
+      }
+    }
+  }, [login]);
 
   // Listen for imperative logout events fired from outside React (e.g. axios interceptor)
   useEffect(() => {

@@ -119,7 +119,7 @@ export default function GoogleAuthButton({
         (navigator.maxTouchPoints && navigator.maxTouchPoints > 2));
 
     const nonce = crypto.randomUUID?.() || Math.random().toString(36).slice(2);
-    const redirectUri = window.location.origin + window.location.pathname;
+    const redirectUri = window.location.origin;
 
     const authUrl =
       `https://accounts.google.com/o/oauth2/v2/auth?` +
