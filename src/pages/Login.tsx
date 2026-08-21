@@ -11,7 +11,7 @@ import { isEmailPasswordSignInEnabled, isEmailOtpSignInEnabled, isEmailSignUpEna
 
 function LogoMark() {
   return (
-    <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-input bg-elevated shadow-[0_0_16px_rgba(217,255,0,0.15)]">
+    <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-input bg-elevated border border-border/40">
       <svg width="22" height="22" viewBox="0 0 20 20" fill="none" aria-hidden>
         <path fill="#D9FF00" d="M4 6h4v10H4V6zm6 0h4v4h-4V6zm0 6h4v4h-4v-4z" />
       </svg>
@@ -181,9 +181,9 @@ export default function Login() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 sm:p-6 lg:p-8">
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
-            <Link to="/" className="inline-block transition-transform hover:scale-[1.02]">
+            <Link to="/" className="group inline-block transition-transform hover:scale-[1.02]">
               <LogoMark />
-              <h1 className="mt-4 font-headline text-2xl font-black uppercase tracking-widest text-textPrimary">
+              <h1 className="mt-4 font-headline text-2xl font-bold tracking-tight text-textPrimary group-hover:text-primary transition-colors">
                 Neural Architect
               </h1>
             </Link>

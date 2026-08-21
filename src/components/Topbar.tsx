@@ -229,7 +229,8 @@ export default function Topbar({
       : "#D9FF00";
 
   return (
-    <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center gap-4 bg-background/70 backdrop-blur-xl px-4 sm:px-6 shadow-sm shadow-black/10 transition-all">
+    <>
+      <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center gap-4 bg-background/70 backdrop-blur-xl px-4 sm:px-6 shadow-sm shadow-black/10 transition-all">
       {showHamburger && (
         <button
           onClick={() => window.dispatchEvent(new Event("sidebar-toggle"))}
@@ -638,29 +639,31 @@ export default function Topbar({
           </div>
         )}
       </div>
-
-      <ConfirmModal
-        isOpen={showLogoutConfirm}
-        onClose={() => setShowLogoutConfirm(false)}
-        onConfirm={() => {
-          logout();
-          navigate("/login");
-        }}
-        title="Account Logout"
-        message="Are you sure you want to log out? You will need to sign in again to access your conversations."
-        confirmText="Log Out"
-        confirmVariant="danger"
-      />
-
-      <SignupModal
-        isOpen={showSignupModal}
-        onClose={() => setShowSignupModal(false)}
-      />
-
-      <TopupModal
-        isOpen={showTopupModal}
-        onClose={() => setShowTopupModal(false)}
-      />
     </header>
-  );
+
+    <ConfirmModal
+      isOpen={showLogoutConfirm}
+      onClose={() => setShowLogoutConfirm(false)}
+      onConfirm={() => {
+        logout();
+        navigate("/login");
+      }}
+      title="Sign Out"
+      message="Are you sure you want to log out of Neural Architect? You can sign back in anytime to access your saved conversations."
+      confirmText="Sign Out"
+      cancelText="Stay Signed In"
+      confirmVariant="primary"
+    />
+
+    <SignupModal
+      isOpen={showSignupModal}
+      onClose={() => setShowSignupModal(false)}
+    />
+
+    <TopupModal
+      isOpen={showTopupModal}
+      onClose={() => setShowTopupModal(false)}
+    />
+  </>
+);
 }

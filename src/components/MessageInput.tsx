@@ -373,14 +373,14 @@ export default function MessageInput({
 
               <motion.div
                 ref={pickerRef}
-                initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                initial={{ opacity: 0, y: 12, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 15, scale: 0.95 }}
+                exit={{ opacity: 0, y: 12, scale: 0.96 }}
                 transition={{ duration: 0.2 }}
-                className="fixed inset-x-3 bottom-20 z-50 max-h-[80vh] overflow-hidden rounded-2xl border border-border/50 bg-sidebar shadow-2xl ring-1 ring-black/40 sm:absolute sm:inset-x-auto sm:bottom-full sm:left-0 sm:right-auto sm:mb-2 sm:w-[380px] sm:max-w-md sm:rounded-card"
+                className="fixed inset-x-2 bottom-14 sm:bottom-full sm:inset-x-auto sm:left-0 sm:right-auto sm:mb-2 z-50 w-auto sm:w-[380px] max-w-[calc(100vw-16px)] sm:max-w-md max-h-[75vh] sm:max-h-[80vh] overflow-hidden rounded-2xl border border-border/50 bg-sidebar shadow-2xl ring-1 ring-black/40 sm:rounded-card"
               >
                 {/* Mobile Header Bar */}
-                <div className="flex items-center justify-between border-b border-border/20 px-3.5 py-2.5 sm:hidden bg-elevated/40">
+                <div className="flex items-center justify-between border-b border-border/20 px-3.5 py-2 sm:hidden bg-elevated/40">
                   <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
                     <span className="text-xs font-bold uppercase tracking-wider text-textPrimary">Select AI Model</span>
@@ -398,26 +398,65 @@ export default function MessageInput({
                   </button>
                 </div>
 
-                <div className="flex h-[320px] sm:h-[380px]">
+                <div className="flex h-[280px] sm:h-[360px] max-h-[60vh]">
                   {/* Providers Column */}
-                  <div className="w-[110px] shrink-0 border-r border-border/20 bg-elevated/20 p-1.5 overflow-y-auto custom-scrollbar">
+                  <div className="w-[125px] sm:w-[135px] shrink-0 border-r border-border/20 bg-elevated/20 p-1.5 overflow-y-auto custom-scrollbar">
                     <p className="mb-2 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-textMuted">Providers</p>
                     <div className="space-y-1">
-                      {availableModels.map((p) => (
-                        <button
-                          key={p.provider}
-                          type="button"
-                          onClick={() => {
-                            const defaultModel = p.text_models?.[0] || p.image_models?.[0] || "";
-                            onModelChange(p.provider, defaultModel);
-                          }}
-                          className={`w-full rounded-lg px-2 py-2 sm:py-1.5 text-left text-xs sm:text-[11px] font-semibold transition-colors ${
-                            selectedProvider === p.provider ? 'bg-primary text-background font-bold shadow-sm' : 'text-textSecondary hover:bg-elevated'
-                          }`}
-                        >
-                          {p.provider.charAt(0).toUpperCase() + p.provider.slice(1)}
-                        </button>
-                      ))}
+                      {availableModels.map((p) => {
+                        const isOnline = p.status !== "offline" && p.reachable !== false;
+                        const isFast = p.speed_tier === "fast" || (!p.speed_tier && (p.latency_ms || 0) < 300);
+                        const isModerate = p.speed_tier === "moderate" || (!p.speed_tier && (p.latency_ms || 0) >= 300 && (p.latency_ms || 0) < 800);
+                        return (
+                          <button
+                            key={p.provider}
+                            type="button"
+                            onClick={() => {
+                              const defaultModel = p.text_models?.[0] || p.image_models?.[0] || "";
+                              onModelChange(p.provider, defaultModel);
+                            }}
+                            className={`flex items-center justify-between w-full rounded-lg px-2 py-2 sm:py-1.5 text-left text-xs sm:text-[11px] font-semibold transition-colors ${
+                              selectedProvider === p.provider ? 'bg-primary text-background font-bold shadow-sm' : 'text-textSecondary hover:bg-elevated'
+                            }`}
+                          >
+                            <div className="flex items-center gap-1 min-w-0 pr-1">
+                              <span className="truncate">{p.provider.charAt(0).toUpperCase() + p.provider.slice(1)}</span>
+                            </div>
+                            {/* Speed & Reachability Badge */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {p.latency_ms ? (
+                                <span
+                                  className={`text-[8px] font-mono font-bold px-1 py-0.2 rounded border ${
+                                    isFast
+                                      ? selectedProvider === p.provider
+                                        ? 'text-background bg-black/20 border-black/30'
+                                        : 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
+                                      : isModerate
+                                      ? selectedProvider === p.provider
+                                        ? 'text-background bg-black/20 border-black/30'
+                                        : 'text-amber-400 border-amber-500/30 bg-amber-500/10'
+                                      : selectedProvider === p.provider
+                                      ? 'text-background bg-black/20 border-black/30'
+                                      : 'text-rose-400 border-rose-500/30 bg-rose-500/10'
+                                  }`}
+                                  title={`Latency: ${p.latency_ms}ms • Est: ~${p.est_tps || 60} tokens/sec`}
+                                >
+                                  {p.latency_ms}ms
+                                </span>
+                              ) : null}
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${
+                                  isOnline
+                                    ? isFast
+                                      ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]'
+                                      : 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]'
+                                    : 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]'
+                                }`}
+                              />
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -491,21 +530,35 @@ export default function MessageInput({
                             {isOpenRouter ? "Featured Models" : "Text Analytics"}
                           </div>
                           <div className="space-y-1">
-                            {currentProviderData.text_models.map((m) => (
-                              <button
-                                key={m}
-                                type="button"
-                                onClick={() => {
-                                  onModelChange(selectedProvider!, m);
-                                  setShowPicker(false);
-                                }}
-                                className={`w-full rounded-lg px-2.5 py-2 sm:py-1.5 text-left text-xs sm:text-[11px] transition-colors ${
-                                  selectedModel === m ? 'bg-elevated text-primary font-bold shadow-sm' : 'text-textSecondary hover:bg-elevated/50'
-                                }`}
-                              >
-                                {m}
-                              </button>
-                            ))}
+                            {currentProviderData.text_models.map((m) => {
+                              const isReachable =
+                                !currentProviderData.reachable_models ||
+                                currentProviderData.reachable_models.length === 0 ||
+                                currentProviderData.reachable_models.includes(m);
+                              return (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => {
+                                    onModelChange(selectedProvider!, m);
+                                    setShowPicker(false);
+                                  }}
+                                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 sm:py-1.5 text-left text-xs sm:text-[11px] transition-colors ${
+                                    selectedModel === m ? 'bg-elevated text-primary font-bold shadow-sm' : 'text-textSecondary hover:bg-elevated/50'
+                                  }`}
+                                >
+                                  <span className="truncate">{m}</span>
+                                  <span
+                                    className={`h-1.5 w-1.5 shrink-0 rounded-full ml-1.5 ${
+                                      isReachable
+                                        ? 'bg-emerald-400/90 shadow-[0_0_5px_rgba(52,211,153,0.7)]'
+                                        : 'bg-rose-500/90 shadow-[0_0_5px_rgba(244,63,94,0.7)]'
+                                    }`}
+                                    title={isReachable ? 'Model active and operational' : 'Model currently unavailable'}
+                                  />
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -522,21 +575,35 @@ export default function MessageInput({
                             Neural Synthesis (Image)
                           </div>
                           <div className="space-y-1">
-                            {currentProviderData.image_models.map((m) => (
-                              <button
-                                key={m}
-                                type="button"
-                                onClick={() => {
-                                  onModelChange(selectedProvider!, m);
-                                  setShowPicker(false);
-                                }}
-                                className={`w-full rounded-lg px-2.5 py-2 sm:py-1.5 text-left text-xs sm:text-[11px] transition-colors ${
-                                  selectedModel === m ? 'bg-primary/10 text-primary font-bold shadow-[inset_0_0_8px_rgba(217,255,0,0.1)]' : 'text-textSecondary hover:bg-elevated/50'
-                                }`}
-                              >
-                                {m}
-                              </button>
-                            ))}
+                            {currentProviderData.image_models.map((m) => {
+                              const isReachable =
+                                !currentProviderData.reachable_models ||
+                                currentProviderData.reachable_models.length === 0 ||
+                                currentProviderData.reachable_models.includes(m);
+                              return (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => {
+                                    onModelChange(selectedProvider!, m);
+                                    setShowPicker(false);
+                                  }}
+                                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 sm:py-1.5 text-left text-xs sm:text-[11px] transition-colors ${
+                                    selectedModel === m ? 'bg-primary/10 text-primary font-bold shadow-[inset_0_0_8px_rgba(217,255,0,0.1)]' : 'text-textSecondary hover:bg-elevated/50'
+                                  }`}
+                                >
+                                  <span className="truncate">{m}</span>
+                                  <span
+                                    className={`h-1.5 w-1.5 shrink-0 rounded-full ml-1.5 ${
+                                      isReachable
+                                        ? 'bg-emerald-400/90 shadow-[0_0_5px_rgba(52,211,153,0.7)]'
+                                        : 'bg-rose-500/90 shadow-[0_0_5px_rgba(244,63,94,0.7)]'
+                                    }`}
+                                    title={isReachable ? 'Model active and operational' : 'Model currently unavailable'}
+                                  />
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       )}

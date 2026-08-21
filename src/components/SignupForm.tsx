@@ -9,7 +9,7 @@ import { isEmailPasswordSignUpEnabled, isEmailOtpSignUpEnabled, isEmailSignInEna
 
 function LogoMark() {
   return (
-    <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-input bg-elevated shadow-[0_0_16px_rgba(217,255,0,0.15)]">
+    <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-input bg-elevated border border-border/40">
       <svg width="22" height="22" viewBox="0 0 20 20" fill="none" aria-hidden>
         <path fill="#D9FF00" d="M4 6h4v10H4V6zm6 0h4v4h-4V6zm0 6h4v4h-4v-4z" />
       </svg>
@@ -176,9 +176,9 @@ export default function SignupForm({ isModal, onSuccess }: SignupFormProps) {
     <div className={`w-full ${isModal ? "" : "max-w-[420px]"}`}>
       {!isModal && (
         <div className="mb-8 text-center">
-          <Link to="/" className="group block">
+          <Link to="/" className="group inline-block transition-transform hover:scale-[1.02]">
             <LogoMark />
-            <h1 className="mt-5 text-2xl font-headline font-bold tracking-tight text-textPrimary group-hover:text-primary transition-colors">
+            <h1 className="mt-4 text-2xl font-headline font-bold tracking-tight text-textPrimary group-hover:text-primary transition-colors">
               Neural Architect
             </h1>
           </Link>
