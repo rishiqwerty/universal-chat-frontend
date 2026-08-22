@@ -24,6 +24,7 @@ import {
 } from "../api/api";
 import { useDocumentSEO } from "../hooks/useDocumentSEO";
 import { useAuth } from "../context/AuthContext";
+import { isPremiumModel } from "../utils/modelUtils";
 
 const ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3"];
 
@@ -133,7 +134,17 @@ export default function ImageStudio() {
       .then((data) => {
         if (data && typeof data === "object" && Object.keys(data).length > 0) {
           setModels(data);
-          const providers = Object.keys(data);
+          const isFreeProv = (prov: string) =>
+            ["flux", "stable diffusion", "local", "gemini_free", "gemini"].some((name) =>
+              prov.toLowerCase().includes(name)
+            );
+          const providers = Object.keys(data).sort((a, b) => {
+            const aFree = isFreeProv(a);
+            const bFree = isFreeProv(b);
+            if (aFree && !bFree) return -1;
+            if (!aFree && bFree) return 1;
+            return 0;
+          });
           if (providers.length > 0) {
             setSelectedProvider(providers[0]);
             const providerModels = data[providers[0]];
@@ -742,7 +753,18 @@ export default function ImageStudio() {
     );
   };
 
-  const providerKeys = Object.keys(models);
+  const isFreeProvider = (prov: string) =>
+    ["flux", "stable diffusion", "local", "gemini_free", "gemini"].some((name) =>
+      prov.toLowerCase().includes(name)
+    );
+
+  const providerKeys = Object.keys(models).sort((a, b) => {
+    const aFree = isFreeProvider(a);
+    const bFree = isFreeProvider(b);
+    if (aFree && !bFree) return -1;
+    if (!aFree && bFree) return 1;
+    return 0;
+  });
   const hasModels = providerKeys.length > 0;
   const displayedGallery = gallery.slice(0, visibleCount);
   const hasMore = gallery.length > visibleCount;
@@ -1141,13 +1163,16 @@ export default function ImageStudio() {
                                 <select
                                   value={selectedProvider}
                                   onChange={(e) => handleProviderChange(e.target.value)}
-                                  className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
+                                  className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors cursor-pointer"
                                 >
-                                  {providerKeys.map((p) => (
-                                    <option key={p} value={p}>
-                                      {p.charAt(0).toUpperCase() + p.slice(1)}
-                                    </option>
-                                  ))}
+                                  {providerKeys.map((p) => {
+                                    const isPrem = !isFreeProvider(p);
+                                    return (
+                                      <option key={p} value={p}>
+                                        {p.charAt(0).toUpperCase() + p.slice(1)} {isPrem ? "✦ PRO" : ""}
+                                      </option>
+                                    );
+                                  })}
                                 </select>
                               </div>
                               <div className="w-full sm:w-auto min-w-[160px] flex-1 sm:flex-initial">
@@ -1155,11 +1180,16 @@ export default function ImageStudio() {
                                 <select
                                   value={selectedModel}
                                   onChange={(e) => setSelectedModel(e.target.value)}
-                                  className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors"
+                                  className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors cursor-pointer"
                                 >
-                                  {(models[selectedProvider] || []).map((m) => (
-                                    <option key={m} value={m}>{m}</option>
-                                  ))}
+                                  {(models[selectedProvider] || []).map((m) => {
+                                    const isPremModel = isPremiumModel(selectedProvider, m);
+                                    return (
+                                      <option key={m} value={m}>
+                                        {m} {isPremModel ? "✦ PRO" : ""}
+                                      </option>
+                                    );
+                                  })}
                                 </select>
                               </div>
                             </>

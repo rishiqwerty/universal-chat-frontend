@@ -209,8 +209,10 @@ export type ProviderModels = {
   provider: string;
   display_name?: string;
   is_free?: boolean;
+  is_byok_configured?: boolean;
   text_models: string[];
   image_models?: string[];
+  premium_models?: string[];
   status?: "online" | "degraded" | "offline";
   reachable?: boolean;
   latency_ms?: number;

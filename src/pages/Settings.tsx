@@ -421,17 +421,17 @@ export default function Settings() {
         <Sidebar activeNav="settings" />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <Topbar hideIncognito={true} />
-          <main className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full">
-            <h1 className="text-2xl font-bold text-textPrimary">Settings</h1>
-            <p className="mt-1 text-sm text-textSecondary">
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 sm:pb-12 max-w-4xl mx-auto w-full">
+            <h1 className="text-xl sm:text-2xl font-bold text-textPrimary">Settings</h1>
+            <p className="mt-1 text-xs sm:text-sm text-textSecondary">
               Configure your model providers, custom themes, and Model Context Protocol (MCP) servers.
             </p>
 
             {/* Tab Swapper */}
-            <div className="flex border-b border-border/20 mt-6 mb-8 gap-6">
+            <div className="flex items-center border-b border-border/20 mt-4 sm:mt-6 mb-6 sm:mb-8 gap-4 sm:gap-6 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <button
                 onClick={() => setActiveTab("profile")}
-                className={`pb-3 text-sm font-bold transition-all relative ${
+                className={`pb-3 text-xs sm:text-sm font-bold transition-all relative shrink-0 whitespace-nowrap ${
                   activeTab === "profile" 
                     ? "text-primary font-headline" 
                     : "text-textSecondary hover:text-textPrimary"
@@ -444,7 +444,7 @@ export default function Settings() {
               </button>
               <button
                 onClick={() => setActiveTab("providers")}
-                className={`pb-3 text-sm font-bold transition-all relative ${
+                className={`pb-3 text-xs sm:text-sm font-bold transition-all relative shrink-0 whitespace-nowrap ${
                   activeTab === "providers" 
                     ? "text-primary font-headline" 
                     : "text-textSecondary hover:text-textPrimary"
@@ -457,7 +457,7 @@ export default function Settings() {
               </button>
               <button
                 onClick={() => setActiveTab("mcp")}
-                className={`pb-3 text-sm font-bold transition-all relative flex items-center gap-2 ${
+                className={`pb-3 text-xs sm:text-sm font-bold transition-all relative shrink-0 whitespace-nowrap flex items-center gap-2 ${
                   activeTab === "mcp" 
                     ? "text-primary font-headline" 
                     : "text-textSecondary hover:text-textPrimary"
@@ -472,12 +472,12 @@ export default function Settings() {
             </div>
 
             {activeTab === "profile" ? (
-              <div className="space-y-8 animate-fade-in">
+              <div className="space-y-6 sm:space-y-8 animate-fade-in">
                 {/* Profile Overview Card */}
-                <div className="rounded-2xl border border-border/40 bg-surface/50 p-6 backdrop-blur-md">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
-                    <div className="flex items-center gap-4">
-                      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-elevated ring-2 ring-primary/40 shadow-[0_0_20px_rgba(var(--color-primary),0.2)]">
+                <div className="rounded-2xl border border-border/40 bg-surface/50 p-4 sm:p-6 backdrop-blur-md">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-5">
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                      <div className="relative h-14 w-14 sm:h-16 sm:w-16 shrink-0 overflow-hidden rounded-full bg-elevated ring-2 ring-primary/40 shadow-[0_0_20px_rgba(var(--color-primary),0.2)]">
                         {avatarUrl ? (
                           <img
                             src={resolveImagePath(avatarUrl)}
@@ -488,23 +488,23 @@ export default function Settings() {
                             }}
                           />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-primary/10 text-xl font-bold text-primary">
+                          <div className="flex h-full w-full items-center justify-center bg-primary/10 text-lg sm:text-xl font-bold text-primary">
                             {fullName ? fullName.slice(0, 2).toUpperCase() : (user?.email ? user.email.slice(0, 2).toUpperCase() : "OP")}
                           </div>
                         )}
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <h2 className="text-xl font-bold font-headline text-textPrimary">
+                          <h2 className="text-base sm:text-xl font-bold font-headline text-textPrimary truncate">
                             {fullName || (user?.email ? user.email.split('@')[0] : "Operative")}
                           </h2>
-                          <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-primary border border-primary/30">
+                          <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-primary border border-primary/30 shrink-0">
                             Active
                           </span>
                         </div>
-                        <p className="text-xs text-textSecondary mt-0.5">{user?.email || "No email registered"}</p>
+                        <p className="text-xs text-textSecondary mt-0.5 truncate">{user?.email || "No email registered"}</p>
                         {user?.created_at && (
-                          <p className="text-[10px] text-textMuted mt-1">
+                          <p className="text-[10px] text-textMuted mt-0.5 sm:mt-1">
                             Operative since {new Date(user.created_at).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
                           </p>
                         )}
@@ -512,15 +512,15 @@ export default function Settings() {
                     </div>
 
                     {/* Credits badge with topup trigger */}
-                    <div className="flex items-center gap-3 rounded-xl border border-border/40 bg-elevated/60 px-4 py-3">
+                    <div className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-4 rounded-xl border border-border/40 bg-elevated/60 px-3.5 sm:px-4 py-2.5 sm:py-3">
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-textMuted">Available Credits</p>
-                        <p className="text-lg font-bold text-primary">{user?.credits ?? "--"}</p>
+                        <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-textMuted">Available Credits</p>
+                        <p className="text-base sm:text-lg font-bold text-primary">{user?.credits ?? "--"}</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setShowTopup(true)}
-                        className="rounded-input bg-primary px-3 py-1.5 text-xs font-bold text-background shadow-[0_0_12px_rgba(var(--color-primary),0.2)] hover:bg-primaryHover transition-colors"
+                        className="rounded-input bg-primary px-3.5 py-1.5 text-xs font-bold text-background shadow-[0_0_12px_rgba(var(--color-primary),0.2)] hover:bg-primaryHover transition-colors shrink-0"
                       >
                         Refuel
                       </button>
@@ -529,7 +529,7 @@ export default function Settings() {
                 </div>
 
                 {/* Profile Edit Form */}
-                <form onSubmit={handleSaveProfile} className="rounded-2xl border border-border/40 bg-surface/50 p-6 backdrop-blur-md space-y-6">
+                <form onSubmit={handleSaveProfile} className="rounded-2xl border border-border/40 bg-surface/50 p-4 sm:p-6 backdrop-blur-md space-y-5 sm:space-y-6">
                   <div className="border-b border-border/30 pb-4">
                     <h3 className="text-base font-bold font-headline text-textPrimary">Personal Details</h3>
                     <p className="text-xs text-textSecondary mt-0.5">
@@ -682,7 +682,7 @@ export default function Settings() {
                     <button
                       type="submit"
                       disabled={savingProfile}
-                      className="flex items-center gap-2 rounded-input bg-primary px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-background shadow-[0_0_20px_rgba(var(--color-primary),0.25)] hover:bg-primaryHover disabled:opacity-50 transition-all"
+                      className="w-full sm:w-auto justify-center flex items-center gap-2 rounded-input bg-primary px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-background shadow-[0_0_20px_rgba(var(--color-primary),0.25)] hover:bg-primaryHover disabled:opacity-50 transition-all"
                     >
                       {savingProfile ? (
                         <>
@@ -697,27 +697,158 @@ export default function Settings() {
                 </form>
               </div>
             ) : activeTab === "providers" ? (
-              <div className="space-y-10">
-                <form onSubmit={handleAdd} className="rounded-card bg-surface p-6 shadow-none ring-1 ring-border/40">
-                  <h2 className="text-lg font-semibold text-textPrimary">Add API Key</h2>
+              <div className="space-y-6 sm:space-y-8">
+                {/* BYOK Explainer Card */}
+                <div className="rounded-card border border-border/40 bg-surface/70 p-4 sm:p-6 backdrop-blur-md">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                    <div className="flex items-start sm:items-center gap-3 min-w-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 border border-primary/25 text-primary shadow-[0_0_12px_rgba(217,255,0,0.08)] mt-0.5 sm:mt-0">
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                          <h2 className="text-sm sm:text-base font-semibold text-textPrimary">Bring Your Own Key (BYOK)</h2>
+                          <span className="rounded-full bg-primary/10 border border-primary/25 px-2 py-0.5 text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-primary shrink-0 whitespace-nowrap">
+                            Direct Access
+                          </span>
+                        </div>
+                        <p className="text-[11px] sm:text-xs text-textMuted mt-0.5">
+                          Connect your personal provider accounts at wholesale API rates.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-textSecondary leading-relaxed mb-4">
+                    Connect personal API accounts from OpenAI, Anthropic, Google, DeepSeek, or OpenRouter. Requests are dispatched directly to official inference endpoints with zero platform fees or token markups.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 mb-4">
+                    <div className="rounded-xl border border-border/30 bg-elevated/30 p-3.5">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-textPrimary mb-1">
+                        <svg className="h-3.5 w-3.5 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                          <rect x="4" y="4" width="16" height="16" rx="2" />
+                          <rect x="9" y="9" width="6" height="6" />
+                          <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3" />
+                        </svg>
+                        <span>Frontier Models</span>
+                      </div>
+                      <p className="text-[11px] text-textMuted leading-relaxed">
+                        Access Claude 3.5 Sonnet, GPT-4o, DeepSeek R1, and Gemini Pro directly.
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-border/30 bg-elevated/30 p-3.5">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-textPrimary mb-1">
+                        <svg className="h-3.5 w-3.5 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="m9 12 2 2 4-4" />
+                        </svg>
+                        <span>Direct Wholesale Rates</span>
+                      </div>
+                      <p className="text-[11px] text-textMuted leading-relaxed">
+                        Billed directly by your provider at official API rates with zero markup.
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-border/30 bg-elevated/30 p-3.5">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-textPrimary mb-1">
+                        <svg className="h-3.5 w-3.5 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </svg>
+                        <span>Encrypted at Rest</span>
+                      </div>
+                      <p className="text-[11px] text-textMuted leading-relaxed">
+                        Keys are stored with AES-256 encryption and sent only over TLS to official servers.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Quick provider links */}
+                  <div className="pt-3 border-t border-border/20 flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px]">
+                    <span className="text-textMuted font-medium mr-1">Get API Keys:</span>
+                    <a
+                      href="https://platform.openai.com/api-keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg border border-border/40 bg-elevated/50 px-2 py-1 text-textSecondary hover:border-primary/40 hover:text-primary transition-colors"
+                    >
+                      <span>OpenAI</span>
+                      <svg className="h-2.5 w-2.5 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />
+                      </svg>
+                    </a>
+                    <a
+                      href="https://console.anthropic.com/settings/keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg border border-border/40 bg-elevated/50 px-2 py-1 text-textSecondary hover:border-primary/40 hover:text-primary transition-colors"
+                    >
+                      <span>Anthropic</span>
+                      <svg className="h-2.5 w-2.5 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />
+                      </svg>
+                    </a>
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg border border-border/40 bg-elevated/50 px-2 py-1 text-textSecondary hover:border-primary/40 hover:text-primary transition-colors"
+                    >
+                      <span>Google AI Studio</span>
+                      <svg className="h-2.5 w-2.5 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />
+                      </svg>
+                    </a>
+                    <a
+                      href="https://platform.deepseek.com/api_keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg border border-border/40 bg-elevated/50 px-2 py-1 text-textSecondary hover:border-primary/40 hover:text-primary transition-colors"
+                    >
+                      <span>DeepSeek</span>
+                      <svg className="h-2.5 w-2.5 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />
+                      </svg>
+                    </a>
+                    <a
+                      href="https://openrouter.ai/keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg border border-border/40 bg-elevated/50 px-2 py-1 text-textSecondary hover:border-primary/40 hover:text-primary transition-colors"
+                    >
+                      <span>OpenRouter</span>
+                      <svg className="h-2.5 w-2.5 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />
+                      </svg>
+                    </a>
+                  </div>
+                </div>
+
+                <form onSubmit={handleAdd} className="rounded-card bg-surface p-4 sm:p-6 shadow-none ring-1 ring-border/40">
+                  <h2 className="text-base sm:text-lg font-semibold text-textPrimary">Add API Key</h2>
                   {error && (
-                    <p className="mt-4 rounded-input bg-primary/10 px-3 py-2 text-sm text-primary ring-1 ring-primary/50">
+                    <p className="mt-4 rounded-input bg-primary/10 px-3 py-2 text-xs sm:text-sm text-primary ring-1 ring-primary/50">
                       {error}
                     </p>
                   )}
-                  <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-4">
+                  <div className="mt-4 sm:mt-5 grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-4">
                     <label className="block sm:col-span-1">
                       <span className="text-xs font-medium text-textSecondary">Provider</span>
                       <select
                         value={provider}
                         onChange={(e) => setProvider(e.target.value)}
-                        className="mt-2 h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-sm text-textPrimary focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+                        className="mt-1.5 sm:mt-2 h-10 sm:h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-xs sm:text-sm text-textPrimary focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
                       >
                         <option value="openai">OpenAI</option>
                         <option value="anthropic">Anthropic</option>
-                        <option value="gemini">Gemini</option>
+                        <option value="gemini">Google Gemini</option>
+                        <option value="deepseek">DeepSeek</option>
+                        <option value="groq">Groq</option>
                         <option value="openrouter">OpenRouter</option>
-                        <option value="local">Local LLM</option>
+                        <option value="local">Local LLM (Ollama / vLLM)</option>
                       </select>
                     </label>
 
@@ -729,7 +860,7 @@ export default function Settings() {
                           value={baseUrl}
                           onChange={(e) => setBaseUrl(e.target.value)}
                           placeholder="http://localhost:11434/v1"
-                          className="mt-2 h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+                          className="mt-1.5 sm:mt-2 h-10 sm:h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-xs sm:text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
                         />
                       </label>
                     )}
@@ -741,7 +872,7 @@ export default function Settings() {
                         value={label}
                         onChange={(e) => setLabel(e.target.value)}
                         placeholder="e.g. Primary Key"
-                        className="mt-2 h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+                        className="mt-1.5 sm:mt-2 h-10 sm:h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-xs sm:text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
                       />
                     </label>
 
@@ -752,7 +883,7 @@ export default function Settings() {
                         value={apiKeyParam}
                         onChange={(e) => setApiKeyParam(e.target.value)}
                         placeholder={provider === "local" ? "None (or local key)" : "sk-..."}
-                        className="mt-2 h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+                        className="mt-1.5 sm:mt-2 h-10 sm:h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-xs sm:text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
                       />
                     </label>
                   </div>
@@ -772,71 +903,71 @@ export default function Settings() {
                   <button
                     type="submit"
                     disabled={loading || !apiKeyParam.trim() || !label.trim()}
-                    className="mt-6 w-full rounded-input bg-primary py-2.5 text-sm font-bold text-background shadow-[0_0_16px_rgba(217,255,0,0.2)] transition-all hover:scale-[1.02] hover:bg-primaryHover disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:px-8"
+                    className="mt-5 sm:mt-6 w-full rounded-input bg-primary py-2.5 text-xs sm:text-sm font-bold text-background shadow-[0_0_16px_rgba(217,255,0,0.2)] transition-all hover:scale-[1.02] hover:bg-primaryHover disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:px-8 text-center justify-center"
                   >
                     {loading ? "Adding..." : "Securely Add Key"}
                   </button>
                 </form>
 
-                <div className="rounded-card bg-surface p-6 shadow-none ring-1 ring-border/40">
-                  <h2 className="text-lg font-semibold text-textPrimary">Appearance</h2>
+                <div className="rounded-card bg-surface p-4 sm:p-6 shadow-none ring-1 ring-border/40">
+                  <h2 className="text-base sm:text-lg font-semibold text-textPrimary">Appearance</h2>
                   <p className="text-xs text-textSecondary mt-1">Select your personalized neural accent color.</p>
                   
-                  <div className="mt-6 flex flex-wrap gap-4">
+                  <div className="mt-4 sm:mt-6 flex flex-wrap gap-3 sm:gap-4">
                     {availableColors.map((color) => (
                       <button
                         key={color.value}
                         onClick={() => setAccentColor(color.value)}
-                        className={`group relative flex h-14 w-14 items-center justify-center rounded-xl transition-all duration-300 ${
+                        className={`group relative flex h-11 w-11 sm:h-14 sm:w-14 items-center justify-center rounded-xl transition-all duration-300 ${
                           accentColor === color.value 
-                            ? 'ring-2 ring-primary ring-offset-4 ring-offset-background scale-110' 
+                            ? 'ring-2 ring-primary ring-offset-2 sm:ring-offset-4 ring-offset-background scale-105 sm:scale-110' 
                             : 'hover:scale-105'
                         }`}
                         style={{ backgroundColor: color.value }}
                         title={color.name}
                       >
                         {accentColor === color.value && (
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-background/40 backdrop-blur-sm text-white">
-                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <div className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-background/40 backdrop-blur-sm text-white">
+                            <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                             </svg>
                           </div>
                         )}
-                        <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-textPrimary">{color.name}</span>
+                        <div className="absolute -bottom-7 sm:-bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                          <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-textPrimary bg-surface/90 px-1.5 py-0.5 rounded shadow-sm border border-border/30">{color.name}</span>
                         </div>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="pb-10">
-                  <h2 className="text-lg font-semibold text-textPrimary">Configured Keys</h2>
-                  <div className="mt-4 flex flex-col gap-3">
+                <div className="pb-8 sm:pb-10">
+                  <h2 className="text-base sm:text-lg font-semibold text-textPrimary">Configured Keys</h2>
+                  <div className="mt-3 sm:mt-4 flex flex-col gap-2.5 sm:gap-3">
                     {keys.length === 0 ? (
-                      <p className="text-sm text-textMuted">No API keys installed yet.</p>
+                      <p className="text-xs sm:text-sm text-textMuted">No API keys installed yet.</p>
                     ) : (
                       keys.map((k) => (
-                        <div key={k.id} className={`flex items-center justify-between rounded-input border transition-all duration-300 px-4 py-3 ${
+                        <div key={k.id} className={`flex flex-col sm:flex-row sm:items-center justify-between rounded-input border transition-all duration-300 p-3.5 sm:px-4 sm:py-3 gap-3 ${
                           k.is_active ? 'border-primary/50 bg-primary/5 shadow-[0_0_20px_rgba(217,255,0,0.05)]' : 'border-border/30 bg-surface grayscale'
                         }`}>
-                          <div className="flex items-center gap-4">
-                            <div className="relative">
+                          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                            <div className="relative shrink-0">
                               <span className={`h-2.5 w-2.5 block rounded-full ${k.is_active ? 'bg-primary' : 'bg-textMuted'}`} />
                               {k.is_active && (
                                 <span className="absolute -inset-1 rounded-full bg-primary/30 animate-ping" />
                               )}
                             </div>
-                            <div>
+                            <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
-                                <p className="text-[11px] font-bold text-textSecondary uppercase tracking-widest">{k.provider}</p>
+                                <p className="text-[10px] sm:text-[11px] font-bold text-textSecondary uppercase tracking-widest">{k.provider}</p>
                                 {k.is_active && (
-                                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-black uppercase text-primary ring-1 ring-primary/30">Active</span>
+                                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[8px] sm:text-[9px] font-black uppercase text-primary ring-1 ring-primary/30">Active</span>
                                 )}
                               </div>
-                              <p className={`text-base font-semibold ${k.is_active ? 'text-textPrimary' : 'text-textSecondary'}`}>{k.label}</p>
+                              <p className={`text-sm sm:text-base font-semibold truncate ${k.is_active ? 'text-textPrimary' : 'text-textSecondary'}`}>{k.label}</p>
                               {k.base_url && (
-                                <p className="text-[10px] font-mono text-textMuted truncate max-w-[200px]">Endpoint: {k.base_url}</p>
+                                <p className="text-[10px] font-mono text-textMuted truncate max-w-[240px]">Endpoint: {k.base_url}</p>
                               )}
                               <p className="text-[10px] text-textMuted mt-0.5">
                                 Added: {formatDate(k.created_at)}
@@ -844,12 +975,12 @@ export default function Settings() {
                             </div>
                           </div>
                           
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-between sm:justify-end gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-border/20 w-full sm:w-auto">
                             {!k.is_active ? (
                               <button
                                 type="button"
                                 onClick={() => handleActivate(k.id)}
-                                className="rounded-input bg-elevated px-3 py-1.5 text-xs font-bold text-primary transition-all hover:scale-[1.05] hover:bg-primary/20 hover:text-primary ring-1 ring-primary/20"
+                                className="flex-1 sm:flex-none rounded-input bg-elevated px-3 py-1.5 text-xs font-bold text-primary transition-all hover:scale-[1.05] hover:bg-primary/20 hover:text-primary ring-1 ring-primary/20 text-center"
                               >
                                 Activate
                               </button>
@@ -857,7 +988,7 @@ export default function Settings() {
                               <button
                                 type="button"
                                 onClick={() => handleToggle(k.id)}
-                                className="rounded-input bg-background/50 px-3 py-1.5 text-xs font-bold text-textSecondary transition-all hover:scale-[1.05] hover:bg-elevated hover:text-textPrimary border border-border/50"
+                                className="flex-1 sm:flex-none rounded-input bg-background/50 px-3 py-1.5 text-xs font-bold text-textSecondary transition-all hover:scale-[1.05] hover:bg-elevated hover:text-textPrimary border border-border/50 text-center"
                               >
                                 Disable
                               </button>
@@ -866,7 +997,7 @@ export default function Settings() {
                             <button
                               type="button"
                               onClick={() => handleRemove(k.id)}
-                              className="flex h-8 w-8 items-center justify-center rounded-input text-textMuted transition-all hover:scale-[1.1] hover:bg-elevated hover:text-error"
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-input text-textMuted transition-all hover:scale-[1.1] hover:bg-elevated hover:text-error"
                               title="Delete Key"
                             >
                               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -881,17 +1012,16 @@ export default function Settings() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-8 pb-10">
+              <div className="space-y-6 sm:space-y-8 pb-10">
                 {/* Connection Status Card */}
-                {/* Connection Status Card */}
-                <div className="rounded-card bg-surface p-6 ring-1 ring-border/40">
-                  <div className="flex items-center justify-between border-b border-border/20 pb-4">
+                <div className="rounded-card bg-surface p-4 sm:p-6 ring-1 ring-border/40">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/20 pb-4">
                     <div>
-                      <h2 className="text-lg font-semibold text-textPrimary">Server Connection Status</h2>
-                      <p className="text-xs text-textSecondary mt-1">Status of the local Model Context Protocol integration.</p>
+                      <h2 className="text-base sm:text-lg font-semibold text-textPrimary">Server Connection Status</h2>
+                      <p className="text-xs text-textSecondary mt-0.5 sm:mt-1">Status of the local Model Context Protocol integration.</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+                    <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 sm:px-3 py-1 text-xs font-bold ${
                         mcpConnected === true 
                           ? "bg-primary/10 text-primary ring-1 ring-primary/30" 
                           : mcpConnected === false 
@@ -906,7 +1036,7 @@ export default function Settings() {
                       <button
                         onClick={loadMcpData}
                         disabled={mcpLoading}
-                        className="p-2 rounded-input hover:bg-elevated text-textSecondary transition-all"
+                        className="p-2 rounded-input hover:bg-elevated text-textSecondary transition-all shrink-0"
                         title="Refresh Connection"
                       >
                         <svg className={`h-4 w-4 ${mcpLoading ? "animate-spin text-primary" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -916,20 +1046,20 @@ export default function Settings() {
                     </div>
                   </div>
 
-                  <div className="mt-5 space-y-3 font-mono text-xs">
+                  <div className="mt-4 sm:mt-5 space-y-2.5 sm:space-y-3 font-mono text-xs">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-3 rounded-input bg-elevated/40 border border-border/20">
-                      <span className="text-textSecondary text-[11px] font-headline uppercase font-bold tracking-wider">SSE Connection URL</span>
-                      <span className="text-textPrimary font-semibold select-all break-all">{mcpInfo ? `${getApiBaseUrl()}${mcpInfo.sse_url}` : "Loading..."}</span>
+                      <span className="text-textSecondary text-[10px] sm:text-[11px] font-headline uppercase font-bold tracking-wider">SSE Connection URL</span>
+                      <span className="text-textPrimary font-semibold select-all break-all text-[11px] sm:text-xs">{mcpInfo ? `${getApiBaseUrl()}${mcpInfo.sse_url}` : "Loading..."}</span>
                     </div>
                     {isLocalhost && (
                       <>
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-3 rounded-input bg-elevated/40 border border-border/20">
-                          <span className="text-textSecondary text-[11px] font-headline uppercase font-bold tracking-wider">Python Executable</span>
-                          <span className="text-textPrimary font-semibold select-all break-all">{mcpInfo?.python_path || "Loading..."}</span>
+                          <span className="text-textSecondary text-[10px] sm:text-[11px] font-headline uppercase font-bold tracking-wider">Python Executable</span>
+                          <span className="text-textPrimary font-semibold select-all break-all text-[11px] sm:text-xs">{mcpInfo?.python_path || "Loading..."}</span>
                         </div>
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 p-3 rounded-input bg-elevated/40 border border-border/20">
-                          <span className="text-textSecondary text-[11px] font-headline uppercase font-bold tracking-wider">Server Entrypoint</span>
-                          <span className="text-textPrimary font-semibold select-all break-all">{mcpInfo?.server_script_path || "Loading..."}</span>
+                          <span className="text-textSecondary text-[10px] sm:text-[11px] font-headline uppercase font-bold tracking-wider">Server Entrypoint</span>
+                          <span className="text-textPrimary font-semibold select-all break-all text-[11px] sm:text-xs">{mcpInfo?.server_script_path || "Loading..."}</span>
                         </div>
                       </>
                     )}
@@ -937,20 +1067,20 @@ export default function Settings() {
                 </div>
 
                 {/* Unified AI Client Integrations Card */}
-                <div className="rounded-card bg-surface p-6 ring-1 ring-border/40 space-y-6">
+                <div className="rounded-card bg-surface p-4 sm:p-6 ring-1 ring-border/40 space-y-5 sm:space-y-6">
                   <div>
-                    <h2 className="text-lg font-semibold text-textPrimary">AI Client Integrations</h2>
-                    <p className="text-xs text-textSecondary mt-1">
+                    <h2 className="text-base sm:text-lg font-semibold text-textPrimary">AI Client Integrations</h2>
+                    <p className="text-xs text-textSecondary mt-0.5 sm:mt-1">
                       Configure authentication and connect this MCP server to your local development IDEs or remote AI web platforms.
                     </p>
                   </div>
 
                   {/* Mode Selector Segmented Tabs */}
-                  <div className="flex p-0.5 rounded-lg bg-elevated/50 border border-border/20 self-start max-w-fit">
+                  <div className="flex w-full sm:w-auto p-0.5 rounded-lg bg-elevated/50 border border-border/20 self-start">
                     <button
                       type="button"
                       onClick={() => setMcpIntegrationMode("personal")}
-                      className={`px-4 py-2 text-xs font-bold rounded-md transition-all ${
+                      className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs font-bold rounded-md transition-all text-center ${
                         mcpIntegrationMode === "personal"
                           ? "bg-surface text-primary shadow-sm"
                           : "text-textSecondary hover:text-textPrimary"
@@ -961,7 +1091,7 @@ export default function Settings() {
                     <button
                       type="button"
                       onClick={() => setMcpIntegrationMode("oauth")}
-                      className={`px-4 py-2 text-xs font-bold rounded-md transition-all ${
+                      className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs font-bold rounded-md transition-all text-center ${
                         mcpIntegrationMode === "oauth"
                           ? "bg-surface text-primary shadow-sm"
                           : "text-textSecondary hover:text-textPrimary"
@@ -973,22 +1103,22 @@ export default function Settings() {
 
                   {/* Tab Contents */}
                   {mcpIntegrationMode === "personal" ? (
-                    <div className="space-y-6">
+                    <div className="space-y-5 sm:space-y-6">
                       {/* API Key Row */}
-                      <div className="p-4 rounded-input bg-elevated/20 border border-border/20 space-y-3">
+                      <div className="p-3.5 sm:p-4 rounded-input bg-elevated/20 border border-border/20 space-y-3">
                         <div className="flex items-center justify-between">
                           <h3 className="text-xs font-bold text-textPrimary uppercase tracking-wider">Your Personal API Key</h3>
-                          <span className="text-[10px] text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">Personal Auth</span>
+                          <span className="text-[9px] sm:text-[10px] text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">Personal Auth</span>
                         </div>
                         <p className="text-xs text-textSecondary">
                           Use this key to authenticate direct connections (e.g., Claude Desktop, Cursor, Continue, Cherry Studio).
                         </p>
-                        <div className="flex items-center gap-2 p-3 rounded-input bg-background/50 border border-primary/20">
+                        <div className="flex items-center gap-2 p-2.5 sm:p-3 rounded-input bg-background/50 border border-primary/20">
                           <span className="text-textPrimary font-mono break-all text-xs min-w-0 flex-1 select-all select-none">
                             {mcpInfo?.api_key
                               ? showMcpApiKey
                                 ? mcpInfo.api_key
-                                : `${mcpInfo.api_key.slice(0, 12)}${"•".repeat(24)}${mcpInfo.api_key.slice(-8)}`
+                                : `${mcpInfo.api_key.slice(0, 10)}${"•".repeat(18)}${mcpInfo.api_key.slice(-6)}`
                               : "Loading..."}
                           </span>
                           <button
@@ -1034,45 +1164,45 @@ export default function Settings() {
                       </div>
 
                       {/* Claude Desktop Integration instructions */}
-                      <div className="border-t border-border/20 pt-5">
-                        <h3 className="text-sm font-semibold text-textPrimary">Claude Desktop Integration</h3>
+                      <div className="border-t border-border/20 pt-4 sm:pt-5">
+                        <h3 className="text-xs sm:text-sm font-semibold text-textPrimary">Claude Desktop Integration</h3>
                         <p className="text-xs text-textSecondary mt-1 leading-relaxed">
                           Configure Claude Desktop to run your MCP tools locally using the dynamic configuration snippet below.
                         </p>
 
-                        <div className="mt-4 p-4 rounded-input bg-elevated/20 border border-border/20">
+                        <div className="mt-3 sm:mt-4 p-3.5 sm:p-4 rounded-input bg-elevated/20 border border-border/20">
                           <p className="text-xs text-textSecondary leading-relaxed">
                             1. Open or create the Claude Desktop config file on macOS at:
                             <br />
-                            <code className="text-[11px] font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded mt-1 inline-block select-all">~/Library/Application Support/Claude/claude_desktop_config.json</code>
+                            <code className="text-[10px] sm:text-[11px] font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded mt-1 inline-block select-all break-all">~/Library/Application Support/Claude/claude_desktop_config.json</code>
                           </p>
                           <p className="text-xs text-textSecondary leading-relaxed mt-3">
                             2. Add the following JSON configuration snippet to your config file:
                           </p>
 
                           <div className="relative mt-3 rounded-input bg-background border border-border/30 overflow-hidden font-mono text-xs">
-                            <pre className="p-4 overflow-x-auto text-textPrimary max-h-60 leading-relaxed [scrollbar-width:thin]">
+                            <pre className="p-3 sm:p-4 overflow-x-auto text-textPrimary max-h-56 leading-relaxed [scrollbar-width:thin] text-[11px] sm:text-xs">
                               {configString}
                             </pre>
                             <button
                               type="button"
                               onClick={handleCopyConfig}
-                              className="absolute top-3 right-3 p-2 rounded-input bg-surface hover:bg-elevated border border-border/30 text-textSecondary hover:text-textPrimary transition-all flex items-center gap-1.5 text-[10px] font-headline font-bold"
+                              className="absolute top-2.5 right-2.5 p-1.5 sm:p-2 rounded-input bg-surface hover:bg-elevated border border-border/30 text-textSecondary hover:text-textPrimary transition-all flex items-center gap-1.5 text-[9px] sm:text-[10px] font-headline font-bold"
                             >
                               {copiedKey === "claude-config" ? (
                                 <>
-                                  <svg className="h-3.5 w-3.5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                  <svg className="h-3 sm:h-3.5 w-3 sm:w-3.5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                   </svg>
                                   Copied
                                 </>
                               ) : (
                                 <>
-                                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <svg className="h-3 sm:h-3.5 w-3 sm:w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                                     <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
                                   </svg>
-                                  Copy snippet
+                                  Copy
                                 </>
                               )}
                             </button>
@@ -1081,18 +1211,18 @@ export default function Settings() {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-6">
+                    <div className="space-y-5 sm:space-y-6">
                       {/* OAuth 2.0 Connection Parameters */}
-                      <div className="p-4 rounded-input bg-elevated/20 border border-border/20 space-y-4">
+                      <div className="p-3.5 sm:p-4 rounded-input bg-elevated/20 border border-border/20 space-y-3 sm:space-y-4">
                         <div className="flex items-center justify-between">
                           <h3 className="text-xs font-bold text-textPrimary uppercase tracking-wider">OAuth 2.0 Credentials</h3>
-                          <span className="text-[10px] text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">Standard Web Auth</span>
+                          <span className="text-[9px] sm:text-[10px] text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">Standard Web Auth</span>
                         </div>
                         <p className="text-xs text-textSecondary">
                           Supply these parameters when registering this MCP server in third-party platforms requiring OAuth 2.0.
                         </p>
 
-                        <div className="space-y-2.5">
+                        <div className="space-y-2 sm:space-y-2.5">
                           {renderCopyableRow("Authorization URL", `${getApiBaseUrl().replace(/\/+$/, "")}/api/v1/oauth/authorize`, "auth-url")}
                           {renderCopyableRow("Token URL", `${getApiBaseUrl().replace(/\/+$/, "")}/api/v1/oauth/token`, "token-url")}
                           {renderCopyableRow("Client ID", mcpInfo?.oauth_client_id || "Loading...", "client-id")}
@@ -1101,11 +1231,11 @@ export default function Settings() {
                       </div>
 
                       {/* Setup Guides */}
-                      <div className="border-t border-border/20 pt-5 space-y-4">
-                        <h3 className="text-sm font-semibold text-textPrimary">Web Platform Integration Guides</h3>
+                      <div className="border-t border-border/20 pt-4 sm:pt-5 space-y-3 sm:space-y-4">
+                        <h3 className="text-xs sm:text-sm font-semibold text-textPrimary">Web Platform Integration Guides</h3>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="p-4 rounded-input bg-elevated/10 border border-border/10 space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                          <div className="p-3.5 sm:p-4 rounded-input bg-elevated/10 border border-border/10 space-y-2">
                             <h4 className="text-xs font-bold text-textPrimary uppercase tracking-wider flex items-center gap-1.5">
                               <span className="h-1.5 w-1.5 bg-primary rounded-full" />
                               ChatGPT Actions
@@ -1118,7 +1248,7 @@ export default function Settings() {
                             </ol>
                           </div>
 
-                          <div className="p-4 rounded-input bg-elevated/10 border border-border/10 space-y-2">
+                          <div className="p-3.5 sm:p-4 rounded-input bg-elevated/10 border border-border/10 space-y-2">
                             <h4 className="text-xs font-bold text-textPrimary uppercase tracking-wider flex items-center gap-1.5">
                               <span className="h-1.5 w-1.5 bg-primary rounded-full" />
                               Claude Web Tools
@@ -1138,13 +1268,13 @@ export default function Settings() {
 
                 {/* Tools Registry & Tester */}
                 <div>
-                  <h2 className="text-lg font-semibold text-textPrimary">Registered Tools</h2>
-                  <p className="text-xs text-textSecondary mt-1">Examine and test tools loaded by the Model Context Protocol application.</p>
+                  <h2 className="text-base sm:text-lg font-semibold text-textPrimary">Registered Tools</h2>
+                  <p className="text-xs text-textSecondary mt-0.5 sm:mt-1">Examine and test tools loaded by the Model Context Protocol application.</p>
 
-                  <div className="mt-4 flex flex-col gap-3">
+                  <div className="mt-3 sm:mt-4 flex flex-col gap-2.5 sm:gap-3">
                     {mcpTools.length === 0 ? (
                       <div className="p-6 rounded-card border border-border/30 text-center bg-surface/30">
-                        <p className="text-sm text-textMuted">
+                        <p className="text-xs sm:text-sm text-textMuted">
                           {mcpLoading ? "Fetching registered tools..." : "No tools registered in this server."}
                         </p>
                       </div>
@@ -1160,24 +1290,24 @@ export default function Settings() {
                             <button
                               type="button"
                               onClick={() => setExpandedTool(isExpanded ? null : tool.name)}
-                              className="w-full flex items-center justify-between p-4 text-left transition-colors"
+                              className="w-full flex items-center justify-between p-3.5 sm:p-4 text-left transition-colors"
                             >
-                              <div className="flex-1 min-w-0 pr-4">
-                                <p className="text-base font-bold text-textPrimary font-mono flex items-center gap-2">
-                                  <span>{tool.name}</span>
-                                  <span className="rounded bg-elevated px-2 py-0.5 text-[10px] font-medium font-headline text-textSecondary border border-border/20">tool</span>
+                              <div className="flex-1 min-w-0 pr-3 sm:pr-4">
+                                <p className="text-sm sm:text-base font-bold text-textPrimary font-mono flex items-center gap-2">
+                                  <span className="truncate">{tool.name}</span>
+                                  <span className="rounded bg-elevated px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-medium font-headline text-textSecondary border border-border/20 shrink-0">tool</span>
                                 </p>
-                                <p className="text-xs text-textSecondary mt-1 leading-relaxed">{tool.description}</p>
+                                <p className="text-xs text-textSecondary mt-1 leading-relaxed line-clamp-2 sm:line-clamp-none">{tool.description}</p>
                               </div>
-                              <span className="text-textMuted hover:text-textPrimary transition-colors">
-                                <svg className={`h-5 w-5 transform transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <span className="text-textMuted hover:text-textPrimary transition-colors shrink-0">
+                                <svg className={`h-4 sm:h-5 w-4 sm:w-5 transform transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                                 </svg>
                               </span>
                             </button>
 
                             {isExpanded && (
-                              <div className="border-t border-border/20 p-5 bg-elevated/10 space-y-5">
+                              <div className="border-t border-border/20 p-3.5 sm:p-5 bg-elevated/10 space-y-4 sm:space-y-5">
                                 {/* Form Parameters */}
                                 <div>
                                   <h3 className="text-xs font-bold uppercase tracking-wider text-textSecondary">Arguments</h3>
@@ -1190,7 +1320,7 @@ export default function Settings() {
                                     type="button"
                                     onClick={() => handleTestTool(tool.name)}
                                     disabled={result?.loading}
-                                    className="rounded-input bg-primary px-5 py-2 text-xs font-bold text-background shadow-md hover:bg-primaryHover transition-all disabled:opacity-50 flex items-center gap-1.5"
+                                    className="w-full sm:w-auto justify-center rounded-input bg-primary px-5 py-2.5 sm:py-2 text-xs font-bold text-background shadow-md hover:bg-primaryHover transition-all disabled:opacity-50 flex items-center gap-1.5 text-center"
                                   >
                                     {result?.loading && (
                                       <svg className="animate-spin h-3 w-3 text-background" viewBox="0 0 24 24" fill="none">
@@ -1207,16 +1337,16 @@ export default function Settings() {
                                   <div className="space-y-2">
                                     <h3 className="text-xs font-bold uppercase tracking-wider text-textSecondary">Execution Result</h3>
                                     {result.loading ? (
-                                      <div className="p-4 rounded-input bg-background/50 border border-border/20 text-xs font-mono text-textMuted animate-pulse">
+                                      <div className="p-3 sm:p-4 rounded-input bg-background/50 border border-border/20 text-xs font-mono text-textMuted animate-pulse">
                                         Running tool invocation...
                                       </div>
                                     ) : result.error ? (
-                                      <div className="p-4 rounded-input bg-error/10 border border-error/20 text-xs font-mono text-error">
+                                      <div className="p-3 sm:p-4 rounded-input bg-error/10 border border-error/20 text-xs font-mono text-error">
                                         Error: {result.error}
                                       </div>
                                     ) : (
                                       <div className="rounded-input border border-border/20 bg-background overflow-hidden font-mono text-xs relative">
-                                        <pre className="p-4 overflow-x-auto text-primary max-h-80 [scrollbar-width:thin] whitespace-pre-wrap leading-relaxed">
+                                        <pre className="p-3 sm:p-4 overflow-x-auto text-primary max-h-80 [scrollbar-width:thin] whitespace-pre-wrap leading-relaxed text-[11px] sm:text-xs">
                                           {JSON.stringify(result.response, null, 2)}
                                         </pre>
                                         <button
@@ -1226,9 +1356,9 @@ export default function Settings() {
                                             setCopiedKey(`tool-res-${tool.name}`);
                                             setTimeout(() => setCopiedKey(null), 2000);
                                           }}
-                                          className="absolute top-3 right-3 p-1.5 rounded bg-surface hover:bg-elevated text-textMuted hover:text-textPrimary border border-border/30 transition-all text-[9px] font-headline font-bold flex items-center gap-1"
+                                          className="absolute top-2.5 right-2.5 p-1.5 rounded bg-surface hover:bg-elevated text-textMuted hover:text-textPrimary border border-border/30 transition-all text-[9px] font-headline font-bold flex items-center gap-1"
                                         >
-                                          {copiedKey === `tool-res-${tool.name}` ? "Copied" : "Copy output"}
+                                          {copiedKey === `tool-res-${tool.name}` ? "Copied" : "Copy"}
                                         </button>
                                       </div>
                                     )}
