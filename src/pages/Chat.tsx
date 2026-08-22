@@ -584,8 +584,8 @@ export default function Chat() {
                   ...msg,
                   content: displayContent,
                   images: foundImages.length > 0 ? [...(msg.images || []), ...foundImages] : msg.images,
-                  provider: "AI",
-                  model: selectedModel || "Fast",
+                  provider: parsedMeta?.provider || "Temp",
+                  model: parsedMeta?.model || "AI",
                   provider_metadata: parsedMeta || msg.provider_metadata,
                 }
                 : msg
