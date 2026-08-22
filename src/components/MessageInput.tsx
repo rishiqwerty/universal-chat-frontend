@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { type ProviderModels, type OpenRouterModel, searchOpenRouterModels } from "../api/api";
 import PremiumModelModal from "./PremiumModelModal";
-import { isPremiumModel } from "../utils/modelUtils";
+import { isPremiumModel, mergeProviderModels, normalizeProviderName } from "../utils/modelUtils";
 
 type MessageInputProps = {
   inputRef?: React.RefObject<MessageInputHandle> | React.MutableRefObject<MessageInputHandle | null>;
@@ -167,7 +167,11 @@ export default function MessageInput({
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+      const target = event.target as Element;
+      if (target && target.closest && target.closest('[data-model-selector="true"]')) {
+        return;
+      }
+      if (pickerRef.current && !pickerRef.current.contains(target as Node)) {
         setShowPicker(false);
       }
     }
@@ -198,9 +202,20 @@ export default function MessageInput({
     });
   }, []);
 
-  const currentProviderData = availableModels.find((p) => p.provider === selectedProvider);
+  const normalizedModels = useMemo(() => mergeProviderModels(availableModels), [availableModels]);
+  const activeProvider = useMemo(() => {
+    if (!selectedProvider) return normalizedModels[0]?.provider || "";
+    const norm = normalizeProviderName(selectedProvider);
+    const found = normalizedModels.find((p) => p.provider === norm || p.provider === selectedProvider);
+    return found ? found.provider : (normalizedModels[0]?.provider || selectedProvider);
+  }, [selectedProvider, normalizedModels]);
+
+  const currentProviderData = useMemo(() => {
+    return normalizedModels.find((p) => p.provider === activeProvider) || normalizedModels[0];
+  }, [normalizedModels, activeProvider]);
+
   const isImageModel = currentProviderData?.image_models?.includes(selectedModel || "");
-  const isOpenRouter = selectedProvider === "openrouter";
+  const isOpenRouter = activeProvider === "openrouter";
   const isOpenRouterBYOK = isOpenRouter && !currentProviderData?.is_free;
 
   // Debounced search for OpenRouter models
@@ -235,8 +250,7 @@ export default function MessageInput({
   }, [showPicker, selectedProvider]);
 
   const renderModelSelector = (compact?: boolean) => {
-    if (isTempMode) return null;
-    if (isLoadingModels) {
+    if (isLoadingModels && normalizedModels.length === 0) {
       return (
         <div className="flex items-center gap-1 rounded-xl px-2 py-1 text-[10px] sm:text-[11px] font-semibold text-textMuted bg-elevated/40 border border-border/30">
           <div className="h-2 w-2 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -244,13 +258,14 @@ export default function MessageInput({
         </div>
       );
     }
-    const isCurrentModelPremium = isPremiumModel(selectedProvider, selectedModel || "", currentProviderData);
+    const isCurrentModelPremium = isPremiumModel(activeProvider, selectedModel || "", currentProviderData);
 
     return (
       <button
         type="button"
-        onClick={() => setShowPicker(!showPicker)}
-        disabled={isStreaming || availableModels.length === 0}
+        data-model-selector="true"
+        onClick={() => setShowPicker((prev) => !prev)}
+        disabled={isStreaming || normalizedModels.length === 0}
         className={`group flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold tracking-wide transition-all ${
           isImageModel 
             ? 'bg-primary/10 text-primary ring-1 ring-primary/30 hover:bg-primary/20' 
@@ -268,7 +283,7 @@ export default function MessageInput({
           <div className="h-1.5 w-1.5 rounded-full bg-primary/70 group-hover:bg-primary transition-colors shrink-0" />
         )}
         <span className={`${compact ? "max-w-[70px] sm:max-w-[130px]" : "max-w-[120px] sm:max-w-[180px]"} truncate`}>
-          {selectedModel || "Model"}
+          {selectedModel || "Select Model"}
         </span>
         {isCurrentModelPremium && (
           <span className="rounded bg-primary/20 px-1 py-0.2 text-[8px] font-black uppercase tracking-wider text-primary border border-primary/30 shrink-0">
@@ -410,7 +425,7 @@ export default function MessageInput({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 12, scale: 0.96 }}
                 transition={{ duration: 0.2 }}
-                className="fixed inset-x-2 bottom-14 sm:bottom-full sm:inset-x-auto sm:left-0 sm:right-auto sm:mb-2 z-50 w-auto sm:w-[380px] max-w-[calc(100vw-16px)] sm:max-w-md max-h-[75vh] sm:max-h-[80vh] overflow-hidden rounded-2xl border border-border/50 bg-sidebar shadow-2xl ring-1 ring-black/40 sm:rounded-card"
+                className="fixed inset-x-2 bottom-14 sm:absolute sm:bottom-full sm:inset-x-auto sm:left-0 sm:right-auto sm:mb-2 z-50 w-auto sm:w-[380px] max-w-[calc(100vw-16px)] sm:max-w-md max-h-[75vh] sm:max-h-[80vh] overflow-hidden rounded-2xl border border-border/50 bg-sidebar shadow-2xl ring-1 ring-black/40 sm:rounded-card"
               >
                 {/* Mobile Header Bar */}
                 <div className="flex items-center justify-between border-b border-border/20 px-3.5 py-2 sm:hidden bg-elevated/40">
@@ -437,7 +452,7 @@ export default function MessageInput({
                     <p className="mb-2 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-textMuted">Providers</p>
                     <div className="space-y-1">
                       {(() => {
-                        const sortedProviders = [...availableModels].sort((a, b) => {
+                        const sortedProviders = [...normalizedModels].sort((a, b) => {
                           const aFree = a.is_free || a.is_byok_configured;
                           const bFree = b.is_free || b.is_byok_configured;
                           if (aFree && !bFree) return -1;
@@ -450,7 +465,7 @@ export default function MessageInput({
                           const isOnline = p.status !== "offline" && p.reachable !== false;
                           const isFast = p.speed_tier === "fast" || (!p.speed_tier && (p.latency_ms || 0) < 300);
                           const isModerate = p.speed_tier === "moderate" || (!p.speed_tier && (p.latency_ms || 0) >= 300 && (p.latency_ms || 0) < 800);
-                          const isSelected = selectedProvider === p.provider;
+                          const isSelected = activeProvider === p.provider;
 
                           return (
                             <button
@@ -511,7 +526,9 @@ export default function MessageInput({
                         });
                       })()}
                     </div>
-                  </div>                  {/* Models Column */}
+                  </div>
+
+                  {/* Models Column */}
                   <div className="flex-1 flex flex-col overflow-hidden">
                     {/* Universal Search Bar */}
                     <div className="shrink-0 border-b border-border/20 p-2">
@@ -524,7 +541,7 @@ export default function MessageInput({
                           type="text"
                           value={modelSearch}
                           onChange={(e) => handleModelSearch(e.target.value)}
-                          placeholder={isOpenRouterBYOK ? "Search 200+ models..." : `Filter ${selectedProvider ? selectedProvider.charAt(0).toUpperCase() + selectedProvider.slice(1) : ''} models...`}
+                          placeholder={isOpenRouterBYOK ? "Search 200+ models..." : `Filter ${activeProvider ? activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1) : ''} models...`}
                           className="h-8 w-full rounded-lg border border-border/30 bg-elevated/50 pl-8 pr-7 text-xs sm:text-[11px] text-textPrimary placeholder:text-textMuted focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/30"
                         />
                         {modelSearch && !isSearching && (
@@ -565,16 +582,16 @@ export default function MessageInput({
                               </div>
                               <div className="space-y-1">
                                 {searchResults.map((m) => {
-                                  const isPrem = isPremiumModel(selectedProvider, m.id);
+                                  const isPrem = isPremiumModel(activeProvider, m.id);
                                   const isFav = favoriteModels.includes(m.id);
                                   return (
                                     <div
                                       key={m.id}
                                       onClick={() => {
                                         if (isPrem) {
-                                          setPremiumModalData({ provider: selectedProvider || "openrouter", model: m.id });
+                                          setPremiumModalData({ provider: activeProvider || "openrouter", model: m.id });
                                         } else {
-                                          onModelChange(selectedProvider!, m.id);
+                                          onModelChange(activeProvider, m.id);
                                           setShowPicker(false);
                                         }
                                       }}
@@ -597,12 +614,12 @@ export default function MessageInput({
                                         <button
                                           type="button"
                                           onClick={(e) => toggleFavoriteModel(m.id, e)}
-                                          className={`p-0.5 rounded transition-colors ${
-                                            isFav ? 'text-primary' : 'text-textMuted/40 hover:text-primary opacity-0 group-hover:opacity-100'
+                                          className={`p-1 rounded transition-all ${
+                                            isFav ? 'text-primary' : 'text-textMuted/40 hover:text-primary hover:scale-110'
                                           }`}
                                           title={isFav ? "Unpin from favorites" : "Pin to favorites"}
                                         >
-                                          <svg className={`h-3 w-3 ${isFav ? 'fill-primary text-primary' : 'fill-none stroke-currentColor'}`} viewBox="0 0 24 24" strokeWidth="2">
+                                          <svg className={`h-3.5 w-3.5 ${isFav ? 'fill-primary text-primary' : 'fill-none stroke-currentColor'}`} viewBox="0 0 24 24" strokeWidth="2">
                                             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                                           </svg>
                                         </button>
@@ -636,20 +653,20 @@ export default function MessageInput({
                             return (
                               <div>
                                 <div className="mb-1.5 flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-textMuted">
-                                  Matching {selectedProvider ? selectedProvider.charAt(0).toUpperCase() + selectedProvider.slice(1) : ''} Models
+                                  Matching {activeProvider ? activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1) : ''} Models
                                 </div>
                                 <div className="space-y-1">
                                   {filtered.map((m) => {
-                                    const isPrem = isPremiumModel(currentProviderData?.provider || selectedProvider, m, currentProviderData);
+                                    const isPrem = isPremiumModel(currentProviderData?.provider || activeProvider, m, currentProviderData);
                                     const isFav = favoriteModels.includes(m);
                                     return (
                                       <div
                                         key={m}
                                         onClick={() => {
                                           if (isPrem) {
-                                            setPremiumModalData({ provider: selectedProvider!, model: m });
+                                            setPremiumModalData({ provider: activeProvider, model: m });
                                           } else {
-                                            onModelChange(selectedProvider!, m);
+                                            onModelChange(activeProvider, m);
                                             setShowPicker(false);
                                           }
                                         }}
@@ -669,12 +686,12 @@ export default function MessageInput({
                                           <button
                                             type="button"
                                             onClick={(e) => toggleFavoriteModel(m, e)}
-                                            className={`p-0.5 rounded transition-colors ${
-                                              isFav ? 'text-primary' : 'text-textMuted/40 hover:text-primary opacity-0 group-hover:opacity-100'
+                                            className={`p-1 rounded transition-all ${
+                                              isFav ? 'text-primary' : 'text-textMuted/40 hover:text-primary hover:scale-110'
                                             }`}
                                             title={isFav ? "Unpin from favorites" : "Pin to favorites"}
                                           >
-                                            <svg className={`h-3 w-3 ${isFav ? 'fill-primary text-primary' : 'fill-none stroke-currentColor'}`} viewBox="0 0 24 24" strokeWidth="2">
+                                            <svg className={`h-3.5 w-3.5 ${isFav ? 'fill-primary text-primary' : 'fill-none stroke-currentColor'}`} viewBox="0 0 24 24" strokeWidth="2">
                                               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                                             </svg>
                                           </button>
@@ -712,7 +729,7 @@ export default function MessageInput({
                                 </div>
                                 <div className="space-y-1">
                                   {providerFavorites.map((m) => {
-                                    const isPrem = isPremiumModel(currentProviderData?.provider || selectedProvider, m, currentProviderData);
+                                    const isPrem = isPremiumModel(currentProviderData?.provider || activeProvider, m, currentProviderData);
                                     const isReachable =
                                       !currentProviderData?.reachable_models ||
                                       currentProviderData.reachable_models.length === 0 ||
@@ -723,9 +740,9 @@ export default function MessageInput({
                                         key={`fav-${m}`}
                                         onClick={() => {
                                           if (isPrem) {
-                                            setPremiumModalData({ provider: selectedProvider!, model: m });
+                                            setPremiumModalData({ provider: activeProvider, model: m });
                                           } else {
-                                            onModelChange(selectedProvider!, m);
+                                            onModelChange(activeProvider, m);
                                             setShowPicker(false);
                                           }
                                         }}
@@ -773,10 +790,10 @@ export default function MessageInput({
                           {(() => {
                             const textModels = currentProviderData?.text_models || [];
                             const standardModels = textModels.filter(
-                              (m) => !isPremiumModel(currentProviderData?.provider || selectedProvider, m, currentProviderData)
+                              (m) => !isPremiumModel(currentProviderData?.provider || activeProvider, m, currentProviderData)
                             );
                             const premiumModels = textModels.filter(
-                              (m) => isPremiumModel(currentProviderData?.provider || selectedProvider, m, currentProviderData)
+                              (m) => isPremiumModel(currentProviderData?.provider || activeProvider, m, currentProviderData)
                             );
 
                             return (
@@ -800,7 +817,7 @@ export default function MessageInput({
                                           <div
                                             key={m}
                                             onClick={() => {
-                                              onModelChange(selectedProvider!, m);
+                                              onModelChange(activeProvider, m);
                                               setShowPicker(false);
                                             }}
                                             className={`group flex items-center justify-between w-full rounded-lg px-2.5 py-2 sm:py-1.5 text-left text-xs sm:text-[11px] transition-colors cursor-pointer ${
@@ -820,12 +837,12 @@ export default function MessageInput({
                                               <button
                                                 type="button"
                                                 onClick={(e) => toggleFavoriteModel(m, e)}
-                                                className={`p-0.5 rounded transition-colors ${
-                                                  isFav ? 'text-primary' : 'text-textMuted/40 hover:text-primary opacity-0 group-hover:opacity-100'
+                                                className={`p-1 rounded transition-all ${
+                                                  isFav ? 'text-primary' : 'text-textMuted/40 hover:text-primary hover:scale-110'
                                                 }`}
                                                 title={isFav ? "Unpin from favorites" : "Pin to favorites"}
                                               >
-                                                <svg className={`h-3 w-3 ${isFav ? 'fill-primary text-primary' : 'fill-none stroke-currentColor'}`} viewBox="0 0 24 24" strokeWidth="2">
+                                                <svg className={`h-3.5 w-3.5 ${isFav ? 'fill-primary text-primary' : 'fill-none stroke-currentColor'}`} viewBox="0 0 24 24" strokeWidth="2">
                                                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                                                 </svg>
                                               </button>
@@ -862,7 +879,7 @@ export default function MessageInput({
                                           <div
                                             key={m}
                                             onClick={() => {
-                                              setPremiumModalData({ provider: selectedProvider!, model: m });
+                                              setPremiumModalData({ provider: activeProvider, model: m });
                                             }}
                                             className={`group flex items-center justify-between w-full rounded-lg px-2.5 py-2 sm:py-1.5 text-left text-xs sm:text-[11px] transition-colors cursor-pointer ${
                                               selectedModel === m ? 'bg-elevated text-primary font-bold shadow-sm ring-1 ring-primary/30' : 'text-textSecondary hover:bg-elevated/50'
@@ -890,12 +907,12 @@ export default function MessageInput({
                                               <button
                                                 type="button"
                                                 onClick={(e) => toggleFavoriteModel(m, e)}
-                                                className={`p-0.5 rounded transition-colors ${
-                                                  isFav ? 'text-primary' : 'text-textMuted/40 hover:text-primary opacity-0 group-hover:opacity-100'
+                                                className={`p-1 rounded transition-all ${
+                                                  isFav ? 'text-primary' : 'text-textMuted/40 hover:text-primary hover:scale-110'
                                                 }`}
                                                 title={isFav ? "Unpin from favorites" : "Pin to favorites"}
                                               >
-                                                <svg className={`h-3 w-3 ${isFav ? 'fill-primary text-primary' : 'fill-none stroke-currentColor'}`} viewBox="0 0 24 24" strokeWidth="2">
+                                                <svg className={`h-3.5 w-3.5 ${isFav ? 'fill-primary text-primary' : 'fill-none stroke-currentColor'}`} viewBox="0 0 24 24" strokeWidth="2">
                                                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                                                 </svg>
                                               </button>
@@ -937,7 +954,7 @@ export default function MessageInput({
                                     <div
                                       key={m}
                                       onClick={() => {
-                                        setPremiumModalData({ provider: selectedProvider!, model: m });
+                                        setPremiumModalData({ provider: activeProvider, model: m });
                                       }}
                                       className={`group flex items-center justify-between w-full rounded-lg px-2.5 py-2 sm:py-1.5 text-left text-xs sm:text-[11px] transition-colors cursor-pointer ${
                                         selectedModel === m ? 'bg-primary/10 text-primary font-bold shadow-[inset_0_0_8px_rgba(217,255,0,0.1)]' : 'text-textSecondary hover:bg-elevated/50'
@@ -965,12 +982,12 @@ export default function MessageInput({
                                         <button
                                           type="button"
                                           onClick={(e) => toggleFavoriteModel(m, e)}
-                                          className={`p-0.5 rounded transition-colors ${
-                                            isFav ? 'text-primary' : 'text-textMuted/40 hover:text-primary opacity-0 group-hover:opacity-100'
+                                          className={`p-1 rounded transition-all ${
+                                            isFav ? 'text-primary' : 'text-textMuted/40 hover:text-primary hover:scale-110'
                                           }`}
                                           title={isFav ? "Unpin from favorites" : "Pin to favorites"}
                                         >
-                                          <svg className={`h-3 w-3 ${isFav ? 'fill-primary text-primary' : 'fill-none stroke-currentColor'}`} viewBox="0 0 24 24" strokeWidth="2">
+                                          <svg className={`h-3.5 w-3.5 ${isFav ? 'fill-primary text-primary' : 'fill-none stroke-currentColor'}`} viewBox="0 0 24 24" strokeWidth="2">
                                             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                                           </svg>
                                         </button>

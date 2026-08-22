@@ -244,7 +244,10 @@ export async function fetchModelHealth(): Promise<ModelHealthResponse> {
 
 export async function getAvailableModels(): Promise<ProviderModels[]> {
   const { data } = await client.get("/chat/models");
-  return data;
+  if (!Array.isArray(data)) return [];
+  // Ensure duplicates (e.g. gemini_free and gemini) are merged into one canonical provider
+  const { mergeProviderModels } = await import("../utils/modelUtils");
+  return mergeProviderModels(data);
 }
 
 export type OpenRouterModel = {
