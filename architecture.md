@@ -42,12 +42,16 @@ universal-chat-frontend/
 │   │   ├── MessageBubble.tsx    # User and AI markdown message bubble with code copy & delete
 │   │   ├── MessageInput.tsx     # Adaptive single/multiline text input with model picker popover
 │   │   ├── TopupModal.tsx       # Credit refuel modal with electric spark lightning icon and Razorpay checkout
-│   │   ├── WelcomeScreen.tsx    # Empty chat welcome screen with prompt suggestions & logo
+│   │   ├── PremiumModelModal.tsx# Premium model unlock modal with BYOK suggestions & dummy coming soon upgrade
+│   │   ├── WelcomeScreen.tsx    # Empty chat welcome screen with prompt suggestions, Image Studio spotlight & logo
 │   │   ├── CodeRunnerModal.tsx  # Interactive live sandbox execution for generated HTML/JS/CSS code
 │   │   ├── GoogleAuthButton.tsx # One-tap & popup Google OAuth authentication button
 │   │   ├── SignupForm.tsx       # Standard and OTP signup flow
 │   │   ├── ImageLightbox.tsx    # Full-screen image preview, details, and authenticated download
 │   │   └── HelpModal.tsx        # In-app help and support modal
+│   ├── utils/
+│   │   ├── modelUtils.ts        # Frontier / Premium model classification & detection rules
+│   │   └── codeDetector.ts      # AST async rewriter and code block detection
 │   └── pages/
 │       ├── Chat.tsx             # Main conversational chat view & temporary guest mode
 │       ├── ImageStudio.tsx      # Generative image synthesis workspace with gallery & presets
