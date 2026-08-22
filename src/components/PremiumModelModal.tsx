@@ -7,7 +7,6 @@ type PremiumModelModalProps = {
   onClose: () => void;
   modelName: string;
   provider: string;
-  onSelectAnyway?: () => void;
 };
 
 export default function PremiumModelModal({
@@ -15,13 +14,12 @@ export default function PremiumModelModal({
   onClose,
   modelName,
   provider,
-  onSelectAnyway,
 }: PremiumModelModalProps) {
   const navigate = useNavigate();
 
   if (typeof document === "undefined") return null;
 
-  const formattedProvider = provider.charAt(0).toUpperCase() + provider.slice(1);
+  const formattedProvider = provider ? (provider.charAt(0).toUpperCase() + provider.slice(1)) : "Provider";
 
   return createPortal(
     <AnimatePresence>
@@ -64,22 +62,23 @@ export default function PremiumModelModal({
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 border border-primary/25 text-primary">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-bold text-textPrimary truncate">{modelName}</h3>
                   <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary border border-primary/25">
-                    PRO
+                    LOCKED / PRO
                   </span>
                 </div>
-                <p className="text-xs text-textMuted">{formattedProvider} Frontier Intelligence</p>
+                <p className="text-xs text-textMuted">{formattedProvider} API Key Required</p>
               </div>
             </div>
 
             <p className="text-xs text-textSecondary leading-relaxed mb-5">
-              This model requires an active provider connection. You can connect your own API key to start using it immediately or wait for Pro plans.
+              This model requires an active API key connection to operate. Configure your key in Settings to unlock and use this model.
             </p>
 
             {/* Choice Options */}
@@ -92,11 +91,11 @@ export default function PremiumModelModal({
                     <span className="text-xs font-bold text-textPrimary">Connect Your API Key (BYOK)</span>
                   </div>
                   <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[9px] font-bold text-emerald-400 uppercase tracking-wider">
-                    Available Now
+                    Zero Fee
                   </span>
                 </div>
                 <p className="text-[11px] text-textMuted leading-relaxed mb-3">
-                  Add your personal {formattedProvider} or OpenRouter key in Settings to chat with this model with zero platform fee.
+                  Add your personal {formattedProvider} or OpenRouter key in Settings to chat with this model with zero platform markup.
                 </p>
                 <button
                   type="button"
@@ -106,7 +105,7 @@ export default function PremiumModelModal({
                   }}
                   className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-background shadow-[0_0_15px_rgba(217,255,0,0.15)] transition-all hover:bg-primaryHover hover:shadow-[0_0_20px_rgba(217,255,0,0.25)] active:scale-[0.99]"
                 >
-                  <span>Configure {formattedProvider} API Key</span>
+                  <span>Configure {formattedProvider} Key in Settings</span>
                   <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                   </svg>
@@ -133,22 +132,6 @@ export default function PremiumModelModal({
                 </button>
               </div>
             </div>
-
-            {/* Select Anyway Link */}
-            {onSelectAnyway && (
-              <div className="mt-4 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSelectAnyway();
-                    onClose();
-                  }}
-                  className="text-[11px] text-textMuted hover:text-textPrimary underline transition-colors"
-                >
-                  I already have an active key &mdash; select model
-                </button>
-              </div>
-            )}
           </motion.div>
         </div>
       )}
