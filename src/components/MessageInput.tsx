@@ -202,13 +202,16 @@ export default function MessageInput({
     });
   }, []);
 
+  const [viewedProvider, setViewedProvider] = useState<string | null>(null);
+
   const normalizedModels = useMemo(() => mergeProviderModels(availableModels), [availableModels]);
   const activeProvider = useMemo(() => {
-    if (!selectedProvider) return normalizedModels[0]?.provider || "";
-    const norm = normalizeProviderName(selectedProvider);
-    const found = normalizedModels.find((p) => p.provider === norm || p.provider === selectedProvider);
-    return found ? found.provider : (normalizedModels[0]?.provider || selectedProvider);
-  }, [selectedProvider, normalizedModels]);
+    const provToUse = viewedProvider || selectedProvider;
+    if (!provToUse) return normalizedModels[0]?.provider || "";
+    const norm = normalizeProviderName(provToUse);
+    const found = normalizedModels.find((p) => p.provider === norm || p.provider === provToUse);
+    return found ? found.provider : (normalizedModels[0]?.provider || provToUse);
+  }, [viewedProvider, selectedProvider, normalizedModels]);
 
   const currentProviderData = useMemo(() => {
     return normalizedModels.find((p) => p.provider === activeProvider) || normalizedModels[0];
@@ -241,15 +244,17 @@ export default function MessageInput({
     }, 300);
   }, [isOpenRouterBYOK]);
 
-  // Reset search when picker closes or provider changes
+  // Reset search and preview when picker closes or provider changes
   useEffect(() => {
     if (!showPicker) {
       setModelSearch("");
       setSearchResults([]);
+      setViewedProvider(null);
     }
   }, [showPicker, selectedProvider]);
 
   const renderModelSelector = (compact?: boolean) => {
+    if (isTempMode) return null;
     if (isLoadingModels && normalizedModels.length === 0) {
       return (
         <div className="flex items-center gap-1 rounded-xl px-2 py-1 text-[10px] sm:text-[11px] font-semibold text-textMuted bg-elevated/40 border border-border/30">
@@ -472,8 +477,7 @@ export default function MessageInput({
                               key={p.provider}
                               type="button"
                               onClick={() => {
-                                const defaultModel = p.text_models?.[0] || p.image_models?.[0] || "";
-                                onModelChange(p.provider, defaultModel);
+                                setViewedProvider(p.provider);
                               }}
                               className={`flex items-center justify-between w-full rounded-lg px-2 py-2 sm:py-1.5 text-left text-xs sm:text-[11px] font-semibold transition-colors group ${
                                 isSelected ? 'bg-primary text-background font-bold shadow-sm' : 'text-textSecondary hover:bg-elevated'
@@ -1014,13 +1018,6 @@ export default function MessageInput({
           onClose={() => setPremiumModalData(null)}
           provider={premiumModalData?.provider || ""}
           modelName={premiumModalData?.model || ""}
-          onSelectAnyway={() => {
-            if (premiumModalData) {
-              onModelChange(premiumModalData.provider, premiumModalData.model);
-              setShowPicker(false);
-              setPremiumModalData(null);
-            }
-          }}
         />
 
         {/* Disclaimer (only shown on initial empty state before first message) */}
