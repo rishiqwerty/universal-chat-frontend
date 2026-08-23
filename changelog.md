@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Architecture and Maintenance Documentation**: Created `architecture.md` and added mandatory changelog and architecture maintenance rules in `rules.md`.
 
 ### Added
+- **API `is_free` Flag Prioritization & Suffix Check Removal (`modelUtils.ts`, `ImageStudio.tsx`)**: Removed all string suffix checks (`_free`, `:free`). The frontend now strictly honors the boolean `is_free` and `premium_models` fields directly from the API response to determine whether a model or provider is free.
 - **Accurate Model Metadata in Temporary Chat Mode (`Chat.tsx`)**: Resolved a bug where temporary mode messages inherited the persistent chat's `selectedModel` state. Messages in temporary mode now accurately display the actual streaming engine (`gemini-2.0-flash` / metadata payload from `/temporary/stream`).
 - **Universal Inline Model Search & ⭐ Pinned Favorites (`MessageInput.tsx`)**: Added a global real-time search input bar at the top of the model selector (with instant local matching & OpenRouter catalog search) and a 1-click **⭐ Favorite / Pin** mechanism that persists chosen models in `localStorage` and pins them into a dedicated top **"Pinned Favorites"** section.
 - **Image Studio Free Provider Prioritization & PRO Model Tags (`ImageStudio.tsx`)**: Reordered image generation providers so that free/local engines (Flux, Stable Diffusion, Local) appear first, and tagged premium providers/models with subtle `✦ PRO` indicators in the dropdown selectors.
