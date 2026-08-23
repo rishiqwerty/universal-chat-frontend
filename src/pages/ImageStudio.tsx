@@ -135,7 +135,7 @@ export default function ImageStudio() {
         if (data && typeof data === "object" && Object.keys(data).length > 0) {
           setModels(data);
           const isFreeProv = (prov: string) =>
-            ["flux", "stable diffusion", "local", "gemini_free", "gemini"].some((name) =>
+            ["flux", "stable diffusion", "local", "gemini"].some((name) =>
               prov.toLowerCase().includes(name)
             );
           const providers = Object.keys(data).sort((a, b) => {
@@ -754,7 +754,7 @@ export default function ImageStudio() {
   };
 
   const isFreeProvider = (prov: string) =>
-    ["flux", "stable diffusion", "local", "gemini_free", "gemini"].some((name) =>
+    ["flux", "stable diffusion", "local", "gemini"].some((name) =>
       prov.toLowerCase().includes(name)
     );
 
