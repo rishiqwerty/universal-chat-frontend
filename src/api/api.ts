@@ -6,7 +6,7 @@ const apiRoot = `${getApiBaseUrl().replace(/\/+$/, "")}/api/v1`;
 
 const client = axios.create({
   baseURL: apiRoot,
-  timeout: 35000,
+  timeout: 60000,
   withCredentials: true,
 });
 
@@ -23,16 +23,23 @@ client.interceptors.response.use(
   async (error) => {
     const config = error.config;
     
-    // Check if error is due to cold-start / sleeping server
-    const isColdStart =
+    // Check if error is due to cold-start / sleeping GCP server / transient network reset
+    const status = error.response?.status;
+    const isColdStartOrTransient =
       !error.response ||
       error.code === "ECONNABORTED" ||
-      [502, 503, 504, 520, 521, 522, 524].includes(error.response?.status);
+      error.code === "ERR_NETWORK" ||
+      error.message?.toLowerCase().includes("network error") ||
+      [502, 503, 504, 520, 521, 522, 524].includes(status);
 
-    if (config && isColdStart && (config.__retryCount || 0) < 2) {
-      config.__retryCount = (config.__retryCount || 0) + 1;
-      const delay = config.__retryCount * 2000;
-      await new Promise((r) => setTimeout(r, delay));
+    const maxRetries = 3;
+    const currentRetry = config?.__retryCount || 0;
+
+    if (config && isColdStartOrTransient && currentRetry < maxRetries) {
+      config.__retryCount = currentRetry + 1;
+      // Exponential backoff: 1.2s, 2.5s, 4.5s
+      const backoffDelay = [1200, 2500, 4500][currentRetry] || 3000;
+      await new Promise((r) => setTimeout(r, backoffDelay));
       return client(config);
     }
 
@@ -44,14 +51,57 @@ client.interceptors.response.use(
   }
 );
 
+/**
+ * Resilient fetch wrapper with automatic exponential backoff retry for cold starts
+ * before streaming responses begin.
+ */
+async function fetchWithStreamRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries: number = 3
+): Promise<Response> {
+  let lastError: any = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (options.signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
+    try {
+      const response = await fetch(url, options);
+
+      // If gateway is cold-starting (502, 503, 504), retry with backoff
+      if ([502, 503, 504].includes(response.status) && attempt < maxRetries) {
+        const delay = [1500, 3000, 5000][attempt] || 3000;
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+
+      return response;
+    } catch (err: any) {
+      lastError = err;
+      if (options.signal?.aborted || err.name === "AbortError") {
+        throw err;
+      }
+      if (attempt < maxRetries) {
+        const delay = [1500, 3000, 5000][attempt] || 3000;
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+    }
+  }
+
+  throw lastError || new Error("Failed to connect to chat service. Please retry.");
+}
+
 export async function pingServerHealth(): Promise<boolean> {
   const root = getApiBaseUrl().replace(/\/+$/, "");
   try {
-    await axios.get(`${root}/health`, { timeout: 8000 });
+    await axios.get(`${root}/health`, { timeout: 15000 });
     return true;
   } catch {
     try {
-      await axios.get(`${root}/api/v1/models`, { timeout: 8000 });
+      await axios.get(`${root}/api/v1/chat/models`, { timeout: 15000 });
       return true;
     } catch {
       return false;
@@ -365,7 +415,7 @@ export async function sendMessageStream(
   signal?: AbortSignal
 ): Promise<void> {
   const token = localStorage.getItem("access_token");
-  const response = await fetch(`${apiRoot}/chat/conversations/${conversationId}/messages`, {
+  const response = await fetchWithStreamRetry(`${apiRoot}/chat/conversations/${conversationId}/messages`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -454,7 +504,7 @@ export async function sendTempChatMessageStream(
   onChunk: (chunk: string) => void,
   signal?: AbortSignal
 ): Promise<void> {
-  const response = await fetch(`${apiRoot}/chat/temp`, {
+  const response = await fetchWithStreamRetry(`${apiRoot}/chat/temp`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
