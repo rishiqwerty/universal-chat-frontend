@@ -196,6 +196,80 @@ export default function Sidebar({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Mobile swipe gestures:
+  // 1. Swipe right from left edge (x <= 40px) -> Opens sidebar
+  // 2. Swipe left anywhere when open -> Closes sidebar
+  useEffect(() => {
+    let startX = 0;
+    let startY = 0;
+    let isTracking = false;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (window.innerWidth >= 768) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      startX = touch.clientX;
+      startY = touch.clientY;
+
+      // Track if starting from the left edge (when closed) or anywhere (when open)
+      if (!isOpen && startX <= 45) {
+        isTracking = true;
+      } else if (isOpen) {
+        isTracking = true;
+      } else {
+        isTracking = false;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isTracking) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      const deltaX = touch.clientX - startX;
+      const deltaY = touch.clientY - startY;
+
+      // If user is primarily scrolling vertically, cancel swipe tracking
+      if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 25) {
+        isTracking = false;
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!isTracking) return;
+      isTracking = false;
+
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+
+      const deltaX = touch.clientX - startX;
+      const deltaY = touch.clientY - startY;
+
+      // Ensure horizontal swipe dominates vertical movement
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 40) {
+        if (!isOpen && deltaX > 40 && startX <= 45) {
+          setIsOpen(true);
+          localStorage.setItem("sidebar_collapsed", "false");
+        } else if (isOpen && deltaX < -40) {
+          setIsOpen(false);
+          localStorage.setItem("sidebar_collapsed", "true");
+        }
+      }
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+    window.addEventListener("touchcancel", () => { isTracking = false; }, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [isOpen]);
+
   const isRecentLoading = isLoadingRecent !== undefined ? isLoadingRecent : loading;
 
   const sourceChats = propsRecentChats || internalAllChats;
