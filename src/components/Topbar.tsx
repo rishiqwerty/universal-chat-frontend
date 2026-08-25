@@ -244,12 +244,14 @@ export default function Topbar({
       <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center gap-4 bg-background/70 backdrop-blur-xl px-4 sm:px-6 shadow-sm shadow-black/10 transition-all">
         {showHamburger && (
           <button
+            type="button"
             onClick={() => window.dispatchEvent(new Event("sidebar-toggle"))}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-input text-textSecondary hover:bg-surface hover:text-textPrimary transition-colors"
-            title="Open Sidebar"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-elevated/70 border border-border/40 text-primary shadow-sm transition-all hover:bg-elevated hover:border-primary/40 hover:scale-105 active:scale-95 group"
+            title="Toggle Navigation"
+            aria-label="Toggle Navigation"
           >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" className="transition-transform group-hover:scale-110">
+              <path fill="#D9FF00" d="M4 6h4v10H4V6zm6 0h4v4h-4V6zm0 6h4v4h-4v-4z" />
             </svg>
           </button>
         )}
