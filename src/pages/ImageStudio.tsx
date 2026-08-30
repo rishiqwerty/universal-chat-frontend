@@ -5,6 +5,7 @@ import Sidebar from "../components/Sidebar";
 import ConfirmModal from "../components/ConfirmModal";
 import Topbar from "../components/Topbar";
 import ImageLightbox from "../components/ImageLightbox";
+import ImageExpandModal from "../components/ImageExpandModal";
 import BeforeAfterSlider from "../components/BeforeAfterSlider";
 import PageTransition from "../components/PageTransition";
 import { getStudioPollingInterval } from "../config";
@@ -54,6 +55,8 @@ export default function ImageStudio() {
   const [secondaryImage, setSecondaryImage] = useState<File | null>(null);
   const [secondaryPreview, setSecondaryPreview] = useState<string | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<StudioPreset | null>(null);
+  const [activeTask, setActiveTask] = useState<string | null>(null);
+  const [showStudioExpandModal, setShowStudioExpandModal] = useState(false);
   const [dismissedPresetPrompt, setDismissedPresetPrompt] = useState(false);
 
   const isDualImagePreset = useCallback((preset: StudioPreset | null): boolean => {
@@ -79,10 +82,8 @@ export default function ImageStudio() {
   const getPresetSlotLabels = useCallback((preset: StudioPreset | null) => {
     if (!preset) {
       return {
-        mainLabel: "Image",
-        mainEmoji: "🖼️",
+        mainLabel: "Reference Image",
         secondaryLabel: "Secondary Image",
-        secondaryEmoji: "🖼️",
         bannerTag: "Preset Active",
         guidanceText: "Optionally upload a reference image below to customize this preset style."
       };
@@ -91,13 +92,9 @@ export default function ImageStudio() {
     if (preset.main_image_label || preset.secondary_image_label) {
       const main = preset.main_image_label || "Primary Image";
       const secondary = preset.secondary_image_label || "Secondary Image";
-      const mainEmoji = main.toLowerCase().includes("person") || main.toLowerCase().includes("model") || main.toLowerCase().includes("face") ? "👤" : "🖼️";
-      const secEmoji = secondary.toLowerCase().includes("outfit") || secondary.toLowerCase().includes("clothes") || secondary.toLowerCase().includes("garment") ? "👗" : "🖼️";
       return {
         mainLabel: main,
-        mainEmoji,
         secondaryLabel: secondary,
-        secondaryEmoji: secEmoji,
         bannerTag: `${preset.title}`,
         guidanceText: `Upload both ${main} and ${secondary} to customize this preset.`
       };
@@ -108,9 +105,7 @@ export default function ImageStudio() {
     if (str.includes("tryon") || str.includes("try-on") || str.includes("try on") || str.includes("outfit") || str.includes("clothes") || str.includes("garment") || str.includes("wardrobe")) {
       return {
         mainLabel: "Person",
-        mainEmoji: "👤",
         secondaryLabel: "Outfit",
-        secondaryEmoji: "👗",
         bannerTag: "Try-On Preset",
         guidanceText: "Upload both Person and Outfit images to generate your virtual try-on render."
       };
@@ -119,9 +114,7 @@ export default function ImageStudio() {
     if (str.includes("face") || str.includes("portrait") || str.includes("headshot") || str.includes("avatar")) {
       return {
         mainLabel: "Target Face",
-        mainEmoji: "👤",
         secondaryLabel: "Style / Pose",
-        secondaryEmoji: "🎨",
         bannerTag: "Portrait Preset",
         guidanceText: "Upload both target face and style/pose reference images."
       };
@@ -130,20 +123,16 @@ export default function ImageStudio() {
     if (str.includes("background") || str.includes("scene") || str.includes("environment") || str.includes("backdrop")) {
       return {
         mainLabel: "Subject",
-        mainEmoji: "📦",
         secondaryLabel: "Background",
-        secondaryEmoji: "🌄",
         bannerTag: "Scene Swap",
         guidanceText: "Upload your subject and desired background/scene references."
       };
     }
 
     return {
-      mainLabel: "Primary Ref",
-      mainEmoji: "🖼️",
-      secondaryLabel: "Secondary Ref",
-      secondaryEmoji: "🖼️",
-      bannerTag: "Multi-Ref Preset",
+      mainLabel: "Primary Reference",
+      secondaryLabel: "Secondary Reference",
+      bannerTag: "Multi-Reference",
       guidanceText: "Upload both primary and secondary reference images."
     };
   }, []);
@@ -170,6 +159,7 @@ export default function ImageStudio() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const secondaryFileInputRef = useRef<HTMLInputElement>(null);
   const autoCloseTimerRef = useRef<any>(null);
+  const executeGenRef = useRef<any>(null);
 
   const scrollToLatestGeneration = useCallback(() => {
     setActiveTab("generations");
@@ -190,11 +180,16 @@ export default function ImageStudio() {
       model?: string;
       referenceImageUrl?: string;
       imageUrl?: string;
+      task?: string;
       isEdit?: boolean;
+      autoGenerate?: boolean;
     } | null;
 
     if (!state) return;
 
+    if (state.task) {
+      setActiveTask(state.task);
+    }
     if (state.presetPrompt || state.prompt) {
       setPrompt(state.presetPrompt || state.prompt || "");
     }
@@ -218,6 +213,18 @@ export default function ImageStudio() {
           const file = new File([blob], `reference-${Date.now()}.png`, { type: blob.type || "image/png" });
           setReferenceImage(file);
           setReferencePreview(URL.createObjectURL(blob));
+
+          if (state.autoGenerate) {
+            // Immediately start generation without requiring manual click
+            executeGenRef.current?.({
+              prompt: state.presetPrompt || state.prompt || "",
+              aspectRatio: state.aspectRatio || "1:1",
+              provider: state.provider || undefined,
+              model: state.model || undefined,
+              referenceImage: file,
+              task: state.task || "expand",
+            });
+          }
         })
         .catch(() => {
           setReferencePreview(resolved);
@@ -421,28 +428,51 @@ export default function ImageStudio() {
     }
   };
 
-  const handleGenerate = async () => {
-    const hasPrompt = prompt.trim() || selectedPreset;
-    if (!hasPrompt || (paymentMode !== "free_queue" && (!selectedProvider || !selectedModel))) return;
+  const executeGeneration = useCallback(async (override?: {
+    prompt?: string;
+    provider?: string;
+    model?: string;
+    aspectRatio?: string;
+    paymentMode?: "own_key" | "credits" | "free_queue";
+    referenceImage?: File | null;
+    presetId?: string | null;
+    secondaryImage?: File | null;
+    task?: string | null;
+  }) => {
+    const finalPrompt = override?.prompt !== undefined ? override.prompt : prompt;
+    const finalProvider = override?.provider !== undefined ? override.provider : selectedProvider;
+    const finalModel = override?.model !== undefined ? override.model : selectedModel;
+    const finalRatio = override?.aspectRatio !== undefined ? override.aspectRatio : aspectRatio;
+    const finalPayment = override?.paymentMode !== undefined ? override.paymentMode : paymentMode;
+    const finalRef = override?.referenceImage !== undefined ? override.referenceImage : referenceImage;
+    const finalPresetId = override?.presetId !== undefined ? override.presetId : selectedPreset?.id || null;
+    const finalSec = override?.secondaryImage !== undefined ? override.secondaryImage : secondaryImage;
+    const finalTask = override?.task !== undefined ? override.task : activeTask;
+
+    const hasPrompt = finalPrompt.trim() || finalPresetId;
+    if (!hasPrompt || (finalPayment !== "free_queue" && (!finalProvider || !finalModel))) return;
+
     setGenerating(true);
     setError(null);
 
     try {
       // POST returns instantly with a pending/queued record
       const pendingImage = await generateStudioImage(
-        prompt,
-        paymentMode === "free_queue" ? "local" : selectedProvider,
-        paymentMode === "free_queue" ? "system_default" : selectedModel,
-        aspectRatio,
-        paymentMode,
-        referenceImage,
-        selectedPreset?.id || null,
-        secondaryImage
+        finalPrompt,
+        finalPayment === "free_queue" ? "local" : finalProvider,
+        finalPayment === "free_queue" ? "system_default" : finalModel,
+        finalRatio,
+        finalPayment,
+        finalRef,
+        finalPresetId,
+        finalSec,
+        finalTask
       );
       // Add the pending/queued record to the gallery immediately
       setGallery((prev) => [pendingImage, ...prev]);
       setPrompt("");
       setSelectedPreset(null);
+      setActiveTask(null);
       setReferenceImage(null);
       setReferencePreview(null);
       setSecondaryImage(null);
@@ -453,7 +483,7 @@ export default function ImageStudio() {
       // Switch tab to Recent Generations & scroll immediately to latest generation
       scrollToLatestGeneration();
 
-      if (paymentMode === "free_queue") {
+      if (finalPayment === "free_queue") {
         // Refresh queue status
         getQueueStatus().then(setQueueStatus).catch(() => { });
       }
@@ -467,7 +497,7 @@ export default function ImageStudio() {
       const detail = err?.response?.data?.detail || "";
       const status = err?.response?.status;
       // Detect API key related failures when using own key
-      const isKeyError = paymentMode === "own_key" && (
+      const isKeyError = finalPayment === "own_key" && (
         status === 400 || status === 502 ||
         /api.key|key.not|no.*key|unauthorized|invalid.*key|forbidden/i.test(detail)
       );
@@ -480,6 +510,14 @@ export default function ImageStudio() {
       }
       setGenerating(false);
     }
+  }, [prompt, selectedProvider, selectedModel, aspectRatio, paymentMode, referenceImage, selectedPreset, secondaryImage, activeTask, scrollToLatestGeneration, pollForCompletion]);
+
+  useEffect(() => {
+    executeGenRef.current = executeGeneration;
+  }, [executeGeneration]);
+
+  const handleGenerate = async () => {
+    await executeGeneration();
   };
 
   const handleRetry = async (imageId: string, paymentMode?: string) => {
@@ -552,7 +590,7 @@ export default function ImageStudio() {
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
-        className={`group relative cursor-pointer overflow-hidden rounded-card border bg-surface transition-all ${isGridMode ? "w-full aspect-square" : "w-[240px] flex-shrink-0 snap-start"
+        className={`group relative cursor-pointer overflow-hidden rounded-card border bg-surface transition-all ${isGridMode ? "w-full aspect-square" : "w-[180px] sm:w-[240px] flex-shrink-0 snap-start"
           } ${img.status === "failed"
             ? "border-red-500/30"
             : img.status === "completed"
@@ -910,13 +948,13 @@ export default function ImageStudio() {
     const items = Array.from({ length: count });
     return (
       <div className={isGrid
-        ? "grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-4"
-        : "flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
+        ? "grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-4"
+        : "flex gap-2.5 sm:gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
       }>
         {items.map((_, i) => (
           <div
             key={`skeleton-${i}`}
-            className={`relative overflow-hidden rounded-card border border-border/20 bg-surface/40 p-1 flex-shrink-0 ${isGrid ? "w-full aspect-square" : "w-[240px] h-[240px]"
+            className={`relative overflow-hidden rounded-card border border-border/20 bg-surface/40 p-1 flex-shrink-0 ${isGrid ? "w-full aspect-square" : "w-[180px] h-[180px] sm:w-[240px] sm:h-[240px]"
               }`}
           >
             <div className="relative h-full w-full rounded-[10px] overflow-hidden bg-elevated/40 flex items-center justify-center">
@@ -1121,21 +1159,83 @@ export default function ImageStudio() {
                       </div>
 
                       {showFullGallery ? (
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-4">
+                        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-4">
                           <AnimatePresence>
                             {gallery.map((img) => renderGalleryCard(img, true))}
                           </AnimatePresence>
                         </div>
                       ) : (
-                        <div
-                          ref={sliderRef}
-                          onScroll={handleScroll}
-                          className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
-                        >
-                          <AnimatePresence>
-                            {displayedGallery.map((img) => renderGalleryCard(img, false))}
-                          </AnimatePresence>
-                        </div>
+                        <>
+                          <div
+                            ref={sliderRef}
+                            onScroll={handleScroll}
+                            className="flex gap-2.5 sm:gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
+                          >
+                            <AnimatePresence>
+                              {displayedGallery.map((img) => renderGalleryCard(img, false))}
+                            </AnimatePresence>
+                          </div>
+
+                          {/* Featured Preset Styles (1-Click Try) */}
+                          {presets.length > 0 && (
+                            <div className="mt-5 pt-4 border-t border-border/15">
+                              <div className="mb-3 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <h3
+                                    className="text-xs font-bold uppercase tracking-wider text-textSecondary"
+                                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                                  >
+                                    Featured Preset Styles
+                                  </h3>
+                                  <span className="text-[8.5px] uppercase px-1.5 py-0.2 rounded font-bold bg-primary/10 text-primary border border-primary/20">
+                                    1-Click Try
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveTab("presets")}
+                                  className="text-[11px] font-bold text-textMuted hover:text-primary transition-colors flex items-center gap-1"
+                                >
+                                  <span>Explore All</span>
+                                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                                  </svg>
+                                </button>
+                              </div>
+
+                              <div className="flex gap-2.5 sm:gap-3.5 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory touch-pan-x">
+                                {presets.slice(0, 10).map((preset) => (
+                                  <div
+                                    key={`featured-slider-${preset.id}`}
+                                    onClick={() => handleRecreate(preset)}
+                                    className="group relative w-[130px] sm:w-[155px] aspect-square flex-shrink-0 cursor-pointer overflow-hidden rounded-xl border border-border/30 bg-surface snap-start hover:border-primary/50 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.12)] transition-all"
+                                  >
+                                    <img
+                                      src={resolveImagePath(preset.thumbnail_url || preset.image_url)}
+                                      alt={preset.title}
+                                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                      loading="lazy"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent flex flex-col justify-end p-2 sm:p-2.5">
+                                      <span className="text-[7.5px] sm:text-[8px] font-bold uppercase tracking-wider text-primary truncate">
+                                        {preset.category}
+                                      </span>
+                                      <span className="text-[10px] sm:text-[11px] font-bold text-white truncate group-hover:text-primary transition-colors">
+                                        {preset.title}
+                                      </span>
+                                    </div>
+
+                                    <div className="absolute right-1.5 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-background rounded-full p-1 shadow-md">
+                                      <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
+                                      </svg>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   ) : (
@@ -1233,7 +1333,7 @@ export default function ImageStudio() {
 
                   {/* Grid */}
                   {loadingPresets ? (
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
                       {Array.from({ length: 8 }).map((_, i) => (
                         <div
                           key={`preset-skeleton-${i}`}
@@ -1260,7 +1360,7 @@ export default function ImageStudio() {
                       ))}
                     </div>
                   ) : sortedPresets.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
                       {sortedPresets.map((preset) => (
                         <div
                           key={preset.id}
@@ -1281,20 +1381,23 @@ export default function ImageStudio() {
                               loading="lazy"
                             />
                           )}
-                          <div className="absolute left-3 top-3 rounded bg-background/80 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary border border-primary/20 backdrop-blur-sm z-10">
+                          <div className="absolute left-2 top-2 sm:left-3 sm:top-3 rounded bg-background/80 px-1.5 sm:px-2 py-0.5 text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-primary border border-primary/20 backdrop-blur-sm z-10">
                             {preset.category}
                           </div>
 
                           {/* Hover Overlay with Recreate option */}
-                          <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-4 px-4">
+                          <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-2 sm:pb-4 px-2 sm:px-4">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleRecreate(preset);
                               }}
-                              className="w-full rounded-input bg-primary py-2 text-[10px] font-black uppercase tracking-wider text-background shadow-lg shadow-primary/20 transition-all hover:bg-primaryHover active:scale-[0.98]"
+                              className="w-full flex items-center justify-center gap-1 rounded-input bg-primary py-1.5 sm:py-2 text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-background shadow-lg shadow-primary/20 transition-all hover:bg-primaryHover active:scale-[0.98]"
                             >
-                              Recreate ⚡
+                              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                              </svg>
+                              <span>Recreate</span>
                             </button>
                           </div>
                         </div>
@@ -1554,6 +1657,120 @@ export default function ImageStudio() {
                 )}
               </AnimatePresence>
 
+              {/* AI Tool / Creation Mode Quick Selector for New Generations */}
+              <div className="w-full max-w-full min-w-0 flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar pb-1 pt-0.5 touch-pan-x overscroll-x-contain">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-textMuted shrink-0 pr-1 select-none">
+                  Tools:
+                </span>
+
+                {/* 1. Standard Generation */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTask(null);
+                  }}
+                  className={`shrink-0 flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
+                    !activeTask
+                      ? "bg-primary text-background font-bold shadow-[0_0_12px_rgba(var(--color-primary),0.3)]"
+                      : "bg-surface/60 border border-border/30 text-textSecondary hover:text-textPrimary hover:border-border/60"
+                  }`}
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                  </svg>
+                  <span>Generate</span>
+                </button>
+
+                {/* 2. Expand Canvas (Outpaint) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (referencePreview) {
+                      setShowStudioExpandModal(true);
+                    } else {
+                      setActiveTask("expand");
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  className={`shrink-0 flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
+                    activeTask === "expand"
+                      ? "bg-primary text-background font-bold shadow-[0_0_12px_rgba(var(--color-primary),0.3)]"
+                      : "bg-surface/60 border border-border/30 text-textSecondary hover:text-primary hover:border-primary/50"
+                  }`}
+                  title="Expand canvas boundaries & synthesize surrounding scenery"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                  </svg>
+                  <span>Expand Canvas</span>
+                  <span className={`text-[7.5px] sm:text-[8px] uppercase px-1 py-0.2 rounded font-bold ${
+                    activeTask === "expand" ? "bg-background/20 text-background" : "bg-primary/10 text-primary border border-primary/20"
+                  }`}>
+                    Outpaint
+                  </span>
+                </button>
+
+                {/* 3. Remove Background */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTask("remove_background");
+                    if (!prompt.trim()) {
+                      setPrompt("Isolate main subject, remove background, clean sharp silhouette edges, transparent studio backdrop");
+                    }
+                    if (!referenceImage) {
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  className={`shrink-0 flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
+                    activeTask === "remove_background"
+                      ? "bg-rose-500 text-white font-bold shadow-[0_0_12px_rgba(244,63,94,0.3)]"
+                      : "bg-surface/60 border border-border/30 text-textSecondary hover:text-rose-400 hover:border-rose-500/50"
+                  }`}
+                  title="Isolate foreground subject with clean cutout edges"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.848 8.25l1.536.887M7.848 8.25a3 3 0 11-5.196-3 3 3 0 015.196 3zm1.536.887a2.165 2.165 0 011.083 1.839c.005.351.054.695.14 1.024M9.384 9.137l2.077 1.199M7.848 15.75l1.536-.887m-1.536.887a3 3 0 11-5.196 3 3 3 0 015.196-3zm1.536-.887a2.165 2.165 0 001.083-1.838c.005-.352.054-.696.14-1.025m-1.223 2.863l2.077-1.199m0-3.328a4.323 4.323 0 012.068-1.379l5.325-1.628a4.5 4.5 0 012.48 8.528l-5.325-1.627a4.323 4.323 0 01-2.068-1.379z" />
+                  </svg>
+                  <span>Remove BG</span>
+                  <span className={`text-[7.5px] sm:text-[8px] uppercase px-1 py-0.2 rounded font-bold ${
+                    activeTask === "remove_background" ? "bg-white/20 text-white" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                  }`}>
+                    Cutout
+                  </span>
+                </button>
+
+                {/* 4. AI Upscale & Enhance */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTask("upscale");
+                    if (!prompt.trim()) {
+                      setPrompt("Super resolution upscale 4K ultra high fidelity, enhance fine textures, remove compression noise, crisp sharpness");
+                    }
+                    if (!referenceImage) {
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  className={`shrink-0 flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
+                    activeTask === "upscale"
+                      ? "bg-sky-500 text-white font-bold shadow-[0_0_12px_rgba(14,165,233,0.3)]"
+                      : "bg-surface/60 border border-border/30 text-textSecondary hover:text-sky-400 hover:border-sky-500/50"
+                  }`}
+                  title="Enhance 4K clarity, textures, and details"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
+                  </svg>
+                  <span>AI Upscale</span>
+                  <span className={`text-[7.5px] sm:text-[8px] uppercase px-1 py-0.2 rounded font-bold ${
+                    activeTask === "upscale" ? "bg-white/20 text-white" : "bg-sky-500/10 text-sky-400 border border-sky-500/20"
+                  }`}>
+                    4K
+                  </span>
+                </button>
+              </div>
+
               {/* Prompt Input Card Container (Mobile Friendly) */}
               <div className="flex w-full flex-col rounded-xl border border-border/60 bg-surface focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_rgba(var(--color-primary),0.08)] transition-all overflow-hidden p-2">
                 {/* Reference & Secondary Image Previews inside the box */}
@@ -1565,7 +1782,7 @@ export default function ImageStudio() {
                       {referencePreview && (
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center justify-between text-[10px] font-bold text-textMuted uppercase tracking-wider">
-                            <span>{slotInfo.mainEmoji} {slotInfo.mainLabel}</span>
+                            <span>{slotInfo.mainLabel}</span>
                           </div>
                           <div
                             title={`View uploaded ${slotInfo.mainLabel}`}
@@ -1610,7 +1827,7 @@ export default function ImageStudio() {
                       {secondaryPreview && (
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center justify-between text-[10px] font-bold text-textMuted uppercase tracking-wider">
-                            <span>{slotInfo.secondaryEmoji} {slotInfo.secondaryLabel}</span>
+                            <span>{slotInfo.secondaryLabel}</span>
                           </div>
                           <div
                             title={`View uploaded ${slotInfo.secondaryLabel}`}
@@ -1688,20 +1905,78 @@ export default function ImageStudio() {
                         (!referenceImage || !secondaryImage) && !dismissedPresetPrompt && (
                           <div className="text-[10px] text-primary/95 flex items-center gap-1.5 font-medium pb-1">
                             <span>
-                              ✨ Upload {!referenceImage ? `${slotInfo.mainEmoji} ${slotInfo.mainLabel}` : ""} {!referenceImage && !secondaryImage ? "and" : ""} {!secondaryImage ? `${slotInfo.secondaryEmoji} ${slotInfo.secondaryLabel}` : ""} below to generate this preset render.
+                              Upload {!referenceImage ? slotInfo.mainLabel : ""} {!referenceImage && !secondaryImage ? "and" : ""} {!secondaryImage ? slotInfo.secondaryLabel : ""} below to generate this preset render.
                             </span>
                           </div>
                         )
                       ) : (
                         !referenceImage && !dismissedPresetPrompt && (
                           <div className="text-[10px] text-primary/95 flex items-center gap-1.5 animate-pulse font-medium pb-1">
-                            <span>📸 Optionally upload a reference image below to customize this preset style.</span>
+                            <span>Optionally upload a reference image below to customize this preset style.</span>
                           </div>
                         )
                       )}
                     </div>
                   );
                 })()}
+
+                {/* Active Edit Task Banner */}
+                {activeTask && (
+                  <div className="mx-2 sm:mx-3 mt-1.5 mb-1 flex items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs text-primary">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-5 w-5 shrink-0 rounded flex items-center justify-center bg-primary/20 text-primary">
+                        {activeTask === "expand" ? (
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                          </svg>
+                        ) : activeTask === "remove_background" ? (
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M7.848 8.25l1.536.887M7.848 8.25a3 3 0 11-5.196-3 3 3 0 015.196 3zm1.536.887a2.165 2.165 0 011.083 1.839c.005.351.054.695.14 1.024M9.384 9.137l2.077 1.199M7.848 15.75l1.536-.887m-1.536.887a3 3 0 11-5.196 3 3 3 0 015.196-3zm1.536-.887a2.165 2.165 0 001.083-1.838c.005-.352.054-.696.14-1.025m-1.223 2.863l2.077-1.199m0-3.328a4.323 4.323 0 012.068-1.379l5.325-1.628a4.5 4.5 0 012.48 8.528l-5.325-1.627a4.323 4.323 0 01-2.068-1.379z" />
+                          </svg>
+                        ) : activeTask === "upscale" ? (
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
+                          </svg>
+                        ) : (
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="font-bold uppercase tracking-wider text-[11px]">
+                          {activeTask === "expand" ? "Expand Canvas (Outpaint)" : activeTask === "remove_background" ? "Remove Background" : activeTask === "upscale" ? "AI Upscale & Enhance" : "Remix Mode"}
+                        </span>
+                        <span className="hidden sm:inline text-textMuted text-[10px] ml-2 truncate">
+                          {activeTask === "expand" ? "Custom outpaint canvas active" : activeTask === "remove_background" ? "Isolating foreground cutout" : "Super resolution 4K enhancement"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {activeTask === "expand" && referencePreview && (
+                        <button
+                          type="button"
+                          onClick={() => setShowStudioExpandModal(true)}
+                          className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-primary hover:bg-primary hover:text-background px-2 py-0.5 rounded border border-primary/40 bg-primary/10 transition-all"
+                          title="Open interactive expand canvas"
+                        >
+                          <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                          </svg>
+                          <span>Canvas</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setActiveTask(null)}
+                        className="text-[10px] font-bold uppercase tracking-wider text-textMuted hover:text-primary px-1.5 py-0.5 rounded border border-border/40 hover:border-primary/40 bg-surface/60 transition-colors"
+                        title="Reset task mode"
+                      >
+                        Reset ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Textarea Row */}
                 <div className="relative w-full">
@@ -1843,12 +2118,12 @@ export default function ImageStudio() {
                     {/* Selected payment indicator when options are minimized */}
                     {!showOptions && !generating && (
                       <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-textSecondary bg-surface-elevated px-2.5 h-8 rounded-lg border border-border/30 shrink-0">
-                        {paymentMode === "own_key" && "🔑 Personal"}
-                        {paymentMode === "credits" && "⚡ Credits (5c)"}
+                        {paymentMode === "own_key" && "Personal Key"}
+                        {paymentMode === "credits" && "Credits (5c)"}
                         {paymentMode === "free_queue" && (
                           queueStatus && queueStatus.used_today >= queueStatus.limit
-                            ? "⏳ Queue (2c)"
-                            : "⏳ Free Queue"
+                            ? "Queue (2c)"
+                            : "Free Queue"
                         )}
                       </span>
                     )}
@@ -1856,12 +2131,12 @@ export default function ImageStudio() {
                     {/* Credits Counter or Details in toolbar */}
                     {paymentMode === "credits" && !generating && showOptions && (
                       <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-black uppercase text-primary/80 bg-primary/5 px-2 py-0.5 rounded border border-primary/10 shrink-0">
-                        ⚡ 5 Credits
+                        5 Credits
                       </span>
                     )}
                     {paymentMode === "free_queue" && queueStatus && queueStatus.used_today >= queueStatus.limit && !generating && showOptions && (
                       <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-500 bg-amber-500/5 px-2 py-0.5 rounded border border-amber-500/20 shrink-0">
-                        ⚡ 2 Credits Charge
+                        2 Credits Charge
                       </span>
                     )}
                   </div>
@@ -1878,7 +2153,7 @@ export default function ImageStudio() {
                       : "bg-surface-elevated border border-border/40 text-textPrimary hover:border-primary/50"
                       }`}
                   >
-                    <div className="relative z-10 flex items-center gap-1.5">
+                    <div className="relative z-10 flex items-center gap-2">
                       {generating ? (
                         <>
                           <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -1892,13 +2167,24 @@ export default function ImageStudio() {
                         <>
                           <span>{paymentMode === "free_queue" ? "Request" : "Generate"}</span>
                           {paymentMode === "credits" && (
-                            <span className="hidden xs:flex items-center gap-0.5 pl-1 ml-1 border-l border-background/20">
-                              <span className="text-[9px] font-black">⚡ 5</span>
+                            <span className="flex items-center gap-0.5 rounded bg-black/25 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-background border border-black/10">
+                              5 Credits
                             </span>
                           )}
-                          {paymentMode === "free_queue" && queueStatus && queueStatus.used_today >= queueStatus.limit && (
-                            <span className="hidden xs:flex items-center gap-0.5 pl-1 ml-1 border-l border-border/20">
-                              <span className="text-[9px] font-bold text-amber-500">⚡ 2</span>
+                          {paymentMode === "free_queue" && (
+                            queueStatus && queueStatus.used_today >= queueStatus.limit ? (
+                              <span className="flex items-center gap-0.5 rounded bg-amber-500/20 text-amber-400 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-amber-500/30">
+                                2 Credits
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-0.5 rounded bg-surface/80 text-textMuted px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-border/30">
+                                Free
+                              </span>
+                            )
+                          )}
+                          {paymentMode === "own_key" && (
+                            <span className="hidden sm:inline-flex items-center rounded bg-surface/80 text-textMuted px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border border-border/30">
+                              BYOK
                             </span>
                           )}
                         </>
@@ -1907,6 +2193,11 @@ export default function ImageStudio() {
                   </motion.button>
                 </div>
               </div>
+
+              {/* Subtle AI Disclaimer */}
+              <p className="text-center text-[10px] text-textMuted/60 pt-0.5 select-none">
+                AI generated imagery may contain inaccuracies. Verify details before professional use.
+              </p>
             </div>
           </div>
         </div>
@@ -1937,6 +2228,43 @@ export default function ImageStudio() {
           message={deleteConfirmMessage}
           confirmText="Yes, Cancel"
         />
+
+        {/* Studio Expand Canvas Modal */}
+        {referencePreview && (
+          <ImageExpandModal
+            isOpen={showStudioExpandModal}
+            onClose={() => setShowStudioExpandModal(false)}
+            image={{
+              id: "studio-canvas-source",
+              prompt: prompt,
+              image_url: referencePreview,
+              reference_image_url: null,
+              aspect_ratio: aspectRatio,
+              provider: selectedProvider,
+              model: selectedModel,
+              used_credits: "false",
+              payment_mode: paymentMode,
+              status: "completed",
+              error_message: null,
+              created_at: new Date().toISOString(),
+            }}
+            onApplyExpand={(data) => {
+              setReferenceImage(data.expandedFile);
+              setReferencePreview(data.expandedPreview);
+              setPrompt(data.prompt);
+              setAspectRatio(data.targetRatio);
+              setActiveTask("expand");
+
+              // Immediately start generation without waiting for manual click
+              executeGeneration({
+                prompt: data.prompt,
+                aspectRatio: data.targetRatio,
+                referenceImage: data.expandedFile,
+                task: "expand",
+              });
+            }}
+          />
+        )}
       </div>
     </PageTransition>
   );

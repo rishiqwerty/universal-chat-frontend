@@ -46,6 +46,19 @@ export function mergeProviderModels(providers: ProviderModels[]): ProviderModels
         existing.model_speeds = { ...existing.model_speeds, ...item.model_speeds };
       }
 
+      if (item.model_data_policies) {
+        existing.model_data_policies = { ...(existing.model_data_policies || {}), ...item.model_data_policies };
+      }
+      if (item.model_policies) {
+        existing.model_policies = { ...(existing.model_policies || {}), ...item.model_policies };
+      }
+      if (item.collects_data !== undefined) {
+        existing.collects_data = item.collects_data;
+      }
+      if (item.data_policy_notice) {
+        existing.data_policy_notice = item.data_policy_notice;
+      }
+
       // If either has is_free or is_byok_configured, retain true
       if (item.is_free) existing.is_free = true;
       if (item.is_byok_configured) existing.is_byok_configured = true;
@@ -59,6 +72,44 @@ export function mergeProviderModels(providers: ProviderModels[]): ProviderModels
   }
 
   return Array.from(mergedMap.values());
+}
+
+/**
+ * Returns data policy information for a given model.
+ */
+export function getModelPolicy(
+  _provider: string | null,
+  modelName: string | null,
+  providerData?: ProviderModels
+): { collectsData: boolean; notice: string | null } {
+  if (!modelName) {
+    return { collectsData: false, notice: null };
+  }
+
+  // 1. Check model-specific dictionary
+  const modelSpecific =
+    providerData?.model_data_policies?.[modelName] ||
+    providerData?.model_policies?.[modelName];
+
+  if (modelSpecific && modelSpecific.collects_data) {
+    return {
+      collectsData: true,
+      notice: modelSpecific.data_policy_notice || null,
+    };
+  }
+
+  // 2. Check provider-level policy if explicitly true
+  if (providerData?.collects_data) {
+    return {
+      collectsData: true,
+      notice: providerData.data_policy_notice || null,
+    };
+  }
+
+  return {
+    collectsData: false,
+    notice: null,
+  };
 }
 
 /**

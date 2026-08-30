@@ -5,6 +5,7 @@ import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import ConfirmModal from "../components/ConfirmModal";
 import SocialShareModal from "../components/SocialShareModal";
+import ImageEditMenu from "../components/ImageEditMenu";
 import PageTransition from "../components/PageTransition";
 import { useDocumentSEO } from "../hooks/useDocumentSEO";
 import { useAuth } from "../context/AuthContext";
@@ -44,6 +45,7 @@ export default function Library() {
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const [shareImage, setShareImage] = useState<GeneratedImage | null>(null);
+  const [editMenuImage, setEditMenuImage] = useState<GeneratedImage | null>(null);
 
   // Deletion modal state
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -571,11 +573,11 @@ export default function Library() {
                           
                           {img.payment_mode === "credits" ? (
                             <span className="rounded-md bg-primary/90 px-1.5 py-0.5 text-[9px] font-bold text-black backdrop-blur-md shadow-sm">
-                              ⚡ 5c
+                              5c
                             </span>
                           ) : img.payment_mode === "own_key" ? (
                             <span className="rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-bold text-textSecondary backdrop-blur-md border border-white/10">
-                              🔑 BYOK
+                              BYOK
                             </span>
                           ) : null}
                         </div>
@@ -604,9 +606,12 @@ export default function Library() {
 
                               <button
                                 type="button"
-                                onClick={(e) => handleOpenInStudio(img, e)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditMenuImage(img);
+                                }}
                                 className="rounded-lg bg-black/70 p-2 text-white hover:bg-primary hover:text-black transition-colors backdrop-blur-md border border-white/10"
-                                title="Open in Studio"
+                                title="Edit & Transform (Expand, Remove BG, Upscale, Remix)"
                               >
                                 <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
@@ -873,6 +878,15 @@ export default function Library() {
         imageUrl={shareImage?.image_url || ""}
         prompt={shareImage?.prompt || ""}
       />
+
+      {/* Image Edit & Transform Menu */}
+      {editMenuImage && (
+        <ImageEditMenu
+          isOpen={!!editMenuImage}
+          onClose={() => setEditMenuImage(null)}
+          image={editMenuImage}
+        />
+      )}
     </PageTransition>
   );
 }

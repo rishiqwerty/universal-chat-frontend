@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { type ProviderModels, type OpenRouterModel, searchOpenRouterModels } from "../api/api";
 import PremiumModelModal from "./PremiumModelModal";
-import { isPremiumModel, mergeProviderModels, normalizeProviderName } from "../utils/modelUtils";
+import { isPremiumModel, mergeProviderModels, normalizeProviderName, getModelPolicy } from "../utils/modelUtils";
 
 type MessageInputProps = {
   inputRef?: React.RefObject<MessageInputHandle> | React.MutableRefObject<MessageInputHandle | null>;
@@ -264,6 +264,7 @@ export default function MessageInput({
       );
     }
     const isCurrentModelPremium = isPremiumModel(activeProvider, selectedModel || "", currentProviderData);
+    const activePolicy = getModelPolicy(activeProvider, selectedModel, currentProviderData);
 
     return (
       <button
@@ -276,7 +277,11 @@ export default function MessageInput({
             ? 'bg-primary/10 text-primary ring-1 ring-primary/30 hover:bg-primary/20' 
             : 'bg-elevated/60 text-textSecondary hover:bg-elevated hover:text-textPrimary border border-border/20'
         } disabled:opacity-30`}
-        title="Select model"
+        title={
+          activePolicy.collectsData
+            ? `Select model (${activePolicy.notice || 'Provider collects data'})`
+            : `Select model (${activePolicy.notice || 'Zero data retention'})`
+        }
       >
         {isImageModel ? (
           <svg className="h-3 w-3 animate-pulse text-primary shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -295,6 +300,19 @@ export default function MessageInput({
             PRO
           </span>
         )}
+
+        {/* Data Privacy Status Icon - only shown if collectsData is true */}
+        {activePolicy.collectsData && (
+          <span
+            className="flex items-center text-amber-400 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity"
+            title={activePolicy.notice || "Data Collection Active"}
+          >
+            <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+          </span>
+        )}
+
         <svg className={`h-2.5 w-2.5 shrink-0 text-textMuted transition-transform ${showPicker ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
           <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
         </svg>
@@ -430,10 +448,10 @@ export default function MessageInput({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 12, scale: 0.96 }}
                 transition={{ duration: 0.2 }}
-                className="fixed inset-x-2 bottom-14 sm:absolute sm:bottom-full sm:inset-x-auto sm:left-0 sm:right-auto sm:mb-2 z-50 w-auto sm:w-[380px] max-w-[calc(100vw-16px)] sm:max-w-md max-h-[75vh] sm:max-h-[80vh] overflow-hidden rounded-2xl border border-border/50 bg-sidebar shadow-2xl ring-1 ring-black/40 sm:rounded-card"
+                className="fixed inset-x-2 bottom-14 sm:absolute sm:bottom-full sm:inset-x-auto sm:left-0 sm:right-auto sm:mb-2 z-50 w-auto sm:w-[440px] max-w-[calc(100vw-16px)] sm:max-w-lg max-h-[82vh] sm:max-h-[80vh] overflow-hidden rounded-2xl border border-border/50 bg-sidebar shadow-2xl ring-1 ring-black/40 sm:rounded-card flex flex-col"
               >
                 {/* Mobile Header Bar */}
-                <div className="flex items-center justify-between border-b border-border/20 px-3.5 py-2 sm:hidden bg-elevated/40">
+                <div className="flex items-center justify-between border-b border-border/20 px-3.5 py-2 sm:hidden bg-elevated/40 shrink-0">
                   <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
                     <span className="text-xs font-bold uppercase tracking-wider text-textPrimary">Select AI Model</span>
@@ -451,9 +469,9 @@ export default function MessageInput({
                   </button>
                 </div>
 
-                <div className="flex h-[280px] sm:h-[360px] max-h-[60vh]">
-                  {/* Providers Column */}
-                  <div className="w-[125px] sm:w-[135px] shrink-0 border-r border-border/20 bg-elevated/20 p-1.5 overflow-y-auto custom-scrollbar">
+                <div className="flex h-[280px] sm:h-[360px] max-h-[50vh] sm:max-h-[55vh] min-h-[220px] flex-1 min-w-0">
+                  {/* Providers Column (Responsive width) */}
+                  <div className="w-[125px] xs:w-[135px] sm:w-[155px] shrink-0 border-r border-border/20 bg-elevated/20 p-1.5 overflow-y-auto custom-scrollbar">
                     <p className="mb-2 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-textMuted">Providers</p>
                     <div className="space-y-1">
                       {(() => {
@@ -1028,6 +1046,32 @@ export default function MessageInput({
                     </div>
                   </div>
                 </div>
+
+                {/* Model Data Retention & Privacy Policy Footer - only shown when collects_data is true */}
+                {(() => {
+                  const policy = getModelPolicy(activeProvider, selectedModel, currentProviderData);
+                  if (!policy.collectsData) return null;
+                  return (
+                    <div className="border-t border-border/20 bg-amber-500/[0.06] px-3 sm:px-3.5 py-2 sm:py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 text-[10.5px] sm:text-[11px] leading-snug shrink-0 max-h-[130px] overflow-y-auto custom-scrollbar">
+                      <div className="flex items-start sm:items-center gap-2 min-w-0">
+                        <svg className="h-4 w-4 shrink-0 text-amber-400 mt-0.5 sm:mt-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                        </svg>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-amber-300 font-bold text-[9.5px] sm:text-[10px] uppercase tracking-wider">
+                            Data Collection Notice
+                          </span>
+                          <span className="text-textSecondary text-[10.5px] sm:text-[11px] leading-relaxed break-words">
+                            {policy.notice || "This model provider may collect conversation data for AI model training and evaluation."}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="self-start sm:self-center shrink-0 text-[8px] sm:text-[8.5px] uppercase tracking-wider font-bold px-1.5 sm:px-2 py-0.5 rounded border bg-amber-500/15 text-amber-400 border-amber-500/30">
+                        Data Collected
+                      </span>
+                    </div>
+                  );
+                })()}
               </motion.div>
             </>
           )}
@@ -1041,12 +1085,26 @@ export default function MessageInput({
           modelName={premiumModalData?.model || ""}
         />
 
-        {/* Disclaimer (only shown on initial empty state before first message) */}
-        {showDisclaimer && (
-          <p className="mt-1 text-center text-[10px] sm:text-[11px] text-textMuted/60 leading-tight select-none">
-            AI can make mistakes. Chats with free models and temporary guest chats may be used by model providers for training purposes.
-          </p>
-        )}
+        {/* Disclaimer / Data Policy Notice (shown on initial empty state before first message) */}
+        {showDisclaimer && (() => {
+          const policy = getModelPolicy(activeProvider, selectedModel, currentProviderData);
+          return (
+            <p className="mt-1.5 text-center text-[10px] sm:text-[11.5px] leading-normal select-none px-2">
+              {policy.collectsData ? (
+                <span className="text-amber-400 font-medium inline-flex items-center justify-center gap-1.5 flex-wrap">
+                  <svg className="h-3.5 w-3.5 shrink-0 inline text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                  </svg>
+                  <span className="break-words">{policy.notice || "Chats with this model may be collected and used by the model provider for AI training purposes."}</span>
+                </span>
+              ) : (
+                <span className="text-textMuted/60">
+                  AI can make mistakes. Check important info.
+                </span>
+              )}
+            </p>
+          );
+        })()}
       </div>
     </div>
   );

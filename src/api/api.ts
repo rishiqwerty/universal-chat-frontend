@@ -255,6 +255,11 @@ export type Conversation = {
   created_at?: string;
 };
 
+export type ModelDataPolicy = {
+  collects_data?: boolean;
+  data_policy_notice?: string | null;
+};
+
 export type ProviderModels = {
   provider: string;
   display_name?: string;
@@ -271,6 +276,10 @@ export type ProviderModels = {
   est_tps?: number;
   model_speeds?: Record<string, number>;
   reachable_models?: string[];
+  collects_data?: boolean;
+  data_policy_notice?: string | null;
+  model_data_policies?: Record<string, ModelDataPolicy>;
+  model_policies?: Record<string, ModelDataPolicy>;
 };
 
 export type ModelHealthResponse = {
@@ -720,7 +729,8 @@ export async function generateStudioImage(
   paymentMode: string,
   referenceImage: File | null = null,
   presetId: string | null = null,
-  secondaryImage: File | null = null
+  secondaryImage: File | null = null,
+  task: string | null = null
 ): Promise<GeneratedImage> {
   const formData = new FormData();
   formData.append("prompt", prompt);
@@ -737,6 +747,10 @@ export async function generateStudioImage(
   }
   if (presetId) {
     formData.append("preset_id", presetId);
+  }
+  if (task) {
+    formData.append("task", task);
+    formData.append("edit_type", task);
   }
 
   const { data } = await client.post("/studio/generate", formData, {
