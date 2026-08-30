@@ -467,6 +467,7 @@ export default function MessageInput({
 
                         return sortedProviders.map((p) => {
                           const isPrem = !p.is_free && !p.is_byok_configured;
+                          const isLocal = p.provider.toLowerCase() === "local";
                           const isOnline = p.status !== "offline" && p.reachable !== false;
                           const isFast = p.speed_tier === "fast" || (!p.speed_tier && (p.latency_ms || 0) < 300);
                           const isModerate = p.speed_tier === "moderate" || (!p.speed_tier && (p.latency_ms || 0) >= 300 && (p.latency_ms || 0) < 800);
@@ -485,13 +486,19 @@ export default function MessageInput({
                             >
                               <div className="flex items-center gap-1 min-w-0 pr-1">
                                 <span className="truncate">{p.provider.charAt(0).toUpperCase() + p.provider.slice(1)}</span>
-                                {isPrem && (
+                                {isLocal ? (
+                                  <span className={`text-[7px] font-black uppercase px-1 py-0.2 rounded shrink-0 ${
+                                    isSelected ? 'bg-background/20 text-background' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                                  }`}>
+                                    SOON
+                                  </span>
+                                ) : isPrem ? (
                                   <span className={`text-[7px] font-black uppercase px-1 py-0.2 rounded shrink-0 ${
                                     isSelected ? 'bg-background/20 text-background' : 'bg-primary/10 text-primary border border-primary/20'
                                   }`}>
                                     PRO
                                   </span>
-                                )}
+                                ) : null}
                               </div>
                               {/* Speed & Reachability Badge */}
                               <div className="flex items-center gap-1 shrink-0">
@@ -571,8 +578,22 @@ export default function MessageInput({
                     </div>
 
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
-                      {/* Search Results (when modelSearch query is present) */}
-                      {modelSearch.trim() ? (
+                      {currentProviderData?.provider.toLowerCase() === "local" ? (
+                        <div className="flex flex-col items-center justify-center p-6 text-center h-full my-auto">
+                          <div className="h-10 w-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center mb-2.5 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
+                            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full mb-1.5">
+                            Coming Soon
+                          </span>
+                          <h3 className="text-xs font-bold text-textPrimary">Local LLM Integration</h3>
+                          <p className="text-[11px] text-textMuted max-w-[200px] mt-1 leading-relaxed">
+                            Direct local inference with Ollama, LM Studio, and vLLM is coming soon.
+                          </p>
+                        </div>
+                      ) : modelSearch.trim() ? (
                         <div className="space-y-4">
                           {/* Remote OpenRouter Search Results */}
                           {isOpenRouterBYOK && searchResults.length > 0 && (

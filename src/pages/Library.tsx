@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import ConfirmModal from "../components/ConfirmModal";
+import SocialShareModal from "../components/SocialShareModal";
 import PageTransition from "../components/PageTransition";
 import { useDocumentSEO } from "../hooks/useDocumentSEO";
 import { useAuth } from "../context/AuthContext";
@@ -42,6 +43,7 @@ export default function Library() {
 
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
+  const [shareImage, setShareImage] = useState<GeneratedImage | null>(null);
 
   // Deletion modal state
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -184,7 +186,7 @@ export default function Library() {
     setTimeout(() => setCopiedPromptId(null), 2000);
   };
 
-  // Open in Studio handler
+  // Open in Studio / Edit with reference handler
   const handleOpenInStudio = (img: GeneratedImage, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     navigate("/studio", {
@@ -193,6 +195,8 @@ export default function Library() {
         aspectRatio: img.aspect_ratio,
         provider: img.provider,
         model: img.model,
+        referenceImageUrl: img.image_url,
+        isEdit: true,
       },
     });
   };
@@ -488,9 +492,82 @@ export default function Library() {
 
                         {/* Top Badges */}
                         <div className="absolute top-2 left-2 right-2 flex items-center justify-between pointer-events-none">
-                          <span className="rounded-md bg-black/70 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-white backdrop-blur-md border border-white/10 shadow-sm">
-                            {img.aspect_ratio || "1:1"}
-                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className="rounded-md bg-black/70 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-white backdrop-blur-md border border-white/10 shadow-sm">
+                              {img.aspect_ratio || "1:1"}
+                            </span>
+                            
+                            {/* Source Reference Thumbnails */}
+                            {(img.reference_image_url || img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url) && (
+                              <div className="flex items-center gap-1 pointer-events-auto">
+                                {img.reference_image_url && (
+                                  <div
+                                    title="View Person / Primary Reference"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setLightboxImage({
+                                        id: `${img.id}-ref-1`,
+                                        prompt: `[Person Reference] ${img.prompt}`,
+                                        image_url: img.reference_image_url,
+                                        thumbnail_url: img.reference_image_thumbnail_url || img.reference_image_url,
+                                        reference_image_url: null,
+                                        reference_image_thumbnail_url: null,
+                                        aspect_ratio: img.aspect_ratio,
+                                        provider: img.provider,
+                                        model: img.model,
+                                        used_credits: "false",
+                                        payment_mode: img.payment_mode,
+                                        status: "completed",
+                                        error_message: null,
+                                        created_at: img.created_at
+                                      });
+                                    }}
+                                    className="relative h-6 w-6 overflow-hidden rounded border border-white/20 bg-black/60 shadow hover:border-primary transition-all cursor-zoom-in"
+                                  >
+                                    <img
+                                      src={resolveImagePath(img.reference_image_thumbnail_url || img.reference_image_url)}
+                                      alt="Person Ref"
+                                      className="h-full w-full object-cover"
+                                    />
+                                  </div>
+                                )}
+
+                                {(img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url) && (
+                                  <div
+                                    title="View Outfit Reference"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const secUrl = img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url || "";
+                                      const secThumb = img.secondary_reference_image_thumbnail_url || secUrl;
+                                      setLightboxImage({
+                                        id: `${img.id}-ref-2`,
+                                        prompt: `[Outfit Reference] ${img.prompt}`,
+                                        image_url: secUrl,
+                                        thumbnail_url: secThumb,
+                                        reference_image_url: null,
+                                        reference_image_thumbnail_url: null,
+                                        aspect_ratio: img.aspect_ratio,
+                                        provider: img.provider,
+                                        model: img.model,
+                                        used_credits: "false",
+                                        payment_mode: img.payment_mode,
+                                        status: "completed",
+                                        error_message: null,
+                                        created_at: img.created_at
+                                      });
+                                    }}
+                                    className="relative h-6 w-6 overflow-hidden rounded border border-white/20 bg-black/60 shadow hover:border-primary transition-all cursor-zoom-in"
+                                  >
+                                    <img
+                                      src={resolveImagePath(img.secondary_reference_image_thumbnail_url || img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url || "")}
+                                      alt="Outfit Ref"
+                                      className="h-full w-full object-cover"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           
                           {img.payment_mode === "credits" ? (
                             <span className="rounded-md bg-primary/90 px-1.5 py-0.5 text-[9px] font-bold text-black backdrop-blur-md shadow-sm">
@@ -533,6 +610,24 @@ export default function Library() {
                               >
                                 <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+                                </svg>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShareImage(img);
+                                }}
+                                className="rounded-lg bg-black/70 p-2 text-white hover:bg-primary hover:text-black transition-colors backdrop-blur-md border border-white/10"
+                                title="Share image (WhatsApp, Instagram, X...)"
+                              >
+                                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <circle cx="18" cy="5" r="3" />
+                                  <circle cx="6" cy="12" r="3" />
+                                  <circle cx="18" cy="19" r="3" />
+                                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
                                 </svg>
                               </button>
 
@@ -759,15 +854,24 @@ export default function Library() {
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={isDeleteModalOpen}
+        title="Delete Image"
+        message="Are you sure you want to delete this generated image? This action cannot be undone."
+        confirmText="Delete Image"
+        cancelText="Keep Image"
+        confirmVariant="danger"
+        onConfirm={handleConfirmDelete}
         onClose={() => {
           setIsDeleteModalOpen(false);
           setImageToDelete(null);
         }}
-        onConfirm={handleConfirmDelete}
-        title="Delete Image"
-        message="Are you sure you want to permanently delete this image from your library? This action cannot be undone."
-        confirmText="Delete"
-        confirmVariant="danger"
+      />
+
+      {/* Social Share Modal */}
+      <SocialShareModal
+        isOpen={!!shareImage}
+        onClose={() => setShareImage(null)}
+        imageUrl={shareImage?.image_url || ""}
+        prompt={shareImage?.prompt || ""}
       />
     </PageTransition>
   );

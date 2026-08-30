@@ -1,5 +1,8 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import BeforeAfterSlider from "./BeforeAfterSlider";
+import SocialShareModal from "./SocialShareModal";
 import { resolveImagePath, getProxyDownloadUrl, type GeneratedImage, type StudioPreset } from "../api/api";
 
 type Props = {
@@ -14,6 +17,8 @@ const isPreset = (img: any): img is StudioPreset => {
 };
 
 export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: Props) {
+  const navigate = useNavigate();
+  const [isShareOpen, setIsShareOpen] = useState(false);
   if (!image || !image.image_url) return null;
 
   const handleDownload = async () => {
@@ -121,11 +126,101 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
                         </span>
                       )}
                     </div>
+
+                    {/* Source Reference Thumbnails */}
+                    {(image.reference_image_url || (image as any).secondary_reference_image_url || (image as any).secondary_image_url || (image as any).outfit_image_url) && (
+                      <div className="mt-3 flex flex-col gap-1.5 pt-2 border-t border-border/20">
+                        <span className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Source References:</span>
+                        <div className="flex items-center gap-2">
+                          {image.reference_image_url && (
+                            <a
+                              href={resolveImagePath(image.reference_image_url)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="group relative flex items-center gap-1.5 rounded-lg border border-border/40 bg-elevated/40 p-1.5 hover:border-primary/40 transition-colors"
+                              title="View Person / Primary Reference"
+                            >
+                              <img
+                                src={resolveImagePath(image.reference_image_thumbnail_url || image.reference_image_url)}
+                                alt="Person Reference"
+                                className="h-8 w-8 rounded object-cover"
+                              />
+                              <span className="text-[10px] font-semibold text-textSecondary group-hover:text-primary pr-1">
+                                👤 Person
+                              </span>
+                            </a>
+                          )}
+
+                          {((image as any).secondary_reference_image_url || (image as any).secondary_image_url || (image as any).outfit_image_url) && (
+                            <a
+                              href={resolveImagePath((image as any).secondary_reference_image_url || (image as any).secondary_image_url || (image as any).outfit_image_url)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="group relative flex items-center gap-1.5 rounded-lg border border-border/40 bg-elevated/40 p-1.5 hover:border-primary/40 transition-colors"
+                              title="View Outfit Reference"
+                            >
+                              <img
+                                src={resolveImagePath((image as any).secondary_reference_image_thumbnail_url || (image as any).secondary_reference_image_url || (image as any).secondary_image_url || (image as any).outfit_image_url)}
+                                alt="Outfit Reference"
+                                className="h-8 w-8 rounded object-cover"
+                              />
+                              <span className="text-[10px] font-semibold text-textSecondary group-hover:text-primary pr-1">
+                                👗 Outfit
+                              </span>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
 
-              <div className="flex shrink-0 gap-2 self-end md:self-start">
+              <div className="flex shrink-0 items-center gap-2 self-end md:self-start">
+                {/* Share Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsShareOpen(true)}
+                  className="flex items-center gap-1.5 rounded-input border border-border/40 bg-surface px-3 py-2 text-xs font-semibold text-textSecondary transition-colors hover:border-primary/50 hover:text-primary hover:bg-surface-elevated"
+                  title="Share to WhatsApp, Instagram, X..."
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="18" cy="5" r="3" />
+                    <circle cx="6" cy="12" r="3" />
+                    <circle cx="18" cy="19" r="3" />
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                  </svg>
+                  <span>Share</span>
+                </button>
+
+                {/* Edit in Studio with Reference */}
+                {!isPreset(image) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      navigate("/studio", {
+                        state: {
+                          presetPrompt: image.prompt,
+                          aspectRatio: (image as GeneratedImage).aspect_ratio || "1:1",
+                          provider: (image as GeneratedImage).provider,
+                          model: (image as GeneratedImage).model,
+                          referenceImageUrl: image.image_url,
+                          isEdit: true,
+                        },
+                      });
+                    }}
+                    className="flex items-center gap-1 rounded-input border border-primary/50 bg-primary/10 px-3 py-2 text-xs font-bold uppercase tracking-wider text-primary hover:bg-primary hover:text-background transition-all"
+                    title="Edit prompt and regenerate using this image as reference"
+                  >
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+                    </svg>
+                    <span>Edit 🎨</span>
+                  </button>
+                )}
+
                 {/* Download */}
                 <button
                   onClick={handleDownload}
@@ -166,6 +261,15 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+
+            {/* Social Share Modal */}
+            <SocialShareModal
+              isOpen={isShareOpen}
+              onClose={() => setIsShareOpen(false)}
+              imageUrl={image.image_url || ""}
+              prompt={isPreset(image) ? image.title : image.prompt}
+              title={isPreset(image) ? image.title : undefined}
+            />
           </motion.div>
         </motion.div>
       )}

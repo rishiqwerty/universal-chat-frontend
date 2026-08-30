@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "../components/Sidebar";
 import ConfirmModal from "../components/ConfirmModal";
@@ -15,6 +16,7 @@ import {
   retryStudioImage,
   deleteStudioImage,
   resolveImagePath,
+  getProxyDownloadUrl,
   getQueueStatus,
   getStudioPresets,
   type StudioModels,
@@ -49,15 +51,109 @@ export default function ImageStudio() {
   const [visibleCount, setVisibleCount] = useState(5);
   const [referenceImage, setReferenceImage] = useState<File | null>(null);
   const [referencePreview, setReferencePreview] = useState<string | null>(null);
+  const [secondaryImage, setSecondaryImage] = useState<File | null>(null);
+  const [secondaryPreview, setSecondaryPreview] = useState<string | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<StudioPreset | null>(null);
   const [dismissedPresetPrompt, setDismissedPresetPrompt] = useState(false);
+
+  const isDualImagePreset = useCallback((preset: StudioPreset | null): boolean => {
+    if (!preset) return false;
+    if (preset.requires_secondary_image === true) return true;
+    if (preset.preset_type === "tryon" || preset.preset_type === "clothes_tryon" || preset.preset_type === "dual_image" || preset.preset_type === "dual") return true;
+    const str = `${preset.title} ${preset.category} ${preset.description}`.toLowerCase();
+    return (
+      str.includes("tryon") ||
+      str.includes("try-on") ||
+      str.includes("try on") ||
+      str.includes("outfit") ||
+      str.includes("clothes") ||
+      str.includes("garment") ||
+      str.includes("wardrobe") ||
+      str.includes("swap") ||
+      str.includes("blend") ||
+      str.includes("dual") ||
+      str.includes("composite")
+    );
+  }, []);
+
+  const getPresetSlotLabels = useCallback((preset: StudioPreset | null) => {
+    if (!preset) {
+      return {
+        mainLabel: "Image",
+        mainEmoji: "🖼️",
+        secondaryLabel: "Secondary Image",
+        secondaryEmoji: "🖼️",
+        bannerTag: "Preset Active",
+        guidanceText: "Optionally upload a reference image below to customize this preset style."
+      };
+    }
+
+    if (preset.main_image_label || preset.secondary_image_label) {
+      const main = preset.main_image_label || "Primary Image";
+      const secondary = preset.secondary_image_label || "Secondary Image";
+      const mainEmoji = main.toLowerCase().includes("person") || main.toLowerCase().includes("model") || main.toLowerCase().includes("face") ? "👤" : "🖼️";
+      const secEmoji = secondary.toLowerCase().includes("outfit") || secondary.toLowerCase().includes("clothes") || secondary.toLowerCase().includes("garment") ? "👗" : "🖼️";
+      return {
+        mainLabel: main,
+        mainEmoji,
+        secondaryLabel: secondary,
+        secondaryEmoji: secEmoji,
+        bannerTag: `${preset.title}`,
+        guidanceText: `Upload both ${main} and ${secondary} to customize this preset.`
+      };
+    }
+
+    const str = `${preset.title} ${preset.category} ${preset.description}`.toLowerCase();
+
+    if (str.includes("tryon") || str.includes("try-on") || str.includes("try on") || str.includes("outfit") || str.includes("clothes") || str.includes("garment") || str.includes("wardrobe")) {
+      return {
+        mainLabel: "Person",
+        mainEmoji: "👤",
+        secondaryLabel: "Outfit",
+        secondaryEmoji: "👗",
+        bannerTag: "Try-On Preset",
+        guidanceText: "Upload both Person and Outfit images to generate your virtual try-on render."
+      };
+    }
+
+    if (str.includes("face") || str.includes("portrait") || str.includes("headshot") || str.includes("avatar")) {
+      return {
+        mainLabel: "Target Face",
+        mainEmoji: "👤",
+        secondaryLabel: "Style / Pose",
+        secondaryEmoji: "🎨",
+        bannerTag: "Portrait Preset",
+        guidanceText: "Upload both target face and style/pose reference images."
+      };
+    }
+
+    if (str.includes("background") || str.includes("scene") || str.includes("environment") || str.includes("backdrop")) {
+      return {
+        mainLabel: "Subject",
+        mainEmoji: "📦",
+        secondaryLabel: "Background",
+        secondaryEmoji: "🌄",
+        bannerTag: "Scene Swap",
+        guidanceText: "Upload your subject and desired background/scene references."
+      };
+    }
+
+    return {
+      mainLabel: "Primary Ref",
+      mainEmoji: "🖼️",
+      secondaryLabel: "Secondary Ref",
+      secondaryEmoji: "🖼️",
+      bannerTag: "Multi-Ref Preset",
+      guidanceText: "Upload both primary and secondary reference images."
+    };
+  }, []);
 
   const [presets, setPresets] = useState<StudioPreset[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [sortBy, setSortBy] = useState("Latest Deployed");
   const [activeTab, setActiveTab] = useState<"generations" | "presets">("generations");
-  const [showOptions, setShowOptions] = useState(true);
+  const [showOptions, setShowOptions] = useState(() => typeof window !== "undefined" ? window.innerWidth >= 640 : false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [imageIdToDelete, setImageIdToDelete] = useState<string | null>(null);
   const [deleteConfirmMessage, setDeleteConfirmMessage] = useState("");
@@ -72,6 +168,7 @@ export default function ImageStudio() {
   const pollingRef = useRef<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const secondaryFileInputRef = useRef<HTMLInputElement>(null);
   const autoCloseTimerRef = useRef<any>(null);
 
   const scrollToLatestGeneration = useCallback(() => {
@@ -82,11 +179,66 @@ export default function ImageStudio() {
     });
   }, []);
 
+  const location = useLocation();
+
   useEffect(() => {
-    // Automatically close options panel after 3.5 seconds only on first load
-    autoCloseTimerRef.current = setTimeout(() => {
-      setShowOptions(false);
-    }, 3500);
+    const state = location.state as {
+      presetPrompt?: string;
+      prompt?: string;
+      aspectRatio?: string;
+      provider?: string;
+      model?: string;
+      referenceImageUrl?: string;
+      imageUrl?: string;
+      isEdit?: boolean;
+    } | null;
+
+    if (!state) return;
+
+    if (state.presetPrompt || state.prompt) {
+      setPrompt(state.presetPrompt || state.prompt || "");
+    }
+    if (state.aspectRatio) {
+      setAspectRatio(state.aspectRatio);
+    }
+    if (state.provider) {
+      setSelectedProvider(state.provider);
+    }
+    if (state.model) {
+      setSelectedModel(state.model);
+    }
+
+    const refUrl = state.referenceImageUrl || state.imageUrl;
+    if (refUrl) {
+      const resolved = resolveImagePath(refUrl);
+      const downloadProxy = getProxyDownloadUrl(refUrl) || resolved;
+      fetch(downloadProxy)
+        .then((res) => res.blob())
+        .then((blob) => {
+          const file = new File([blob], `reference-${Date.now()}.png`, { type: blob.type || "image/png" });
+          setReferenceImage(file);
+          setReferencePreview(URL.createObjectURL(blob));
+        })
+        .catch(() => {
+          setReferencePreview(resolved);
+        });
+    }
+
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 200);
+
+    // Clear location state so browser refresh doesn't re-apply
+    window.history.replaceState({}, document.title);
+  }, [location.state]);
+
+  useEffect(() => {
+    // Automatically close options panel after 3.5 seconds on desktop initial load
+    if (window.innerWidth >= 640) {
+      autoCloseTimerRef.current = setTimeout(() => {
+        setShowOptions(false);
+      }, 3500);
+    }
 
     return () => {
       if (autoCloseTimerRef.current) {
@@ -105,28 +257,32 @@ export default function ImageStudio() {
     }
   }, [prompt]);
 
-  // Reset dismissed prompt state when selected preset changes
+  // Reset dismissed prompt state and secondary image when selected preset changes
   useEffect(() => {
     setDismissedPresetPrompt(false);
+    if (!selectedPreset) {
+      setSecondaryImage(null);
+      setSecondaryPreview(null);
+    }
   }, [selectedPreset]);
 
   // Listen for clicks anywhere on the screen to dismiss the preset reference image prompt
   useEffect(() => {
-    if (selectedPreset && !referenceImage && !dismissedPresetPrompt) {
-      const handleOutsideClick = () => {
+    if (selectedPreset && (!referenceImage || (isDualImagePreset(selectedPreset) && !secondaryImage)) && !dismissedPresetPrompt) {
+      const handleGlobalClick = () => {
         setDismissedPresetPrompt(true);
       };
 
       const timer = setTimeout(() => {
-        document.addEventListener("click", handleOutsideClick);
-      }, 50);
+        document.addEventListener("click", handleGlobalClick);
+      }, 500);
 
       return () => {
         clearTimeout(timer);
-        document.removeEventListener("click", handleOutsideClick);
+        document.removeEventListener("click", handleGlobalClick);
       };
     }
-  }, [selectedPreset, referenceImage, dismissedPresetPrompt]);
+  }, [selectedPreset, referenceImage, secondaryImage, dismissedPresetPrompt, isDualImagePreset]);
 
   // Fetch available image models and queue status
   useEffect(() => {
@@ -280,7 +436,8 @@ export default function ImageStudio() {
         aspectRatio,
         paymentMode,
         referenceImage,
-        selectedPreset?.id || null
+        selectedPreset?.id || null,
+        secondaryImage
       );
       // Add the pending/queued record to the gallery immediately
       setGallery((prev) => [pendingImage, ...prev]);
@@ -288,6 +445,8 @@ export default function ImageStudio() {
       setSelectedPreset(null);
       setReferenceImage(null);
       setReferencePreview(null);
+      setSecondaryImage(null);
+      setSecondaryPreview(null);
       setShowCreditSuggestion(false);
       setGenerating(false);
 
@@ -402,35 +561,80 @@ export default function ImageStudio() {
           }`}
         onClick={() => img.status === "completed" && setLightboxImage(img)}
       >
-        {img.reference_image_url && (
-          <div
-            title="View reference image"
-            onClick={(e) => {
-              e.stopPropagation();
-              setLightboxImage({
-                id: `${img.id}-ref`,
-                prompt: `[Reference Image] ${img.prompt}`,
-                image_url: img.reference_image_url,
-                thumbnail_url: img.reference_image_thumbnail_url || img.reference_image_url,
-                reference_image_url: null,
-                reference_image_thumbnail_url: null,
-                aspect_ratio: img.aspect_ratio,
-                provider: img.provider,
-                model: img.model,
-                used_credits: "false",
-                payment_mode: img.payment_mode,
-                status: "completed",
-                error_message: null,
-                created_at: img.created_at
-              });
-            }}
-            className="absolute left-2 top-2 z-20 h-10 w-10 overflow-hidden rounded border border-border/40 bg-surface shadow-md hover:border-primary transition-all cursor-zoom-in"
-          >
-            <img
-              src={resolveImagePath(img.reference_image_thumbnail_url || img.reference_image_url)}
-              alt="Reference"
-              className="h-full w-full object-cover"
-            />
+        {/* Reference Image Badges (Main + Secondary / Outfit) */}
+        {(img.reference_image_url || img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url) && (
+          <div className="absolute left-2 top-2 z-20 flex items-center gap-1.5 pointer-events-auto">
+            {img.reference_image_url && (
+              <div
+                title="View Person / Main Reference"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxImage({
+                    id: `${img.id}-ref-1`,
+                    prompt: `[Person Reference] ${img.prompt}`,
+                    image_url: img.reference_image_url,
+                    thumbnail_url: img.reference_image_thumbnail_url || img.reference_image_url,
+                    reference_image_url: null,
+                    reference_image_thumbnail_url: null,
+                    aspect_ratio: img.aspect_ratio,
+                    provider: img.provider,
+                    model: img.model,
+                    used_credits: "false",
+                    payment_mode: img.payment_mode,
+                    status: "completed",
+                    error_message: null,
+                    created_at: img.created_at
+                  });
+                }}
+                className="relative h-9 w-9 overflow-hidden rounded-md border border-border/60 bg-surface shadow-md hover:border-primary transition-all cursor-zoom-in group/ref"
+              >
+                <img
+                  src={resolveImagePath(img.reference_image_thumbnail_url || img.reference_image_url)}
+                  alt="Person Reference"
+                  className="h-full w-full object-cover"
+                />
+                <span className="absolute bottom-0 inset-x-0 bg-black/75 text-[7px] font-bold text-center text-white leading-tight py-0.5">
+                  👤
+                </span>
+              </div>
+            )}
+
+            {(img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url) && (
+              <div
+                title="View Outfit / Garment Reference"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const secUrl = img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url || "";
+                  const secThumb = img.secondary_reference_image_thumbnail_url || secUrl;
+                  setLightboxImage({
+                    id: `${img.id}-ref-2`,
+                    prompt: `[Outfit Reference] ${img.prompt}`,
+                    image_url: secUrl,
+                    thumbnail_url: secThumb,
+                    reference_image_url: null,
+                    reference_image_thumbnail_url: null,
+                    aspect_ratio: img.aspect_ratio,
+                    provider: img.provider,
+                    model: img.model,
+                    used_credits: "false",
+                    payment_mode: img.payment_mode,
+                    status: "completed",
+                    error_message: null,
+                    created_at: img.created_at
+                  });
+                }}
+                className="relative h-9 w-9 overflow-hidden rounded-md border border-border/60 bg-surface shadow-md hover:border-primary transition-all cursor-zoom-in group/ref"
+              >
+                <img
+                  src={resolveImagePath(img.secondary_reference_image_thumbnail_url || img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url || "")}
+                  alt="Outfit Reference"
+                  className="h-full w-full object-cover"
+                />
+                <span className="absolute bottom-0 inset-x-0 bg-black/75 text-[7px] font-bold text-center text-white leading-tight py-0.5">
+                  👗
+                </span>
+              </div>
+            )}
           </div>
         )}
         <div className="aspect-square overflow-hidden">
@@ -821,7 +1025,7 @@ export default function ImageStudio() {
           />
 
           {/* Scrollable Gallery Area */}
-          <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-4 md:px-8 pb-36 md:pb-48 pt-0">
+          <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-3 sm:px-6 md:px-8 pb-44 sm:pb-48 pt-0">
             <div ref={galleryEndRef} />
 
             {/* Tabs Selector */}
@@ -1004,8 +1208,8 @@ export default function ImageStudio() {
                             key={cat}
                             onClick={() => setSelectedCategory(cat)}
                             className={`rounded-full px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${isActive
-                                ? "bg-primary text-background shadow-md shadow-primary/10"
-                                : "bg-surface-elevated border border-border/40 text-textMuted hover:text-textSecondary hover:bg-surface"
+                              ? "bg-primary text-background shadow-md shadow-primary/10"
+                              : "bg-surface-elevated border border-border/40 text-textMuted hover:text-textSecondary hover:bg-surface"
                               }`}
                           >
                             {cat}
@@ -1110,7 +1314,7 @@ export default function ImageStudio() {
           </div>
 
           {/* Bottom Input Bar — floating glass window */}
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] max-w-4xl z-20 rounded-2xl border border-white/10 bg-sidebar/40 backdrop-blur-xl px-6 py-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+          <div className="absolute bottom-2 sm:bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-1rem)] sm:w-[calc(100%-3rem)] max-w-4xl z-20 rounded-2xl border border-white/10 bg-sidebar/85 sm:bg-sidebar/40 backdrop-blur-xl p-2.5 sm:px-6 sm:py-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
             {/* Error */}
             <AnimatePresence>
               {error && (
@@ -1139,7 +1343,7 @@ export default function ImageStudio() {
               )}
             </AnimatePresence>
 
-            <div className="flex w-full flex-col gap-3">
+            <div className="flex w-full flex-col gap-2.5 sm:gap-3">
               {/* Settings Drawer (Animated Height & Opacity) */}
               <AnimatePresence initial={false}>
                 {showOptions && (
@@ -1149,7 +1353,7 @@ export default function ImageStudio() {
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.25, ease: "easeInOut" }}
-                    className="overflow-hidden"
+                    className="overflow-y-auto max-h-[48vh] sm:max-h-none pr-1 no-scrollbar"
                   >
                     <div className="flex flex-col gap-3 pb-2">
                       {/* Top row: controls */}
@@ -1217,10 +1421,10 @@ export default function ImageStudio() {
                         {/* Pill Shaped Switcher */}
                         <div className="w-full sm:w-auto flex-1 sm:flex-initial">
                           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Payment</label>
-                          <div className="flex h-9 w-full sm:w-auto items-center rounded-full border border-border/40 bg-surface/40 p-1">
+                          <div className="flex h-9 w-full sm:w-auto items-center rounded-full border border-border/40 bg-surface/40 p-0.5 sm:p-1 overflow-x-auto no-scrollbar">
                             <button
                               onClick={() => setPaymentMode("own_key")}
-                              className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-2 rounded-full px-4 transition-all ${paymentMode === "own_key"
+                              className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-1.5 sm:gap-2 rounded-full px-2.5 sm:px-4 transition-all ${paymentMode === "own_key"
                                 ? "text-textPrimary"
                                 : "text-textMuted hover:text-textSecondary"
                                 }`}
@@ -1233,7 +1437,7 @@ export default function ImageStudio() {
                                   transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
                                 />
                               )}
-                              <div className="relative z-10 flex items-center gap-2">
+                              <div className="relative z-10 flex items-center gap-1.5 sm:gap-2">
                                 <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                 </svg>
@@ -1243,7 +1447,7 @@ export default function ImageStudio() {
 
                             <button
                               onClick={() => setPaymentMode("credits")}
-                              className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-2 rounded-full px-4 transition-all ${paymentMode === "credits"
+                              className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-1.5 sm:gap-2 rounded-full px-2.5 sm:px-4 transition-all ${paymentMode === "credits"
                                 ? "bg-primary text-background shadow-[0_0_15px_rgba(var(--color-primary),0.4)]"
                                 : "text-textMuted hover:text-textSecondary"
                                 }`}
@@ -1256,7 +1460,7 @@ export default function ImageStudio() {
                                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                                 />
                               )}
-                              <div className="relative z-10 flex items-center gap-2">
+                              <div className="relative z-10 flex items-center gap-1.5 sm:gap-2">
                                 <motion.svg
                                   animate={{
                                     opacity: [1, 0.4, 1, 0.2, 1],
@@ -1272,20 +1476,21 @@ export default function ImageStudio() {
                                   transition={{
                                     duration: 0.4,
                                     repeat: Infinity,
-                                    repeatDelay: Math.random() * 2 + 1,
-                                    times: [0, 0.1, 0.2, 0.3, 1]
+                                    repeatDelay: 1.8,
+                                    ease: "easeInOut"
                                   }}
-                                  className={`h-3 w-3 ${paymentMode === "credits" ? "text-[#FF00FF]" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                                  className="h-3 w-3 fill-current"
+                                  viewBox="0 0 24 24"
                                 >
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                                 </motion.svg>
-                                <span className="text-[10px] font-black uppercase tracking-wider">Use Credits</span>
+                                <span className="text-[10px] font-black uppercase tracking-wider">Credits</span>
                               </div>
                             </button>
 
                             <button
                               onClick={() => setPaymentMode("free_queue")}
-                              className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-2 rounded-full px-4 transition-all ${paymentMode === "free_queue"
+                              className={`relative flex-1 sm:flex-initial flex h-full items-center justify-center gap-1.5 sm:gap-2 rounded-full px-2.5 sm:px-4 transition-all ${paymentMode === "free_queue"
                                 ? "text-textPrimary"
                                 : "text-textMuted hover:text-textSecondary"
                                 }`}
@@ -1298,7 +1503,7 @@ export default function ImageStudio() {
                                   transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
                                 />
                               )}
-                              <div className="relative z-10 flex items-center gap-2">
+                              <div className="relative z-10 flex items-center gap-1.5 sm:gap-2">
                                 <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
@@ -1351,78 +1556,152 @@ export default function ImageStudio() {
 
               {/* Prompt Input Card Container (Mobile Friendly) */}
               <div className="flex w-full flex-col rounded-xl border border-border/60 bg-surface focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_rgba(var(--color-primary),0.08)] transition-all overflow-hidden p-2">
-                {/* Reference Image Preview inside the box */}
-                {referencePreview && (
-                  <div className="px-3 pt-2">
-                    <div
-                      title="View uploaded image"
-                      onClick={() => {
-                        setLightboxImage({
-                          id: "input-ref",
-                          prompt: "Uploaded Reference Image",
-                          image_url: referencePreview,
-                          reference_image_url: null,
-                          aspect_ratio: aspectRatio,
-                          provider: selectedProvider || "Local",
-                          model: selectedModel || "File",
-                          used_credits: "false",
-                          payment_mode: paymentMode,
-                          status: "completed",
-                          error_message: null,
-                          created_at: new Date().toISOString()
-                        });
-                      }}
-                      className="relative h-14 w-14 cursor-pointer rounded-lg border border-border/40 overflow-hidden bg-surface hover:border-primary/50 transition-colors group"
-                    >
-                      <img src={referencePreview} alt="Reference Preview" className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setReferenceImage(null);
-                          setReferencePreview(null);
-                        }}
-                        className="absolute right-1 top-1 rounded-full bg-background/80 p-0.5 text-textMuted hover:text-red-500 shadow-md backdrop-blur-sm transition-all"
-                      >
-                        <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                {/* Reference & Secondary Image Previews inside the box */}
+                {(referencePreview || secondaryPreview) && (() => {
+                  const slotInfo = getPresetSlotLabels(selectedPreset);
+                  return (
+                    <div className="px-3 pt-2 flex items-center gap-3 flex-wrap">
+                      {/* Slot 1: Primary Image */}
+                      {referencePreview && (
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center justify-between text-[10px] font-bold text-textMuted uppercase tracking-wider">
+                            <span>{slotInfo.mainEmoji} {slotInfo.mainLabel}</span>
+                          </div>
+                          <div
+                            title={`View uploaded ${slotInfo.mainLabel}`}
+                            onClick={() => {
+                              setLightboxImage({
+                                id: "input-ref-1",
+                                prompt: `Uploaded ${slotInfo.mainLabel} Reference`,
+                                image_url: referencePreview,
+                                reference_image_url: null,
+                                aspect_ratio: aspectRatio,
+                                provider: selectedProvider || "Local",
+                                model: selectedModel || "File",
+                                used_credits: "false",
+                                payment_mode: paymentMode,
+                                status: "completed",
+                                error_message: null,
+                                created_at: new Date().toISOString()
+                              });
+                            }}
+                            className="relative h-14 w-14 cursor-pointer rounded-lg border border-border/40 overflow-hidden bg-surface hover:border-primary/50 transition-colors group"
+                          >
+                            <img src={referencePreview} alt={`${slotInfo.mainLabel} Preview`} className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReferenceImage(null);
+                                setReferencePreview(null);
+                              }}
+                              className="absolute right-1 top-1 rounded-full bg-background/80 p-0.5 text-textMuted hover:text-red-500 shadow-md backdrop-blur-sm transition-all"
+                              title={`Remove ${slotInfo.mainLabel}`}
+                            >
+                              <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Slot 2: Secondary Image */}
+                      {secondaryPreview && (
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center justify-between text-[10px] font-bold text-textMuted uppercase tracking-wider">
+                            <span>{slotInfo.secondaryEmoji} {slotInfo.secondaryLabel}</span>
+                          </div>
+                          <div
+                            title={`View uploaded ${slotInfo.secondaryLabel}`}
+                            onClick={() => {
+                              setLightboxImage({
+                                id: "input-ref-2",
+                                prompt: `Uploaded ${slotInfo.secondaryLabel} Reference`,
+                                image_url: secondaryPreview,
+                                reference_image_url: null,
+                                aspect_ratio: aspectRatio,
+                                provider: selectedProvider || "Local",
+                                model: selectedModel || "File",
+                                used_credits: "false",
+                                payment_mode: paymentMode,
+                                status: "completed",
+                                error_message: null,
+                                created_at: new Date().toISOString()
+                              });
+                            }}
+                            className="relative h-14 w-14 cursor-pointer rounded-lg border border-border/40 overflow-hidden bg-surface hover:border-primary/50 transition-colors group"
+                          >
+                            <img src={secondaryPreview} alt={`${slotInfo.secondaryLabel} Preview`} className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSecondaryImage(null);
+                                setSecondaryPreview(null);
+                              }}
+                              className="absolute right-1 top-1 rounded-full bg-background/80 p-0.5 text-textMuted hover:text-red-500 shadow-md backdrop-blur-sm transition-all"
+                              title={`Remove ${slotInfo.secondaryLabel}`}
+                            >
+                              <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Selected Preset Badge */}
-                {selectedPreset && (
-                  <div className="px-3 pt-2 pb-1 flex flex-col border-b border-border/10 mb-2 gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded animate-pulse">
-                          Preset Active
-                        </span>
-                        <span className="text-xs font-semibold text-textPrimary">
-                          {selectedPreset.title}
-                        </span>
+                {selectedPreset && (() => {
+                  const slotInfo = getPresetSlotLabels(selectedPreset);
+                  return (
+                    <div className="px-3 pt-2 pb-1 flex flex-col border-b border-border/10 mb-2 gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded animate-pulse">
+                            {slotInfo.bannerTag}
+                          </span>
+                          <span className="text-xs font-semibold text-textPrimary">
+                            {selectedPreset.title}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedPreset(null);
+                            setSecondaryImage(null);
+                            setSecondaryPreview(null);
+                          }}
+                          className="text-textMuted hover:text-red-400 transition-colors"
+                          title="Clear preset selection"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedPreset(null);
-                        }}
-                        className="text-textMuted hover:text-red-400 transition-colors"
-                        title="Clear preset selection"
-                      >
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+
+                      {isDualImagePreset(selectedPreset) ? (
+                        (!referenceImage || !secondaryImage) && !dismissedPresetPrompt && (
+                          <div className="text-[10px] text-primary/95 flex items-center gap-1.5 font-medium pb-1">
+                            <span>
+                              ✨ Upload {!referenceImage ? `${slotInfo.mainEmoji} ${slotInfo.mainLabel}` : ""} {!referenceImage && !secondaryImage ? "and" : ""} {!secondaryImage ? `${slotInfo.secondaryEmoji} ${slotInfo.secondaryLabel}` : ""} below to generate this preset render.
+                            </span>
+                          </div>
+                        )
+                      ) : (
+                        !referenceImage && !dismissedPresetPrompt && (
+                          <div className="text-[10px] text-primary/95 flex items-center gap-1.5 animate-pulse font-medium pb-1">
+                            <span>📸 Optionally upload a reference image below to customize this preset style.</span>
+                          </div>
+                        )
+                      )}
                     </div>
-                    {!referenceImage && !dismissedPresetPrompt && (
-                      <div className="text-[10px] text-primary/95 flex items-center gap-1.5 animate-pulse font-medium pb-1">
-                        <span>📸 Optionally upload a reference image below to customize this preset style.</span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Textarea Row */}
                 <div className="relative w-full">
@@ -1439,11 +1718,13 @@ export default function ImageStudio() {
                       }
                     }}
                     placeholder={
-                      selectedPreset
-                        ? "Type additional instructions to customize this preset style..."
-                        : paymentMode === "free_queue"
-                          ? "Describe the image you want to request..."
-                          : "Describe the image you want to create..."
+                      isDualImagePreset(selectedPreset)
+                        ? "Additional styling instructions (e.g., lighting, pose, fit)..."
+                        : selectedPreset
+                          ? "Type additional instructions to customize this preset style..."
+                          : paymentMode === "free_queue"
+                            ? "Describe the image you want to request..."
+                            : "Describe the image you want to create..."
                     }
                     rows={1}
                     disabled={generating}
@@ -1452,8 +1733,8 @@ export default function ImageStudio() {
                 </div>
 
                 {/* Toolbar Row */}
-                <div className="flex items-center justify-between border-t border-border/20 pt-2 px-1">
-                  <div className="flex items-center gap-1.5">
+                <div className="flex items-center justify-between border-t border-border/20 pt-1.5 sm:pt-2 px-0.5 sm:px-1 gap-1.5 sm:gap-2">
+                  <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-1 overflow-x-auto no-scrollbar py-0.5">
                     {/* Settings toggle */}
                     <button
                       type="button"
@@ -1464,9 +1745,9 @@ export default function ImageStudio() {
                         }
                         setShowOptions(!showOptions);
                       }}
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${showOptions
-                          ? "border-primary/50 text-primary bg-primary/10"
-                          : "border-border/30 bg-surface-elevated text-textMuted hover:text-primary hover:border-primary/50"
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors ${showOptions
+                        ? "border-primary/50 text-primary bg-primary/10"
+                        : "border-border/30 bg-surface-elevated text-textMuted hover:text-primary hover:border-primary/50"
                         }`}
                       title="Toggle Options"
                     >
@@ -1476,56 +1757,92 @@ export default function ImageStudio() {
                       </svg>
                     </button>
 
-                    {/* Upload Image Button with Tooltip guide */}
-                    <div className="relative">
-                      <label
-                        title="Upload image"
-                        className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border transition-all disabled:opacity-50 ${selectedPreset && !referenceImage && !dismissedPresetPrompt
-                            ? "border-primary text-primary bg-primary/5 shadow-[0_0_12px_rgba(var(--color-primary),0.25)] ring-1 ring-primary animate-pulse"
-                            : "border-border/30 bg-surface-elevated text-textMuted hover:border-primary/50 hover:text-primary"
-                          }`}
-                      >
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          disabled={generating}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              setReferenceImage(file);
-                              setReferencePreview(URL.createObjectURL(file));
-                            }
-                          }}
-                        />
-                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-                        </svg>
-                      </label>
+                    {/* Upload Main Image Button */}
+                    {(() => {
+                      const slotInfo = getPresetSlotLabels(selectedPreset);
+                      const isDual = isDualImagePreset(selectedPreset);
+                      return (
+                        <>
+                          <div className="relative shrink-0">
+                            <label
+                              title={isDual ? `Upload ${slotInfo.mainLabel}` : "Upload Reference Image"}
+                              className={`flex h-8 px-2 sm:px-2.5 cursor-pointer items-center justify-center gap-1 sm:gap-1.5 rounded-lg border text-xs font-semibold transition-all disabled:opacity-50 ${
+                                isDual && !referenceImage && !dismissedPresetPrompt
+                                  ? "border-primary text-primary bg-primary/10 shadow-[0_0_12px_rgba(var(--color-primary),0.25)] ring-1 ring-primary animate-pulse"
+                                  : referenceImage
+                                  ? "border-primary/60 bg-primary/10 text-primary"
+                                  : "border-border/30 bg-surface-elevated text-textMuted hover:border-primary/50 hover:text-primary"
+                              }`}
+                            >
+                              <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={generating}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    setReferenceImage(file);
+                                    setReferencePreview(URL.createObjectURL(file));
+                                  }
+                                }}
+                              />
+                              <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                              </svg>
+                              <span className="inline text-[11px] sm:text-xs">
+                                {isDual
+                                  ? (referenceImage ? `${slotInfo.mainLabel} ✓` : slotInfo.mainLabel)
+                                  : (referenceImage ? "Image ✓" : "Image")
+                                }
+                              </span>
+                            </label>
+                          </div>
 
-                      {/* Floating Tooltip */}
-                      <AnimatePresence>
-                        {selectedPreset && !referenceImage && !dismissedPresetPrompt && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-30 w-52 p-2.5 rounded-xl border border-primary/20 bg-[#0d0d0f]/95 text-[11px] text-textSecondary text-center shadow-[0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-md pointer-events-none"
-                          >
-                            <span className="font-bold text-primary block mb-0.5">📸 Style Preset Active</span>
-                            Optionally upload a reference image to transfer this style.
-                            {/* Tooltip arrow */}
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-primary/20" />
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-[#0d0d0f]" style={{ marginTop: '-1px' }} />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
+                          {/* Upload Secondary Image Button for Dual-Image Presets */}
+                          {isDual && (
+                            <div className="relative shrink-0">
+                              <label
+                                title={`Upload ${slotInfo.secondaryLabel}`}
+                                className={`flex h-8 px-2 sm:px-2.5 cursor-pointer items-center justify-center gap-1 sm:gap-1.5 rounded-lg border text-xs font-semibold transition-all disabled:opacity-50 ${
+                                  !secondaryImage && !dismissedPresetPrompt
+                                    ? "border-primary text-primary bg-primary/10 shadow-[0_0_12px_rgba(var(--color-primary),0.25)] ring-1 ring-primary animate-pulse"
+                                    : secondaryImage
+                                    ? "border-primary/60 bg-primary/10 text-primary"
+                                    : "border-border/30 bg-surface-elevated text-textMuted hover:border-primary/50 hover:text-primary"
+                                }`}
+                              >
+                                <input
+                                  ref={secondaryFileInputRef}
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  disabled={generating}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      setSecondaryImage(file);
+                                      setSecondaryPreview(URL.createObjectURL(file));
+                                    }
+                                  }}
+                                />
+                                <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                                </svg>
+                                <span className="inline text-[11px] sm:text-xs">
+                                  {secondaryImage ? `${slotInfo.secondaryLabel} ✓` : slotInfo.secondaryLabel}
+                                </span>
+                              </label>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
 
                     {/* Selected payment indicator when options are minimized */}
                     {!showOptions && !generating && (
-                      <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-textSecondary bg-surface-elevated px-2.5 h-8 rounded-lg border border-border/30">
+                      <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-textSecondary bg-surface-elevated px-2.5 h-8 rounded-lg border border-border/30 shrink-0">
                         {paymentMode === "own_key" && "🔑 Personal"}
                         {paymentMode === "credits" && "⚡ Credits (5c)"}
                         {paymentMode === "free_queue" && (
@@ -1538,12 +1855,12 @@ export default function ImageStudio() {
 
                     {/* Credits Counter or Details in toolbar */}
                     {paymentMode === "credits" && !generating && showOptions && (
-                      <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-black uppercase text-primary/80 bg-primary/5 px-2 py-0.5 rounded border border-primary/10">
+                      <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-black uppercase text-primary/80 bg-primary/5 px-2 py-0.5 rounded border border-primary/10 shrink-0">
                         ⚡ 5 Credits
                       </span>
                     )}
                     {paymentMode === "free_queue" && queueStatus && queueStatus.used_today >= queueStatus.limit && !generating && showOptions && (
-                      <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-500 bg-amber-500/5 px-2 py-0.5 rounded border border-amber-500/20">
+                      <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-500 bg-amber-500/5 px-2 py-0.5 rounded border border-amber-500/20 shrink-0">
                         ⚡ 2 Credits Charge
                       </span>
                     )}
@@ -1556,7 +1873,7 @@ export default function ImageStudio() {
                     transition={{ type: "spring", stiffness: 400, damping: 15 }}
                     onClick={handleGenerate}
                     disabled={generating || (!prompt.trim() && !selectedPreset) || (paymentMode !== "free_queue" && !hasModels)}
-                    className={`relative h-8 overflow-hidden rounded-lg px-4 text-xs font-bold framer-btn disabled:opacity-40 disabled:cursor-not-allowed ${paymentMode === "credits"
+                    className={`relative h-8 shrink-0 ml-auto overflow-hidden rounded-lg px-3.5 sm:px-4 text-xs font-bold framer-btn disabled:opacity-40 disabled:cursor-not-allowed ${paymentMode === "credits"
                       ? "bg-primary text-background shadow-[0_0_12px_rgba(var(--color-primary),0.2)]"
                       : "bg-surface-elevated border border-border/40 text-textPrimary hover:border-primary/50"
                       }`}
@@ -1568,18 +1885,19 @@ export default function ImageStudio() {
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                           </svg>
-                          <span>Architecting...</span>
+                          <span className="hidden xs:inline">Architecting...</span>
+                          <span className="xs:hidden">...</span>
                         </>
                       ) : (
                         <>
                           <span>{paymentMode === "free_queue" ? "Request" : "Generate"}</span>
                           {paymentMode === "credits" && (
-                            <span className="flex items-center gap-0.5 pl-1 ml-1 border-l border-background/20">
+                            <span className="hidden xs:flex items-center gap-0.5 pl-1 ml-1 border-l border-background/20">
                               <span className="text-[9px] font-black">⚡ 5</span>
                             </span>
                           )}
                           {paymentMode === "free_queue" && queueStatus && queueStatus.used_today >= queueStatus.limit && (
-                            <span className="flex items-center gap-0.5 pl-1 ml-1 border-l border-border/20">
+                            <span className="hidden xs:flex items-center gap-0.5 pl-1 ml-1 border-l border-border/20">
                               <span className="text-[9px] font-bold text-amber-500">⚡ 2</span>
                             </span>
                           )}
