@@ -255,6 +255,11 @@ export type Conversation = {
   created_at?: string;
 };
 
+export type ModelDataPolicy = {
+  collects_data?: boolean;
+  data_policy_notice?: string | null;
+};
+
 export type ProviderModels = {
   provider: string;
   display_name?: string;
@@ -271,6 +276,10 @@ export type ProviderModels = {
   est_tps?: number;
   model_speeds?: Record<string, number>;
   reachable_models?: string[];
+  collects_data?: boolean;
+  data_policy_notice?: string | null;
+  model_data_policies?: Record<string, ModelDataPolicy>;
+  model_policies?: Record<string, ModelDataPolicy>;
 };
 
 export type ModelHealthResponse = {
@@ -698,6 +707,10 @@ export type GeneratedImage = {
   thumbnail_url?: string | null;
   reference_image_url: string | null;
   reference_image_thumbnail_url?: string | null;
+  secondary_reference_image_url?: string | null;
+  secondary_image_url?: string | null;
+  secondary_reference_image_thumbnail_url?: string | null;
+  outfit_image_url?: string | null;
   aspect_ratio: string;
   provider: string;
   model: string;
@@ -715,7 +728,9 @@ export async function generateStudioImage(
   aspectRatio: string,
   paymentMode: string,
   referenceImage: File | null = null,
-  presetId: string | null = null
+  presetId: string | null = null,
+  secondaryImage: File | null = null,
+  task: string | null = null
 ): Promise<GeneratedImage> {
   const formData = new FormData();
   formData.append("prompt", prompt);
@@ -726,8 +741,16 @@ export async function generateStudioImage(
   if (referenceImage) {
     formData.append("reference_image", referenceImage);
   }
+  if (secondaryImage) {
+    formData.append("secondary_image", secondaryImage);
+    formData.append("outfit_image", secondaryImage);
+  }
   if (presetId) {
     formData.append("preset_id", presetId);
+  }
+  if (task) {
+    formData.append("task", task);
+    formData.append("edit_type", task);
   }
 
   const { data } = await client.post("/studio/generate", formData, {
@@ -778,6 +801,10 @@ export type StudioPreset = {
   thumbnail_url?: string | null;
   before_image_url?: string | null;
   description: string;
+  requires_secondary_image?: boolean;
+  main_image_label?: string;
+  secondary_image_label?: string;
+  preset_type?: string;
 };
 
 export async function getStudioPresets(): Promise<StudioPreset[]> {

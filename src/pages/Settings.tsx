@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { 
-  getApiKeys, 
-  addApiKey, 
-  removeApiKey, 
+import {
+  getApiKeys,
+  addApiKey,
+  removeApiKey,
   activateApiKey,
   toggleApiKey,
   type ApiKey,
@@ -195,7 +195,7 @@ export default function Settings() {
       const res = await testMcpTool(toolName, args);
       const isError = res.isError || false;
       const textVal = res.content && res.content[0] ? res.content[0].text : "";
-      
+
       let finalResult = textVal;
       try {
         finalResult = JSON.parse(textVal);
@@ -431,11 +431,10 @@ export default function Settings() {
             <div className="flex items-center border-b border-border/20 mt-4 sm:mt-6 mb-6 sm:mb-8 gap-4 sm:gap-6 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <button
                 onClick={() => setActiveTab("profile")}
-                className={`pb-3 text-xs sm:text-sm font-bold transition-all relative shrink-0 whitespace-nowrap ${
-                  activeTab === "profile" 
-                    ? "text-primary font-headline" 
-                    : "text-textSecondary hover:text-textPrimary"
-                }`}
+                className={`pb-3 text-xs sm:text-sm font-bold transition-all relative shrink-0 whitespace-nowrap ${activeTab === "profile"
+                  ? "text-primary font-headline"
+                  : "text-textSecondary hover:text-textPrimary"
+                  }`}
               >
                 Profile & Account
                 {activeTab === "profile" && (
@@ -444,11 +443,10 @@ export default function Settings() {
               </button>
               <button
                 onClick={() => setActiveTab("providers")}
-                className={`pb-3 text-xs sm:text-sm font-bold transition-all relative shrink-0 whitespace-nowrap ${
-                  activeTab === "providers" 
-                    ? "text-primary font-headline" 
-                    : "text-textSecondary hover:text-textPrimary"
-                }`}
+                className={`pb-3 text-xs sm:text-sm font-bold transition-all relative shrink-0 whitespace-nowrap ${activeTab === "providers"
+                  ? "text-primary font-headline"
+                  : "text-textSecondary hover:text-textPrimary"
+                  }`}
               >
                 Providers & Theme
                 {activeTab === "providers" && (
@@ -457,11 +455,10 @@ export default function Settings() {
               </button>
               <button
                 onClick={() => setActiveTab("mcp")}
-                className={`pb-3 text-xs sm:text-sm font-bold transition-all relative shrink-0 whitespace-nowrap flex items-center gap-2 ${
-                  activeTab === "mcp" 
-                    ? "text-primary font-headline" 
-                    : "text-textSecondary hover:text-textPrimary"
-                }`}
+                className={`pb-3 text-xs sm:text-sm font-bold transition-all relative shrink-0 whitespace-nowrap flex items-center gap-2 ${activeTab === "mcp"
+                  ? "text-primary font-headline"
+                  : "text-textSecondary hover:text-textPrimary"
+                  }`}
               >
                 <span>MCP Server</span>
                 <span className={`h-1.5 w-1.5 rounded-full ${mcpConnected === true ? "bg-primary animate-pulse" : mcpConnected === false ? "bg-error" : "bg-textMuted"}`} />
@@ -539,11 +536,10 @@ export default function Settings() {
 
                   {profileMessage && (
                     <div
-                      className={`rounded-xl p-3 text-xs font-semibold ${
-                        profileMessage.type === "success"
-                          ? "bg-primary/15 border border-primary/40 text-primary"
-                          : "bg-red-500/15 border border-red-500/40 text-red-400"
-                      }`}
+                      className={`rounded-xl p-3 text-xs font-semibold ${profileMessage.type === "success"
+                        ? "bg-primary/15 border border-primary/40 text-primary"
+                        : "bg-red-500/15 border border-red-500/40 text-red-400"
+                        }`}
                     >
                       {profileMessage.text}
                     </div>
@@ -633,11 +629,10 @@ export default function Settings() {
                             key={preset.label}
                             type="button"
                             onClick={() => setAvatarUrl(preset.url)}
-                            className={`flex items-center gap-2 rounded-full px-2.5 py-1 text-xs border transition-all ${
-                              avatarUrl === preset.url
-                                ? "border-primary bg-primary/15 text-primary ring-1 ring-primary/40"
-                                : "border-border/40 bg-elevated/40 text-textSecondary hover:bg-elevated hover:text-textPrimary"
-                            }`}
+                            className={`flex items-center gap-2 rounded-full px-2.5 py-1 text-xs border transition-all ${avatarUrl === preset.url
+                              ? "border-primary bg-primary/15 text-primary ring-1 ring-primary/40"
+                              : "border-border/40 bg-elevated/40 text-textSecondary hover:bg-elevated hover:text-textPrimary"
+                              }`}
                           >
                             <img
                               src={preset.url}
@@ -736,7 +731,7 @@ export default function Settings() {
                         <span>Frontier Models</span>
                       </div>
                       <p className="text-[11px] text-textMuted leading-relaxed">
-                        Access Claude 3.5 Sonnet, GPT-4o, DeepSeek R1, and Gemini Pro directly.
+                        Access Claude 5.0 Opus, GPT, DeepSeek R1, and Gemini Pro directly.
                       </p>
                     </div>
 
@@ -848,81 +843,87 @@ export default function Settings() {
                         <option value="deepseek">DeepSeek</option>
                         <option value="groq">Groq</option>
                         <option value="openrouter">OpenRouter</option>
-                        <option value="local">Local LLM (Ollama / vLLM)</option>
+                        <option value="local" disabled className="text-textMuted/60 bg-surface">Local LLM (Ollama / vLLM) — Coming Soon</option>
                       </select>
                     </label>
 
-                    {provider === "local" && (
-                      <label className="block sm:col-span-1">
-                        <span className="text-xs font-medium text-textSecondary">Base URL</span>
-                        <input
-                          type="text"
-                          value={baseUrl}
-                          onChange={(e) => setBaseUrl(e.target.value)}
-                          placeholder="http://localhost:11434/v1"
-                          className="mt-1.5 sm:mt-2 h-10 sm:h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-xs sm:text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
-                        />
-                      </label>
+                    {provider !== "local" && (
+                      <>
+                        <label className="block sm:col-span-1">
+                          <span className="text-xs font-medium text-textSecondary">Key Label</span>
+                          <input
+                            type="text"
+                            value={label}
+                            onChange={(e) => setLabel(e.target.value)}
+                            placeholder="e.g. Primary Key"
+                            className="mt-1.5 sm:mt-2 h-10 sm:h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-xs sm:text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+                          />
+                        </label>
+
+                        <label className="block sm:col-span-2">
+                          <span className="text-xs font-medium text-textSecondary">API Key</span>
+                          <input
+                            type="password"
+                            value={apiKeyParam}
+                            onChange={(e) => setApiKeyParam(e.target.value)}
+                            placeholder="sk-..."
+                            className="mt-1.5 sm:mt-2 h-10 sm:h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-xs sm:text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
+                          />
+                        </label>
+                      </>
                     )}
-
-                    <label className="block sm:col-span-1">
-                      <span className="text-xs font-medium text-textSecondary">Key Label</span>
-                      <input
-                        type="text"
-                        value={label}
-                        onChange={(e) => setLabel(e.target.value)}
-                        placeholder="e.g. Primary Key"
-                        className="mt-1.5 sm:mt-2 h-10 sm:h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-xs sm:text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
-                      />
-                    </label>
-
-                    <label className={`block ${provider === "local" ? "sm:col-span-2" : "sm:col-span-2"}`}>
-                      <span className="text-xs font-medium text-textSecondary">API Key</span>
-                      <input
-                        type="password"
-                        value={apiKeyParam}
-                        onChange={(e) => setApiKeyParam(e.target.value)}
-                        placeholder={provider === "local" ? "None (or local key)" : "sk-..."}
-                        className="mt-1.5 sm:mt-2 h-10 sm:h-11 w-full rounded-input border border-border/50 bg-elevated px-3 text-xs sm:text-sm text-textPrimary placeholder:text-textMuted focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/40"
-                      />
-                    </label>
                   </div>
 
-                  <div className="mt-4 flex items-start gap-3 rounded-input bg-surface/40 p-3 ring-1 ring-border/30">
-                    <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center text-textMuted">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                      </svg>
+                  {provider === "local" ? (
+                    <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-center">
+                      <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 mb-2">
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <h4 className="text-xs font-bold text-textPrimary">Local LLM Configuration Coming Soon</h4>
+                      <p className="text-[11px] text-textMuted mt-1 max-w-sm mx-auto">
+                        Local model connections (Ollama / vLLM / LM Studio) are currently in active development. Configuration is not yet available.
+                      </p>
                     </div>
-                    <p className="text-[11px] leading-relaxed text-textSecondary">
-                      Your API key is <span className="font-bold text-textPrimary">encrypted</span> at rest. Only one key per provider 
-                      can be <span className="text-primary font-bold">active</span> at a time.
-                    </p>
-                  </div>
-                  
-                  <button
-                    type="submit"
-                    disabled={loading || !apiKeyParam.trim() || !label.trim()}
-                    className="mt-5 sm:mt-6 w-full rounded-input bg-primary py-2.5 text-xs sm:text-sm font-bold text-background shadow-[0_0_16px_rgba(217,255,0,0.2)] transition-all hover:scale-[1.02] hover:bg-primaryHover disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:px-8 text-center justify-center"
-                  >
-                    {loading ? "Adding..." : "Securely Add Key"}
-                  </button>
+                  ) : (
+                    <>
+                      <div className="mt-4 flex items-start gap-3 rounded-input bg-surface/40 p-3 ring-1 ring-border/30">
+                        <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center text-textMuted">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                          </svg>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-textSecondary">
+                          Your API key is <span className="font-bold text-textPrimary">encrypted</span> at rest. Only one key per provider
+                          can be <span className="text-primary font-bold">active</span> at a time.
+                        </p>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={loading || !apiKeyParam.trim() || !label.trim() || provider === "local"}
+                        className="mt-5 sm:mt-6 w-full rounded-input bg-primary py-2.5 text-xs sm:text-sm font-bold text-background shadow-[0_0_16px_rgba(217,255,0,0.2)] transition-all hover:scale-[1.02] hover:bg-primaryHover disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto sm:px-8 text-center justify-center"
+                      >
+                        {loading ? "Adding..." : "Securely Add Key"}
+                      </button>
+                    </>
+                  )}
                 </form>
 
                 <div className="rounded-card bg-surface p-4 sm:p-6 shadow-none ring-1 ring-border/40">
                   <h2 className="text-base sm:text-lg font-semibold text-textPrimary">Appearance</h2>
                   <p className="text-xs text-textSecondary mt-1">Select your personalized neural accent color.</p>
-                  
+
                   <div className="mt-4 sm:mt-6 flex flex-wrap gap-3 sm:gap-4">
                     {availableColors.map((color) => (
                       <button
                         key={color.value}
                         onClick={() => setAccentColor(color.value)}
-                        className={`group relative flex h-11 w-11 sm:h-14 sm:w-14 items-center justify-center rounded-xl transition-all duration-300 ${
-                          accentColor === color.value 
-                            ? 'ring-2 ring-primary ring-offset-2 sm:ring-offset-4 ring-offset-background scale-105 sm:scale-110' 
-                            : 'hover:scale-105'
-                        }`}
+                        className={`group relative flex h-11 w-11 sm:h-14 sm:w-14 items-center justify-center rounded-xl transition-all duration-300 ${accentColor === color.value
+                          ? 'ring-2 ring-primary ring-offset-2 sm:ring-offset-4 ring-offset-background scale-105 sm:scale-110'
+                          : 'hover:scale-105'
+                          }`}
                         style={{ backgroundColor: color.value }}
                         title={color.name}
                       >
@@ -948,9 +949,8 @@ export default function Settings() {
                       <p className="text-xs sm:text-sm text-textMuted">No API keys installed yet.</p>
                     ) : (
                       keys.map((k) => (
-                        <div key={k.id} className={`flex flex-col sm:flex-row sm:items-center justify-between rounded-input border transition-all duration-300 p-3.5 sm:px-4 sm:py-3 gap-3 ${
-                          k.is_active ? 'border-primary/50 bg-primary/5 shadow-[0_0_20px_rgba(217,255,0,0.05)]' : 'border-border/30 bg-surface grayscale'
-                        }`}>
+                        <div key={k.id} className={`flex flex-col sm:flex-row sm:items-center justify-between rounded-input border transition-all duration-300 p-3.5 sm:px-4 sm:py-3 gap-3 ${k.is_active ? 'border-primary/50 bg-primary/5 shadow-[0_0_20px_rgba(217,255,0,0.05)]' : 'border-border/30 bg-surface grayscale'
+                          }`}>
                           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                             <div className="relative shrink-0">
                               <span className={`h-2.5 w-2.5 block rounded-full ${k.is_active ? 'bg-primary' : 'bg-textMuted'}`} />
@@ -974,7 +974,7 @@ export default function Settings() {
                               </p>
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center justify-between sm:justify-end gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-border/20 w-full sm:w-auto">
                             {!k.is_active ? (
                               <button
@@ -993,7 +993,7 @@ export default function Settings() {
                                 Disable
                               </button>
                             )}
-                            
+
                             <button
                               type="button"
                               onClick={() => handleRemove(k.id)}
@@ -1021,16 +1021,14 @@ export default function Settings() {
                       <p className="text-xs text-textSecondary mt-0.5 sm:mt-1">Status of the local Model Context Protocol integration.</p>
                     </div>
                     <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 sm:px-3 py-1 text-xs font-bold ${
-                        mcpConnected === true 
-                          ? "bg-primary/10 text-primary ring-1 ring-primary/30" 
-                          : mcpConnected === false 
-                            ? "bg-error/10 text-error ring-1 ring-error/30"
-                            : "bg-elevated text-textMuted ring-1 ring-border"
-                      }`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${
-                          mcpConnected === true ? "bg-primary animate-pulse" : mcpConnected === false ? "bg-error" : "bg-textMuted"
-                        }`} />
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 sm:px-3 py-1 text-xs font-bold ${mcpConnected === true
+                        ? "bg-primary/10 text-primary ring-1 ring-primary/30"
+                        : mcpConnected === false
+                          ? "bg-error/10 text-error ring-1 ring-error/30"
+                          : "bg-elevated text-textMuted ring-1 ring-border"
+                        }`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${mcpConnected === true ? "bg-primary animate-pulse" : mcpConnected === false ? "bg-error" : "bg-textMuted"
+                          }`} />
                         {mcpConnected === true ? "Connected & Active" : mcpConnected === false ? "Connection Failed" : "Checking Status..."}
                       </span>
                       <button
@@ -1080,22 +1078,20 @@ export default function Settings() {
                     <button
                       type="button"
                       onClick={() => setMcpIntegrationMode("personal")}
-                      className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs font-bold rounded-md transition-all text-center ${
-                        mcpIntegrationMode === "personal"
-                          ? "bg-surface text-primary shadow-sm"
-                          : "text-textSecondary hover:text-textPrimary"
-                      }`}
+                      className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs font-bold rounded-md transition-all text-center ${mcpIntegrationMode === "personal"
+                        ? "bg-surface text-primary shadow-sm"
+                        : "text-textSecondary hover:text-textPrimary"
+                        }`}
                     >
                       Personal Clients (API Key)
                     </button>
                     <button
                       type="button"
                       onClick={() => setMcpIntegrationMode("oauth")}
-                      className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs font-bold rounded-md transition-all text-center ${
-                        mcpIntegrationMode === "oauth"
-                          ? "bg-surface text-primary shadow-sm"
-                          : "text-textSecondary hover:text-textPrimary"
-                      }`}
+                      className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs font-bold rounded-md transition-all text-center ${mcpIntegrationMode === "oauth"
+                        ? "bg-surface text-primary shadow-sm"
+                        : "text-textSecondary hover:text-textPrimary"
+                        }`}
                     >
                       Web Platforms (OAuth 2.0)
                     </button>
@@ -1233,7 +1229,7 @@ export default function Settings() {
                       {/* Setup Guides */}
                       <div className="border-t border-border/20 pt-4 sm:pt-5 space-y-3 sm:space-y-4">
                         <h3 className="text-xs sm:text-sm font-semibold text-textPrimary">Web Platform Integration Guides</h3>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                           <div className="p-3.5 sm:p-4 rounded-input bg-elevated/10 border border-border/10 space-y-2">
                             <h4 className="text-xs font-bold text-textPrimary uppercase tracking-wider flex items-center gap-1.5">
@@ -1282,11 +1278,10 @@ export default function Settings() {
                       mcpTools.map((tool) => {
                         const isExpanded = expandedTool === tool.name;
                         const result = toolResults[tool.name];
-                        
+
                         return (
-                          <div key={tool.name} className={`rounded-card border transition-all duration-300 bg-surface ${
-                            isExpanded ? "border-primary/45 ring-1 ring-primary/10" : "border-border/30"
-                          }`}>
+                          <div key={tool.name} className={`rounded-card border transition-all duration-300 bg-surface ${isExpanded ? "border-primary/45 ring-1 ring-primary/10" : "border-border/30"
+                            }`}>
                             <button
                               type="button"
                               onClick={() => setExpandedTool(isExpanded ? null : tool.name)}
