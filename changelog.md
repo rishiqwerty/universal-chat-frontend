@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 - **Studio Video Hover Preview & Lightweight Zero-Re-Render Playback (`ImageStudio.tsx`)**:
+  - **Beta Tag & Indicator**: Added sleek `Beta` badges to the Video mode switcher and creation toolbar in Image Studio, indicating that video synthesis is currently in beta.
   - **Instant First-Frame Display on Page Load**: Videos use media-fragment `#t=0.001` with `preload="metadata"` and automatic metadata frame-seeking, ensuring the opening frame is immediately decoded and rendered on page load with zero black cards, even when no static poster is provided by the backend.
   - **Zero React Re-Renders During Playback**: Playback timestamps and glowing progress bars are updated via direct DOM element references (`ref`), eliminating 15–30 React re-renders per second and resulting in featherlight 60fps GPU-accelerated video playback.
   - **150ms Hover-Intent Filter**: Fast scrolling and cursor sweeps across cards are ignored, only triggering playback when the user intentionally rests on a card.
