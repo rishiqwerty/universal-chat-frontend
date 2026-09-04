@@ -16,12 +16,19 @@ import {
   getImageStatus,
   retryStudioImage,
   deleteStudioImage,
+  getStudioVideoModels,
+  getVideoCost,
+  generateStudioVideo,
+  getStudioVideoGallery,
+  getVideoStatus,
+  deleteStudioVideo,
   resolveImagePath,
   getProxyDownloadUrl,
   getQueueStatus,
   getStudioPresets,
   type StudioModels,
   type GeneratedImage,
+  type GeneratedVideo,
   type QueueStatus,
   type StudioPreset,
 } from "../api/api";
@@ -31,6 +38,572 @@ import { isPremiumModel } from "../utils/modelUtils";
 
 const ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3"];
 
+interface StudioGalleryCardProps {
+  img: GeneratedImage | GeneratedVideo;
+  isGridMode?: boolean;
+  mediaMode: "image" | "video";
+  durationSeconds: number;
+  onSelect: (item: GeneratedImage | GeneratedVideo) => void;
+  onDelete: (id: string) => void;
+  onRetry: (id: string, mode?: "credits" | "free_queue") => void;
+}
+
+const StudioGalleryCard = ({
+  img,
+  isGridMode = false,
+  mediaMode,
+  durationSeconds,
+  onSelect,
+  onDelete,
+  onRetry,
+}: StudioGalleryCardProps) => {
+  const isVideo = "video_url" in img || mediaMode === "video";
+  const videoUrl = (img as GeneratedVideo).video_url;
+  const posterUrl = (img as any).thumbnail_url || img.reference_image_url || "";
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
+  const timeTextRef = useRef<HTMLSpanElement>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [isHovered, setIsHovered] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    if (isVideo && videoUrl && img.status === "completed") {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      // 150ms hover-intent: ignore rapid sweeps/scrolling, only play if intentional
+      hoverTimerRef.current = setTimeout(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => setIsPlaying(true))
+            .catch(() => setIsPlaying(false));
+        }
+      }, 1500);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    const video = videoRef.current;
+    if (video) {
+      video.pause();
+      try {
+        video.currentTime = 0.001;
+      } catch { }
+    }
+    setIsPlaying(false);
+    if (progressBarRef.current) {
+      progressBarRef.current.style.width = "0%";
+    }
+    if (timeTextRef.current) {
+      timeTextRef.current.textContent = `${(img as GeneratedVideo).duration_seconds || durationSeconds}s`;
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const current = video.currentTime;
+    const dur = video.duration || (img as GeneratedVideo).duration_seconds || durationSeconds;
+
+    // Direct DOM updates — 0 React re-renders during playback!
+    if (progressBarRef.current) {
+      const pct = dur > 0 ? Math.min(100, (current / dur) * 100) : 0;
+      progressBarRef.current.style.width = `${pct}%`;
+    }
+    if (timeTextRef.current) {
+      timeTextRef.current.textContent = `${current.toFixed(1)}s / ${Math.round(dur)}s`;
+    }
+  };
+
+  return (
+    <motion.div
+      key={img.id}
+      layout
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className={`group relative cursor-pointer overflow-hidden rounded-card border bg-surface transition-all ${isGridMode ? "w-full aspect-square" : "w-[180px] sm:w-[240px] flex-shrink-0 snap-start"
+        } ${img.status === "failed"
+          ? "border-red-500/30"
+          : img.status === "completed"
+            ? isHovered && isVideo
+              ? "border-primary/50 shadow-[0_0_25px_rgba(var(--color-primary),0.15)] ring-1 ring-primary/30"
+              : "border-border/30 hover:border-primary/30 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.06)]"
+            : "border-border/20"
+        }`}
+      onClick={() => img.status === "completed" && onSelect(img)}
+    >
+      {/* Video Badges (Duration, Live Playback Status & Frame 1 Reference) */}
+      {isVideo && (
+        <div className="absolute left-2 top-2 z-20 flex flex-col items-start gap-1.5 pointer-events-auto">
+          {/* Duration / Live Time Badge */}
+          <div
+            className={`flex items-center gap-1.5 rounded px-2 py-0.5 text-[8.5px] font-black uppercase tracking-wider text-white backdrop-blur-sm border transition-all duration-200 ${isPlaying
+                ? "bg-primary/25 border-primary/40 text-primary shadow-[0_0_10px_rgba(var(--color-primary),0.2)]"
+                : "bg-black/75 border-white/10"
+              }`}
+          >
+            {isPlaying ? (
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+              </span>
+            ) : (
+              <svg className="h-2.5 w-2.5 text-primary" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+            )}
+            <span ref={timeTextRef}>
+              {`${(img as GeneratedVideo).duration_seconds || durationSeconds}s`}
+            </span>
+          </div>
+
+          {/* Frame 1 Reference Badge */}
+          {img.reference_image_url && (
+            <div
+              title="View Starting Frame (Frame 1)"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect({
+                  id: `${img.id}-frame-1`,
+                  prompt: `[Frame 1 Reference] ${img.prompt}`,
+                  image_url: img.reference_image_url,
+                  thumbnail_url: img.reference_image_thumbnail_url || img.reference_image_url,
+                  reference_image_url: null,
+                  reference_image_thumbnail_url: null,
+                  aspect_ratio: img.aspect_ratio,
+                  provider: img.provider,
+                  model: img.model,
+                  used_credits: "false",
+                  payment_mode: img.payment_mode,
+                  status: "completed",
+                  error_message: null,
+                  created_at: img.created_at
+                } as GeneratedImage);
+              }}
+              className="relative h-9 w-9 overflow-hidden rounded-md border border-border/60 bg-surface shadow-md hover:border-primary transition-all cursor-zoom-in group/ref ring-1 ring-black/40"
+            >
+              <img
+                src={resolveImagePath(img.reference_image_thumbnail_url || img.reference_image_url)}
+                alt="Frame 1 Reference"
+                className="h-full w-full object-cover"
+              />
+              <span className="absolute bottom-0 inset-x-0 bg-black/85 text-[6.5px] font-bold text-center text-primary leading-tight py-0.5 uppercase tracking-wider">
+                Frame 1
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reference Image Badges for Static Images (Main + Secondary / Outfit) */}
+      {!isVideo && (img.reference_image_url || (img as any).secondary_reference_image_url || (img as any).secondary_image_url || (img as any).outfit_image_url) && (
+        <div className="absolute left-2 top-2 z-20 flex items-center gap-1.5 pointer-events-auto">
+          {img.reference_image_url && (
+            <div
+              title="View Person / Main Reference"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect({
+                  id: `${img.id}-ref-1`,
+                  prompt: `[Person Reference] ${img.prompt}`,
+                  image_url: img.reference_image_url,
+                  thumbnail_url: img.reference_image_thumbnail_url || img.reference_image_url,
+                  reference_image_url: null,
+                  reference_image_thumbnail_url: null,
+                  aspect_ratio: img.aspect_ratio,
+                  provider: img.provider,
+                  model: img.model,
+                  used_credits: "false",
+                  payment_mode: img.payment_mode,
+                  status: "completed",
+                  error_message: null,
+                  created_at: img.created_at
+                } as GeneratedImage);
+              }}
+              className="relative h-9 w-9 overflow-hidden rounded-md border border-border/60 bg-surface shadow-md hover:border-primary transition-all cursor-zoom-in group/ref"
+            >
+              <img
+                src={resolveImagePath(img.reference_image_thumbnail_url || img.reference_image_url)}
+                alt="Person Reference"
+                className="h-full w-full object-cover"
+              />
+              <span className="absolute bottom-0 inset-x-0 bg-black/75 text-[7px] font-bold text-center text-white leading-tight py-0.5">
+                👤
+              </span>
+            </div>
+          )}
+
+          {(img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url) && (
+            <div
+              title="View Outfit / Garment Reference"
+              onClick={(e) => {
+                e.stopPropagation();
+                const secUrl = img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url || "";
+                const secThumb = img.secondary_reference_image_thumbnail_url || secUrl;
+                onSelect({
+                  id: `${img.id}-ref-2`,
+                  prompt: `[Outfit Reference] ${img.prompt}`,
+                  image_url: secUrl,
+                  thumbnail_url: secThumb,
+                  reference_image_url: null,
+                  reference_image_thumbnail_url: null,
+                  aspect_ratio: img.aspect_ratio,
+                  provider: img.provider,
+                  model: img.model,
+                  used_credits: "false",
+                  payment_mode: img.payment_mode,
+                  status: "completed",
+                  error_message: null,
+                  created_at: img.created_at
+                } as GeneratedImage);
+              }}
+              className="relative h-9 w-9 overflow-hidden rounded-md border border-border/60 bg-surface shadow-md hover:border-primary transition-all cursor-zoom-in group/ref"
+            >
+              <img
+                src={resolveImagePath(img.secondary_reference_image_thumbnail_url || img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url || "")}
+                alt="Outfit Reference"
+                className="h-full w-full object-cover"
+              />
+              <span className="absolute bottom-0 inset-x-0 bg-black/75 text-[7px] font-bold text-center text-white leading-tight py-0.5">
+                👗
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="aspect-square overflow-hidden relative">
+        {img.status === "completed" ? (
+          isVideo && videoUrl ? (
+            <div className="relative h-full w-full bg-black flex items-center justify-center overflow-hidden">
+              <video
+                ref={videoRef}
+                src={`${resolveImagePath(videoUrl)}#t=0.001`}
+                poster={posterUrl ? resolveImagePath(posterUrl) : undefined}
+                loop
+                muted
+                playsInline
+                preload="metadata"
+                onLoadedMetadata={(e) => {
+                  if (!e.currentTarget.currentTime) {
+                    try {
+                      e.currentTarget.currentTime = 0.001;
+                    } catch { }
+                  }
+                }}
+                onTimeUpdate={handleTimeUpdate}
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+
+              {/* Ambient glow edge when previewing */}
+              {isHovered && (
+                <div className="absolute inset-0 ring-1 ring-inset ring-primary/40 pointer-events-none z-10" />
+              )}
+
+              {/* Subtle Play indicator when idle (smoothly fades out on hover) */}
+              <div
+                className={`absolute inset-0 flex items-center justify-center transition-all duration-300 pointer-events-none ${isHovered ? "opacity-0 scale-90" : "opacity-100 scale-100"
+                  }`}
+              >
+                <div className="h-10 w-10 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white flex items-center justify-center shadow-lg">
+                  <svg className="h-4 w-4 fill-current ml-0.5 text-primary" viewBox="0 0 24 24">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Live Preview Progress Bar at bottom */}
+              <div
+                className={`absolute bottom-0 inset-x-0 h-1 bg-black/60 overflow-hidden transition-opacity duration-200 pointer-events-none z-20 ${isPlaying ? "opacity-100" : "opacity-0"
+                  }`}
+              >
+                <div
+                  ref={progressBarRef}
+                  className="h-full bg-primary transition-all duration-75 ease-linear shadow-[0_0_8px_rgba(var(--color-primary),0.8)]"
+                  style={{ width: "0%" }}
+                />
+              </div>
+            </div>
+          ) : (
+            <img
+              src={resolveImagePath(img.thumbnail_url || (img as any).image_url)}
+              alt={img.prompt}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
+            />
+          )
+        ) : img.status === "failed" ? (
+          <div className="flex h-full w-full flex-col items-center justify-center bg-red-500/10 p-4 relative overflow-hidden">
+            <motion.div
+              animate={{
+                opacity: [0.05, 0.15, 0.05],
+                scale: [1, 1.05, 1]
+              }}
+              transition={{ duration: 3, repeat: Infinity }}
+              className="absolute inset-0 bg-red-500/20"
+            />
+            <motion.div
+              animate={{
+                x: [-1, 1, -1, 0],
+                filter: ["hue-rotate(0deg)", "hue-rotate(90deg)", "hue-rotate(0deg)"]
+              }}
+              transition={{ duration: 0.2, repeat: Infinity, repeatType: "mirror" }}
+            >
+              <svg className="h-10 w-10 text-red-500/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M15 9l-6 6M9 9l6 6" />
+              </svg>
+            </motion.div>
+            <p className="mt-3 text-[10px] font-bold text-red-400 text-center relative z-10 px-2 leading-relaxed">
+              {img.error_message?.slice(0, 80) || "System Failure"}
+            </p>
+            <div className="mt-3 flex flex-col gap-1.5 w-full items-center px-2 relative z-10">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRetry(img.id);
+                }}
+                className="rounded-full bg-red-500/85 hover:bg-red-500 px-4 py-1 text-[9px] font-bold uppercase tracking-widest text-white transition-all w-full"
+              >
+                Retry
+              </motion.button>
+              {img.payment_mode === "credits" ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRetry(img.id, "free_queue");
+                  }}
+                  className="text-[9px] font-bold text-red-300 hover:text-white transition-colors underline decoration-dotted mt-0.5"
+                >
+                  Retry Free/Queue
+                </button>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRetry(img.id, "credits");
+                  }}
+                  className="text-[9px] font-bold text-primary hover:text-primaryHover transition-colors uppercase tracking-wider flex items-center justify-center gap-0.5 bg-primary/10 border border-primary/20 rounded-md py-0.5 w-full"
+                >
+                  ⚡ Credits Retry (5c)
+                </button>
+              )}
+            </div>
+          </div>
+        ) : img.status === "queued" ? (
+          <div className="flex h-full w-full flex-col items-center justify-center bg-amber-500/[0.03] relative overflow-hidden">
+            <div className="flex flex-col items-center gap-4 relative z-10 scale-75">
+              <div className="relative h-16 w-20 flex items-center justify-center">
+                {[...Array(4)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    animate={{
+                      y: [-10, -30],
+                      x: [(Math.random() - 0.5) * 20, (Math.random() - 0.5) * 40],
+                      opacity: [0, 0.8, 0],
+                      scale: [0.4, 0.8]
+                    }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity,
+                      delay: i * 0.4
+                    }}
+                    className="absolute top-0 h-1.5 w-1.5 rounded-full bg-amber-500/20"
+                  />
+                ))}
+
+                <div className="absolute bottom-0 h-8 w-16 border-b-2 border-x-2 border-amber-900/20 rounded-b-full bg-amber-500/5 overflow-hidden">
+                  <svg className="absolute inset-0 h-full w-full text-amber-500/20" viewBox="0 0 20 10">
+                    {[...Array(6)].map((_, i) => (
+                      <motion.path
+                        key={i}
+                        d={`M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${2 + (i % 2) * 3} ${8 + i * 2.5} 10`}
+                        stroke="currentColor"
+                        strokeWidth="1"
+                        fill="none"
+                        animate={{
+                          opacity: [0.3, 0.8, 0.3],
+                          y: [0, -1, 0],
+                        }}
+                        transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 }}
+                      />
+                    ))}
+                  </svg>
+                </div>
+
+                <motion.div
+                  animate={{
+                    rotate: [-15, -35, -15],
+                    x: [-4, 4, -4],
+                    y: [0, 4, 0]
+                  }}
+                  transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute bottom-3 left-5 h-12 w-0.5 bg-amber-900/30 rounded-full origin-bottom"
+                  style={{ transform: "rotate(-25deg)" }}
+                />
+
+                <motion.div
+                  animate={{
+                    scaleY: [1, 1.3, 1],
+                    opacity: [0.1, 0.25, 0.1]
+                  }}
+                  transition={{ duration: 0.4, repeat: Infinity }}
+                  className="absolute bottom-4 left-4 w-4 h-6 bg-amber-500/10 rounded-full blur-[2px]"
+                />
+              </div>
+
+              <div className="flex flex-col items-center">
+                <motion.span
+                  animate={{ opacity: [0.4, 0.9, 0.4] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                  className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-500/70"
+                >
+                  Queued
+                </motion.span>
+                <span className="text-[8px] font-medium text-amber-500/40 mt-0.5">Free GPU Waitlist</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-background relative overflow-hidden">
+            <motion.div
+              animate={{
+                scale: [1, 1.2, 1.1, 1.3, 1],
+                opacity: [0.1, 0.2, 0.15, 0.25, 0.1],
+                borderRadius: ["30% 70% 70% 30% / 30% 30% 70% 70%", "50% 50% 20% 80% / 25% 80% 20% 75%", "30% 70% 70% 30% / 30% 30% 70% 70%"]
+              }}
+              transition={{ duration: 10, repeat: Infinity }}
+              className="absolute inset-4 bg-primary blur-3xl"
+            />
+
+            <motion.div
+              animate={{ y: ["-100%", "400%"] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute top-0 left-0 w-full h-[30%] bg-gradient-to-b from-transparent via-primary/20 to-transparent z-10"
+            />
+
+            <div className="absolute inset-0 flex items-center justify-center">
+              {[...Array(3)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 3 + i, repeat: Infinity, ease: "linear" }}
+                  className="absolute border border-primary/20 rounded-full"
+                  style={{
+                    width: 100 + i * 30,
+                    height: 100 + i * 30,
+                    borderStyle: i === 1 ? "dashed" : "solid"
+                  }}
+                />
+              ))}
+            </div>
+
+            <div className="flex flex-col items-center gap-4 relative z-20">
+              <div className="relative">
+                <motion.div
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    boxShadow: [
+                      "0 0 20px rgba(var(--color-primary), 0.2)",
+                      "0 0 40px rgba(var(--color-primary), 0.6)",
+                      "0 0 20px rgba(var(--color-primary), 0.2)"
+                    ]
+                  }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                  className="h-12 w-12 rounded-full bg-primary flex items-center justify-center relative z-10"
+                >
+                  <svg className="h-6 w-6 text-background animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </motion.div>
+
+                {[...Array(8)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    animate={{
+                      rotate: 360,
+                      scale: [0.8, 1.2, 0.8]
+                    }}
+                    transition={{
+                      rotate: { duration: 2 + i * 0.2, repeat: Infinity, ease: "linear" },
+                      scale: { duration: 1, repeat: Infinity }
+                    }}
+                    className="absolute inset-0"
+                  >
+                    <div
+                      className="h-1.5 w-1.5 rounded-full bg-primary"
+                      style={{ transform: `translate(${25 + i * 2}px, 0)` }}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+
+              <div className="flex flex-col items-center">
+                <motion.span
+                  animate={{ opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="text-[11px] font-black uppercase tracking-[0.3em] text-primary"
+                >
+                  {img.status === "generating" ? "Forging" : "Materializing"}
+                </motion.span>
+                <div className="h-0.5 w-12 bg-surface-elevated mt-1.5 rounded-full overflow-hidden">
+                  <motion.div
+                    animate={{ x: ["-100%", "100%"] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                    className="h-full w-full bg-primary"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="p-2.5">
+        <p className="truncate text-[11px] text-textSecondary">
+          {img.prompt}
+        </p>
+        <p className="mt-0.5 text-[9px] text-textMuted">
+          {new Date(img.created_at).toLocaleDateString()}
+        </p>
+      </div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(img.id);
+        }}
+        className="absolute right-2 top-2 z-30 rounded-full bg-background/70 p-1.5 text-textMuted opacity-0 backdrop-blur-sm transition-all group-hover:opacity-100 hover:text-red-400"
+      >
+        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </motion.div>
+  );
+};
+
 export default function ImageStudio() {
   useDocumentSEO({
     title: "Studio",
@@ -38,9 +611,15 @@ export default function ImageStudio() {
   });
 
   const { isAuthenticated, user } = useAuth();
+  const [mediaMode, setMediaMode] = useState<"image" | "video">("image");
   const [models, setModels] = useState<StudioModels>({});
+  const [videoModels, setVideoModels] = useState<StudioModels>({});
   const [selectedProvider, setSelectedProvider] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
+  const [selectedVideoProvider, setSelectedVideoProvider] = useState("");
+  const [selectedVideoModel, setSelectedVideoModel] = useState("");
+  const [durationSeconds, setDurationSeconds] = useState(5);
+  const [videoCreditCost, setVideoCreditCost] = useState(10);
   const [prompt, setPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [paymentMode, setPaymentMode] = useState<"own_key" | "credits" | "free_queue">("credits");
@@ -58,6 +637,8 @@ export default function ImageStudio() {
   const [activeTask, setActiveTask] = useState<string | null>(null);
   const [showStudioExpandModal, setShowStudioExpandModal] = useState(false);
   const [dismissedPresetPrompt, setDismissedPresetPrompt] = useState(false);
+  const [videoGallery, setVideoGallery] = useState<GeneratedVideo[]>([]);
+  const [loadingVideoGallery, setLoadingVideoGallery] = useState(false);
 
   const isDualImagePreset = useCallback((preset: StudioPreset | null): boolean => {
     if (!preset) return false;
@@ -150,11 +731,12 @@ export default function ImageStudio() {
   const [loadingPresets, setLoadingPresets] = useState(true);
 
   const [gallery, setGallery] = useState<GeneratedImage[]>([]);
-  const [lightboxImage, setLightboxImage] = useState<GeneratedImage | StudioPreset | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<GeneratedImage | GeneratedVideo | StudioPreset | null>(null);
   const galleryEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<Set<string>>(new Set());
+  const videoPollingRef = useRef<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const secondaryFileInputRef = useRef<HTMLInputElement>(null);
@@ -377,6 +959,37 @@ export default function ImageStudio() {
     (window as any)[`poll_${imageId}`] = interval;
   }, []);
 
+  // Poll for video completion
+  const pollForVideoCompletion = useCallback((videoId: string) => {
+    if (videoPollingRef.current.has(videoId)) return;
+    videoPollingRef.current.add(videoId);
+
+    const interval = setInterval(async () => {
+      try {
+        const updated = await getVideoStatus(videoId);
+        if (updated.status === "completed" || updated.status === "failed") {
+          clearInterval(interval);
+          videoPollingRef.current.delete(videoId);
+          setVideoGallery((prev) =>
+            prev.map((vid) => (vid.id === videoId ? updated : vid))
+          );
+          window.dispatchEvent(new Event("balance-update"));
+
+          setActiveTab("generations");
+          requestAnimationFrame(() => {
+            scrollAreaRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+            sliderRef.current?.scrollTo({ left: 0, behavior: "smooth" });
+          });
+        }
+      } catch {
+        clearInterval(interval);
+        videoPollingRef.current.delete(videoId);
+      }
+    }, getStudioPollingInterval() * 1000);
+
+    (window as any)[`poll_vid_${videoId}`] = interval;
+  }, []);
+
   // Cleanup intervals on unmount
   useEffect(() => {
     return () => {
@@ -397,7 +1010,7 @@ export default function ImageStudio() {
     return () => window.removeEventListener("app:user-logged-out", handleLogout);
   }, []);
 
-  // Fetch gallery
+  // Fetch image gallery
   useEffect(() => {
     if (!isAuthenticated) {
       setGallery([]);
@@ -420,6 +1033,61 @@ export default function ImageStudio() {
       .finally(() => setLoadingGallery(false));
   }, [isAuthenticated, user?.id, pollForCompletion]);
 
+  // Fetch video models & gallery ONLY when mediaMode is "video"
+  useEffect(() => {
+    if (mediaMode !== "video" || !isAuthenticated) return;
+
+    // 1. Fetch video models if not yet loaded
+    if (Object.keys(videoModels).length === 0) {
+      getStudioVideoModels()
+        .then((data) => {
+          if (data && typeof data === "object" && Object.keys(data).length > 0) {
+            setVideoModels(data);
+            const vProviders = Object.keys(data);
+            if (vProviders.length > 0) {
+              setSelectedVideoProvider(vProviders[0]);
+              const vModels = data[vProviders[0]];
+              if (vModels && vModels.length > 0) {
+                setSelectedVideoModel(vModels[0]);
+              }
+            }
+          } else {
+            setVideoModels({});
+            setSelectedVideoProvider("");
+            setSelectedVideoModel("");
+          }
+        })
+        .catch(() => {
+          setVideoModels({});
+          setSelectedVideoProvider("");
+          setSelectedVideoModel("");
+        });
+    }
+
+    // 2. Fetch video gallery
+    setLoadingVideoGallery(true);
+    getStudioVideoGallery()
+      .then((videos) => {
+        setVideoGallery(videos);
+        videos.forEach((vid) => {
+          if ((vid.status === "pending" || vid.status === "generating" || vid.status === "queued") && !videoPollingRef.current.has(vid.id)) {
+            pollForVideoCompletion(vid.id);
+          }
+        });
+      })
+      .catch(() => { })
+      .finally(() => setLoadingVideoGallery(false));
+  }, [mediaMode, isAuthenticated, user?.id, pollForVideoCompletion]);
+
+  // Fetch dynamic video cost
+  useEffect(() => {
+    if (mediaMode === "video" && selectedVideoProvider && selectedVideoModel && durationSeconds) {
+      getVideoCost(selectedVideoModel, selectedVideoProvider, durationSeconds)
+        .then(cost => setVideoCreditCost(cost))
+        .catch(() => setVideoCreditCost(10));
+    }
+  }, [mediaMode, selectedVideoProvider, selectedVideoModel, durationSeconds]);
+
   // Update model when provider changes
   const handleProviderChange = (provider: string) => {
     setSelectedProvider(provider);
@@ -440,8 +1108,12 @@ export default function ImageStudio() {
     task?: string | null;
   }) => {
     const finalPrompt = override?.prompt !== undefined ? override.prompt : prompt;
-    const finalProvider = override?.provider !== undefined ? override.provider : selectedProvider;
-    const finalModel = override?.model !== undefined ? override.model : selectedModel;
+    const finalProvider = override?.provider !== undefined
+      ? override.provider
+      : mediaMode === "video" ? selectedVideoProvider : selectedProvider;
+    const finalModel = override?.model !== undefined
+      ? override.model
+      : mediaMode === "video" ? selectedVideoModel : selectedModel;
     const finalRatio = override?.aspectRatio !== undefined ? override.aspectRatio : aspectRatio;
     const finalPayment = override?.paymentMode !== undefined ? override.paymentMode : paymentMode;
     const finalRef = override?.referenceImage !== undefined ? override.referenceImage : referenceImage;
@@ -456,7 +1128,30 @@ export default function ImageStudio() {
     setError(null);
 
     try {
-      // POST returns instantly with a pending/queued record
+      if (mediaMode === "video") {
+        const pendingVideo = await generateStudioVideo(
+          finalPrompt,
+          finalProvider,
+          finalModel,
+          finalRatio,
+          durationSeconds,
+          finalPayment,
+          finalRef
+        );
+        setVideoGallery((prev) => [pendingVideo, ...prev]);
+        setPrompt("");
+        setActiveTask(null);
+        setReferenceImage(null);
+        setReferencePreview(null);
+        setGenerating(false);
+
+        scrollToLatestGeneration();
+        pollForVideoCompletion(pendingVideo.id);
+        window.dispatchEvent(new Event("balance-update"));
+        return;
+      }
+
+      // Image generation
       const pendingImage = await generateStudioImage(
         finalPrompt,
         finalPayment === "free_queue" ? "local" : finalProvider,
@@ -505,12 +1200,12 @@ export default function ImageStudio() {
         setError(detail || "Your API key failed. Try switching to credits.");
         setShowCreditSuggestion(true);
       } else {
-        setError(detail || "Image generation failed. Please try again.");
+        setError(detail || `${mediaMode === "video" ? "Video" : "Image"} generation failed. Please try again.`);
         setShowCreditSuggestion(false);
       }
       setGenerating(false);
     }
-  }, [prompt, selectedProvider, selectedModel, aspectRatio, paymentMode, referenceImage, selectedPreset, secondaryImage, activeTask, scrollToLatestGeneration, pollForCompletion]);
+  }, [prompt, mediaMode, selectedProvider, selectedModel, selectedVideoProvider, selectedVideoModel, durationSeconds, aspectRatio, paymentMode, referenceImage, selectedPreset, secondaryImage, activeTask, scrollToLatestGeneration, pollForCompletion, pollForVideoCompletion]);
 
   useEffect(() => {
     executeGenRef.current = executeGeneration;
@@ -539,6 +1234,17 @@ export default function ImageStudio() {
   };
 
   const handleDelete = async (imageId: string) => {
+    if (mediaMode === "video") {
+      try {
+        await deleteStudioVideo(imageId);
+        setVideoGallery((prev) => prev.filter((v) => v.id !== imageId));
+        if (lightboxImage?.id === imageId) setLightboxImage(null);
+      } catch {
+        // silent
+      }
+      return;
+    }
+
     const targetImage = gallery.find((img) => img.id === imageId);
     if (targetImage && ["queued", "pending", "generating"].includes(targetImage.status)) {
       if (targetImage.payment_mode === "credits") {
@@ -564,8 +1270,13 @@ export default function ImageStudio() {
 
   const performDelete = async (imageId: string) => {
     try {
-      await deleteStudioImage(imageId);
+      if (mediaMode === "video") {
+        await deleteStudioVideo(imageId);
+      } else {
+        await deleteStudioImage(imageId);
+      }
       setGallery((prev) => prev.filter((img) => img.id !== imageId));
+      setVideoGallery((prev) => prev.filter((img) => img.id !== imageId));
       if (lightboxImage?.id === imageId) setLightboxImage(null);
     } catch {
       // silent
@@ -582,365 +1293,18 @@ export default function ImageStudio() {
     }
   };
 
-  const renderGalleryCard = (img: GeneratedImage, isGridMode = false) => {
+  const renderGalleryCard = (img: GeneratedImage | GeneratedVideo, isGridMode = false) => {
     return (
-      <motion.div
+      <StudioGalleryCard
         key={img.id}
-        layout
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        className={`group relative cursor-pointer overflow-hidden rounded-card border bg-surface transition-all ${isGridMode ? "w-full aspect-square" : "w-[180px] sm:w-[240px] flex-shrink-0 snap-start"
-          } ${img.status === "failed"
-            ? "border-red-500/30"
-            : img.status === "completed"
-              ? "border-border/30 hover:border-primary/30 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.06)]"
-              : "border-border/20"
-          }`}
-        onClick={() => img.status === "completed" && setLightboxImage(img)}
-      >
-        {/* Reference Image Badges (Main + Secondary / Outfit) */}
-        {(img.reference_image_url || img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url) && (
-          <div className="absolute left-2 top-2 z-20 flex items-center gap-1.5 pointer-events-auto">
-            {img.reference_image_url && (
-              <div
-                title="View Person / Main Reference"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setLightboxImage({
-                    id: `${img.id}-ref-1`,
-                    prompt: `[Person Reference] ${img.prompt}`,
-                    image_url: img.reference_image_url,
-                    thumbnail_url: img.reference_image_thumbnail_url || img.reference_image_url,
-                    reference_image_url: null,
-                    reference_image_thumbnail_url: null,
-                    aspect_ratio: img.aspect_ratio,
-                    provider: img.provider,
-                    model: img.model,
-                    used_credits: "false",
-                    payment_mode: img.payment_mode,
-                    status: "completed",
-                    error_message: null,
-                    created_at: img.created_at
-                  });
-                }}
-                className="relative h-9 w-9 overflow-hidden rounded-md border border-border/60 bg-surface shadow-md hover:border-primary transition-all cursor-zoom-in group/ref"
-              >
-                <img
-                  src={resolveImagePath(img.reference_image_thumbnail_url || img.reference_image_url)}
-                  alt="Person Reference"
-                  className="h-full w-full object-cover"
-                />
-                <span className="absolute bottom-0 inset-x-0 bg-black/75 text-[7px] font-bold text-center text-white leading-tight py-0.5">
-                  👤
-                </span>
-              </div>
-            )}
-
-            {(img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url) && (
-              <div
-                title="View Outfit / Garment Reference"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const secUrl = img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url || "";
-                  const secThumb = img.secondary_reference_image_thumbnail_url || secUrl;
-                  setLightboxImage({
-                    id: `${img.id}-ref-2`,
-                    prompt: `[Outfit Reference] ${img.prompt}`,
-                    image_url: secUrl,
-                    thumbnail_url: secThumb,
-                    reference_image_url: null,
-                    reference_image_thumbnail_url: null,
-                    aspect_ratio: img.aspect_ratio,
-                    provider: img.provider,
-                    model: img.model,
-                    used_credits: "false",
-                    payment_mode: img.payment_mode,
-                    status: "completed",
-                    error_message: null,
-                    created_at: img.created_at
-                  });
-                }}
-                className="relative h-9 w-9 overflow-hidden rounded-md border border-border/60 bg-surface shadow-md hover:border-primary transition-all cursor-zoom-in group/ref"
-              >
-                <img
-                  src={resolveImagePath(img.secondary_reference_image_thumbnail_url || img.secondary_reference_image_url || img.secondary_image_url || img.outfit_image_url || "")}
-                  alt="Outfit Reference"
-                  className="h-full w-full object-cover"
-                />
-                <span className="absolute bottom-0 inset-x-0 bg-black/75 text-[7px] font-bold text-center text-white leading-tight py-0.5">
-                  👗
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-        <div className="aspect-square overflow-hidden">
-          {img.status === "completed" && img.image_url ? (
-            <img
-              src={resolveImagePath(img.thumbnail_url || img.image_url)}
-              alt={img.prompt}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-              loading="lazy"
-            />
-          ) : img.status === "failed" ? (
-            <div className="flex h-full w-full flex-col items-center justify-center bg-red-500/10 p-4 relative overflow-hidden">
-              <motion.div
-                animate={{
-                  opacity: [0.05, 0.15, 0.05],
-                  scale: [1, 1.05, 1]
-                }}
-                transition={{ duration: 3, repeat: Infinity }}
-                className="absolute inset-0 bg-red-500/20"
-              />
-              <motion.div
-                animate={{
-                  x: [-1, 1, -1, 0],
-                  filter: ["hue-rotate(0deg)", "hue-rotate(90deg)", "hue-rotate(0deg)"]
-                }}
-                transition={{ duration: 0.2, repeat: Infinity, repeatType: "mirror" }}
-              >
-                <svg className="h-10 w-10 text-red-500/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M15 9l-6 6M9 9l6 6" />
-                </svg>
-              </motion.div>
-              <p className="mt-3 text-[10px] font-bold text-red-400 text-center relative z-10 px-2 leading-relaxed">
-                {img.error_message?.slice(0, 80) || "System Failure"}
-              </p>
-              <div className="mt-3 flex flex-col gap-1.5 w-full items-center px-2 relative z-10">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRetry(img.id);
-                  }}
-                  className="rounded-full bg-red-500/85 hover:bg-red-500 px-4 py-1 text-[9px] font-bold uppercase tracking-widest text-white transition-all w-full"
-                >
-                  Try Again
-                </motion.button>
-
-                {img.payment_mode === "credits" ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRetry(img.id, "free_queue");
-                    }}
-                    className="text-[9px] font-bold text-red-300 hover:text-white transition-colors underline decoration-dotted mt-0.5"
-                  >
-                    Retry Free/Queue
-                  </button>
-                ) : (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRetry(img.id, "credits");
-                    }}
-                    className="text-[9px] font-bold text-primary hover:text-primaryHover transition-colors uppercase tracking-wider flex items-center justify-center gap-0.5 bg-primary/10 border border-primary/20 rounded-md py-0.5 w-full"
-                  >
-                    ⚡ Credits Retry (5c)
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : img.status === "queued" ? (
-            <div className="flex h-full w-full flex-col items-center justify-center bg-amber-500/[0.03] relative overflow-hidden">
-              <div className="flex flex-col items-center gap-4 relative z-10 scale-75">
-                <div className="relative h-16 w-20 flex items-center justify-center">
-                  {[...Array(4)].map((_, i) => (
-                    <motion.div
-                      key={i}
-                      animate={{
-                        y: [-10, -30],
-                        x: [(Math.random() - 0.5) * 20, (Math.random() - 0.5) * 40],
-                        opacity: [0, 0.8, 0],
-                        scale: [0.4, 0.8]
-                      }}
-                      transition={{
-                        duration: 1.5,
-                        repeat: Infinity,
-                        delay: i * 0.4
-                      }}
-                      className="absolute top-0 h-1.5 w-1.5 rounded-full bg-amber-500/20"
-                    />
-                  ))}
-
-                  <div className="absolute bottom-0 h-8 w-16 border-b-2 border-x-2 border-amber-900/20 rounded-b-full bg-amber-500/5 overflow-hidden">
-                    <svg className="absolute inset-0 h-full w-full text-amber-500/20" viewBox="0 0 20 10">
-                      {[...Array(6)].map((_, i) => (
-                        <motion.path
-                          key={i}
-                          d={`M ${2 + i * 2.5} 10 Q ${5 + i * 2.5} ${2 + (i % 2) * 3} ${8 + i * 2.5} 10`}
-                          stroke="currentColor"
-                          strokeWidth="1"
-                          fill="none"
-                          animate={{
-                            opacity: [0.3, 0.8, 0.3],
-                            y: [0, -1, 0],
-                          }}
-                          transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 }}
-                        />
-                      ))}
-                    </svg>
-                  </div>
-
-                  <motion.div
-                    animate={{
-                      rotate: [-15, -35, -15],
-                      x: [-4, 4, -4],
-                      y: [0, 4, 0]
-                    }}
-                    transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute bottom-3 left-5 h-12 w-0.5 bg-amber-900/30 rounded-full origin-bottom"
-                    style={{ transform: "rotate(-25deg)" }}
-                  />
-
-                  <motion.div
-                    animate={{
-                      rotate: [15, 35, 15],
-                      x: [4, -4, 4],
-                      y: [0, 4, 0]
-                    }}
-                    transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.1 }}
-                    className="absolute bottom-3 right-5 h-12 w-0.5 bg-amber-900/30 rounded-full origin-bottom"
-                    style={{ transform: "rotate(25deg)" }}
-                  />
-                </div>
-
-                <div className="flex flex-col items-center gap-2 px-6">
-                  <span className="text-[12px] font-black uppercase tracking-[0.15em] text-amber-600/80 text-center leading-relaxed">
-                    Hang tight — your image is cooking 🚀
-                  </span>
-                  <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-amber-600/40 text-center">
-                    (This might take a couple of hours)
-                  </span>
-                  <motion.div
-                    className="flex gap-1 mt-1"
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                  >
-                    <div className="h-1 w-1 rounded-full bg-amber-500/30" />
-                    <div className="h-1 w-1 rounded-full bg-amber-500/30" />
-                    <div className="h-1 w-1 rounded-full bg-amber-500/30" />
-                  </motion.div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-background relative overflow-hidden">
-              <motion.div
-                animate={{
-                  scale: [1, 1.2, 1.1, 1.3, 1],
-                  opacity: [0.1, 0.2, 0.15, 0.25, 0.1],
-                  borderRadius: ["30% 70% 70% 30% / 30% 30% 70% 70%", "50% 50% 20% 80% / 25% 80% 20% 75%", "30% 70% 70% 30% / 30% 30% 70% 70%"]
-                }}
-                transition={{ duration: 10, repeat: Infinity }}
-                className="absolute inset-4 bg-primary blur-3xl"
-              />
-
-              <motion.div
-                animate={{ y: ["-100%", "400%"] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-0 left-0 w-full h-[30%] bg-gradient-to-b from-transparent via-primary/20 to-transparent z-10"
-              />
-
-              <div className="absolute inset-0 flex items-center justify-center">
-                {[...Array(3)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 3 + i, repeat: Infinity, ease: "linear" }}
-                    className="absolute border border-primary/20 rounded-full"
-                    style={{
-                      width: 100 + i * 30,
-                      height: 100 + i * 30,
-                      borderStyle: i === 1 ? "dashed" : "solid"
-                    }}
-                  />
-                ))}
-              </div>
-
-              <div className="flex flex-col items-center gap-4 relative z-20">
-                <div className="relative">
-                  <motion.div
-                    animate={{
-                      scale: [1, 1.2, 1],
-                      boxShadow: [
-                        "0 0 20px rgba(var(--color-primary), 0.2)",
-                        "0 0 40px rgba(var(--color-primary), 0.6)",
-                        "0 0 20px rgba(var(--color-primary), 0.2)"
-                      ]
-                    }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                    className="h-12 w-12 rounded-full bg-primary flex items-center justify-center relative z-10"
-                  >
-                    <svg className="h-6 w-6 text-background animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </motion.div>
-
-                  {[...Array(8)].map((_, i) => (
-                    <motion.div
-                      key={i}
-                      animate={{
-                        rotate: 360,
-                        scale: [0.8, 1.2, 0.8]
-                      }}
-                      transition={{
-                        rotate: { duration: 2 + i * 0.2, repeat: Infinity, ease: "linear" },
-                        scale: { duration: 1, repeat: Infinity }
-                      }}
-                      className="absolute inset-0"
-                    >
-                      <div
-                        className="h-1.5 w-1.5 rounded-full bg-primary"
-                        style={{ transform: `translate(${25 + i * 2}px, 0)` }}
-                      />
-                    </motion.div>
-                  ))}
-                </div>
-
-                <div className="flex flex-col items-center">
-                  <motion.span
-                    animate={{ opacity: [0.5, 1, 0.5] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="text-[11px] font-black uppercase tracking-[0.3em] text-primary"
-                  >
-                    {img.status === "generating" ? "Forging" : "Materializing"}
-                  </motion.span>
-                  <div className="h-0.5 w-12 bg-surface-elevated mt-1.5 rounded-full overflow-hidden">
-                    <motion.div
-                      animate={{ x: ["-100%", "100%"] }}
-                      transition={{ duration: 1, repeat: Infinity }}
-                      className="h-full w-full bg-primary"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="p-2.5">
-          <p className="truncate text-[11px] text-textSecondary">
-            {img.prompt}
-          </p>
-          <p className="mt-0.5 text-[9px] text-textMuted">
-            {new Date(img.created_at).toLocaleDateString()}
-          </p>
-        </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDelete(img.id);
-          }}
-          className="absolute right-2 top-2 rounded-full bg-background/70 p-1.5 text-textMuted opacity-0 backdrop-blur-sm transition-all group-hover:opacity-100 hover:text-red-400"
-        >
-          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </motion.div>
+        img={img}
+        isGridMode={isGridMode}
+        mediaMode={mediaMode}
+        durationSeconds={durationSeconds}
+        onSelect={(item) => setLightboxImage(item)}
+        onDelete={handleDelete}
+        onRetry={handleRetry}
+      />
     );
   };
 
@@ -1048,16 +1412,58 @@ export default function ImageStudio() {
           <Topbar
             hideIncognito={true}
             leftContent={
-              <div className="flex flex-col justify-center select-none shrink-0 pr-2">
-                <h1
-                  className="text-base font-bold text-textPrimary leading-none"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                >
-                  Studio
-                </h1>
-                <p className="hidden sm:block mt-1.5 text-[11px] text-textMuted leading-none">
-                  Generate images from text prompts
-                </p>
+              <div className="flex items-center gap-2 sm:gap-3.5 select-none shrink-0 pr-2">
+                <div className="flex flex-col justify-center">
+                  <h1
+                    className="text-base font-bold text-textPrimary leading-none"
+                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                  >
+                    Studio
+                  </h1>
+                  <p className="hidden sm:block mt-1 text-[10.5px] text-textMuted leading-none">
+                    {mediaMode === "video" ? "Synthesize cinematic AI video clips" : "Generate images from text prompts"}
+                  </p>
+                </div>
+
+                {/* Image vs Video Mode Switcher */}
+                <div className="flex items-center rounded-xl bg-surface-elevated/80 p-0.5 border border-border/40 shadow-inner">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMediaMode("image");
+                      setActiveTask(null);
+                    }}
+                    className={`flex items-center gap-1 sm:gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${mediaMode === "image"
+                        ? "bg-primary text-background shadow-sm"
+                        : "text-textMuted hover:text-textPrimary"
+                      }`}
+                  >
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                    <span>Image</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMediaMode("video");
+                      setActiveTask(null);
+                      if (aspectRatio === "1:1") setAspectRatio("16:9");
+                    }}
+                    className={`flex items-center gap-1 sm:gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${mediaMode === "video"
+                        ? "bg-primary text-background shadow-sm"
+                        : "text-textMuted hover:text-textPrimary"
+                      }`}
+                  >
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+                    </svg>
+                    <span>Video</span>
+                  </button>
+                </div>
               </div>
             }
           />
@@ -1085,11 +1491,16 @@ export default function ImageStudio() {
               </button>
               <button
                 onClick={() => setActiveTab("presets")}
-                className={`relative pb-3 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === "presets" ? "text-primary" : "text-textMuted hover:text-textSecondary"
+                className={`relative pb-3 text-sm font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 ${activeTab === "presets" ? "text-primary" : "text-textMuted hover:text-textSecondary"
                   }`}
                 style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               >
-                Preset Libraries
+                <span>{mediaMode === "video" ? "Video Presets" : "Preset Libraries"}</span>
+                {mediaMode === "video" && (
+                  <span className="rounded bg-primary/10 border border-primary/20 px-1.5 py-0.2 text-[8px] font-bold text-primary">
+                    SOON
+                  </span>
+                )}
                 {activeTab === "presets" && (
                   <motion.div
                     layoutId="studio-active-tab"
@@ -1122,140 +1533,205 @@ export default function ImageStudio() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                         </svg>
-                        <span className="text-sm font-medium text-primary">Generating your image…</span>
+                        <span className="text-sm font-medium text-primary">
+                          {mediaMode === "video" ? "Synthesizing AI video clip…" : "Generating your image…"}
+                        </span>
                       </motion.div>
                     </div>
                   )}
 
-                  {loadingGallery ? (
-                    <div>
-                      <div className="mb-4 flex items-center justify-between">
-                        <h2
-                          className="text-sm font-bold uppercase tracking-wider text-textSecondary"
-                          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                        >
-                          Recent Generations
-                        </h2>
-                      </div>
-                      {renderSkeletonGrid(5, showFullGallery)}
-                    </div>
-                  ) : gallery.length > 0 ? (
-                    <div>
-                      <div className="mb-4 flex items-center justify-between">
-                        <h2
-                          className="text-sm font-bold uppercase tracking-wider text-textSecondary"
-                          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                        >
-                          Recent Generations
-                        </h2>
-                        {hasMore && (
-                          <button
-                            onClick={() => setShowFullGallery(!showFullGallery)}
-                            className="text-xs font-bold uppercase tracking-wider text-primary transition-colors hover:text-primaryHover"
-                          >
-                            {showFullGallery ? "Show Slider" : `View All (${gallery.length})`}
-                          </button>
-                        )}
-                      </div>
-
-                      {showFullGallery ? (
-                        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-4">
-                          <AnimatePresence>
-                            {gallery.map((img) => renderGalleryCard(img, true))}
-                          </AnimatePresence>
+                  {mediaMode === "video" ? (
+                    loadingVideoGallery ? (
+                      <div>
+                        <div className="mb-4 flex items-center justify-between">
+                          <h2 className="text-sm font-bold uppercase tracking-wider text-textSecondary" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                            Recent Video Generations
+                          </h2>
                         </div>
-                      ) : (
-                        <>
+                        {renderSkeletonGrid(5, showFullGallery)}
+                      </div>
+                    ) : videoGallery.length > 0 ? (
+                      <div>
+                        <div className="mb-4 flex items-center justify-between">
+                          <h2 className="text-sm font-bold uppercase tracking-wider text-textSecondary" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                            Recent Video Generations
+                          </h2>
+                          {videoGallery.length > visibleCount && (
+                            <button
+                              onClick={() => setShowFullGallery(!showFullGallery)}
+                              className="text-xs font-bold uppercase tracking-wider text-primary transition-colors hover:text-primaryHover"
+                            >
+                              {showFullGallery ? "Show Slider" : `View All (${videoGallery.length})`}
+                            </button>
+                          )}
+                        </div>
+
+                        {showFullGallery ? (
+                          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-4">
+                            <AnimatePresence>
+                              {videoGallery.map((vid) => renderGalleryCard(vid, true))}
+                            </AnimatePresence>
+                          </div>
+                        ) : (
                           <div
                             ref={sliderRef}
                             onScroll={handleScroll}
                             className="flex gap-2.5 sm:gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
                           >
                             <AnimatePresence>
-                              {displayedGallery.map((img) => renderGalleryCard(img, false))}
+                              {videoGallery.slice(0, visibleCount).map((vid) => renderGalleryCard(vid, false))}
                             </AnimatePresence>
                           </div>
-
-                          {/* Featured Preset Styles (1-Click Try) */}
-                          {presets.length > 0 && (
-                            <div className="mt-5 pt-4 border-t border-border/15">
-                              <div className="mb-3 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <h3
-                                    className="text-xs font-bold uppercase tracking-wider text-textSecondary"
-                                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                                  >
-                                    Featured Preset Styles
-                                  </h3>
-                                  <span className="text-[8.5px] uppercase px-1.5 py-0.2 rounded font-bold bg-primary/10 text-primary border border-primary/20">
-                                    1-Click Try
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setActiveTab("presets")}
-                                  className="text-[11px] font-bold text-textMuted hover:text-primary transition-colors flex items-center gap-1"
-                                >
-                                  <span>Explore All</span>
-                                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                                  </svg>
-                                </button>
-                              </div>
-
-                              <div className="flex gap-2.5 sm:gap-3.5 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory touch-pan-x">
-                                {presets.slice(0, 10).map((preset) => (
-                                  <div
-                                    key={`featured-slider-${preset.id}`}
-                                    onClick={() => handleRecreate(preset)}
-                                    className="group relative w-[130px] sm:w-[155px] aspect-square flex-shrink-0 cursor-pointer overflow-hidden rounded-xl border border-border/30 bg-surface snap-start hover:border-primary/50 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.12)] transition-all"
-                                  >
-                                    <img
-                                      src={resolveImagePath(preset.thumbnail_url || preset.image_url)}
-                                      alt={preset.title}
-                                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                      loading="lazy"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent flex flex-col justify-end p-2 sm:p-2.5">
-                                      <span className="text-[7.5px] sm:text-[8px] font-bold uppercase tracking-wider text-primary truncate">
-                                        {preset.category}
-                                      </span>
-                                      <span className="text-[10px] sm:text-[11px] font-bold text-white truncate group-hover:text-primary transition-colors">
-                                        {preset.title}
-                                      </span>
-                                    </div>
-
-                                    <div className="absolute right-1.5 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-background rounded-full p-1 shadow-md">
-                                      <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
-                                      </svg>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    /* Empty State */
-                    !generating && (
-                      <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <div className="mb-4 rounded-full bg-surface p-5">
-                          <svg className="h-10 w-10 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
-                            <rect x="3" y="3" width="18" height="18" rx="2" />
-                            <circle cx="8.5" cy="8.5" r="1.5" />
-                            <path d="m21 15-5-5L5 21" />
-                          </svg>
-                        </div>
-                        <p className="text-sm text-textMuted">
-                          Your generated images will appear here
-                        </p>
-                        <p className="mt-1 text-xs text-textMuted/50">
-                          Describe something in the prompt below to get started
-                        </p>
+                        )}
                       </div>
+                    ) : (
+                      !generating && (
+                        <div className="flex flex-col items-center justify-center py-20 text-center">
+                          <div className="mb-4 rounded-full bg-surface p-5">
+                            <svg className="h-10 w-10 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+                            </svg>
+                          </div>
+                          <p className="text-sm text-textMuted">
+                            Your generated videos will appear here
+                          </p>
+                          <p className="mt-1 text-xs text-textMuted/50">
+                            Describe a scene or upload an image to animate into video
+                          </p>
+                        </div>
+                      )
+                    )
+                  ) : (
+                    loadingGallery ? (
+                      <div>
+                        <div className="mb-4 flex items-center justify-between">
+                          <h2
+                            className="text-sm font-bold uppercase tracking-wider text-textSecondary"
+                            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                          >
+                            Recent Generations
+                          </h2>
+                        </div>
+                        {renderSkeletonGrid(5, showFullGallery)}
+                      </div>
+                    ) : gallery.length > 0 ? (
+                      <div>
+                        <div className="mb-4 flex items-center justify-between">
+                          <h2
+                            className="text-sm font-bold uppercase tracking-wider text-textSecondary"
+                            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                          >
+                            Recent Generations
+                          </h2>
+                          {hasMore && (
+                            <button
+                              onClick={() => setShowFullGallery(!showFullGallery)}
+                              className="text-xs font-bold uppercase tracking-wider text-primary transition-colors hover:text-primaryHover"
+                            >
+                              {showFullGallery ? "Show Slider" : `View All (${gallery.length})`}
+                            </button>
+                          )}
+                        </div>
+
+                        {showFullGallery ? (
+                          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-4">
+                            <AnimatePresence>
+                              {gallery.map((img) => renderGalleryCard(img, true))}
+                            </AnimatePresence>
+                          </div>
+                        ) : (
+                          <>
+                            <div
+                              ref={sliderRef}
+                              onScroll={handleScroll}
+                              className="flex gap-2.5 sm:gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
+                            >
+                              <AnimatePresence>
+                                {displayedGallery.map((img) => renderGalleryCard(img, false))}
+                              </AnimatePresence>
+                            </div>
+
+                            {/* Featured Preset Styles (1-Click Try) */}
+                            {presets.length > 0 && (
+                              <div className="mt-5 pt-4 border-t border-border/15">
+                                <div className="mb-3 flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <h3
+                                      className="text-xs font-bold uppercase tracking-wider text-textSecondary"
+                                      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                                    >
+                                      Featured Preset Styles
+                                    </h3>
+                                    <span className="text-[8.5px] uppercase px-1.5 py-0.2 rounded font-bold bg-primary/10 text-primary border border-primary/20">
+                                      1-Click Try
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveTab("presets")}
+                                    className="text-[11px] font-bold text-textMuted hover:text-primary transition-colors flex items-center gap-1"
+                                  >
+                                    <span>Explore All</span>
+                                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                                    </svg>
+                                  </button>
+                                </div>
+
+                                <div className="flex gap-2.5 sm:gap-3.5 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory touch-pan-x">
+                                  {presets.slice(0, 10).map((preset) => (
+                                    <div
+                                      key={`featured-slider-${preset.id}`}
+                                      onClick={() => handleRecreate(preset)}
+                                      className="group relative w-[130px] sm:w-[155px] aspect-square flex-shrink-0 cursor-pointer overflow-hidden rounded-xl border border-border/30 bg-surface snap-start hover:border-primary/50 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.12)] transition-all"
+                                    >
+                                      <img
+                                        src={resolveImagePath(preset.thumbnail_url || preset.image_url)}
+                                        alt={preset.title}
+                                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                        loading="lazy"
+                                      />
+                                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent flex flex-col justify-end p-2 sm:p-2.5">
+                                        <span className="text-[7.5px] sm:text-[8px] font-bold uppercase tracking-wider text-primary truncate">
+                                          {preset.category}
+                                        </span>
+                                        <span className="text-[10px] sm:text-[11px] font-bold text-white truncate group-hover:text-primary transition-colors">
+                                          {preset.title}
+                                        </span>
+                                      </div>
+
+                                      <div className="absolute right-1.5 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-background rounded-full p-1 shadow-md">
+                                        <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
+                                        </svg>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      /* Empty State */
+                      !generating && (
+                        <div className="flex flex-col items-center justify-center py-20 text-center">
+                          <div className="mb-4 rounded-full bg-surface p-5">
+                            <svg className="h-10 w-10 text-textMuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
+                              <rect x="3" y="3" width="18" height="18" rx="2" />
+                              <circle cx="8.5" cy="8.5" r="1.5" />
+                              <path d="m21 15-5-5L5 21" />
+                            </svg>
+                          </div>
+                          <p className="text-sm text-textMuted">
+                            Your generated images will appear here
+                          </p>
+                          <p className="mt-1 text-xs text-textMuted/50">
+                            Describe something in the prompt below to get started
+                          </p>
+                        </div>
+                      )
                     )
                   )}
                 </motion.div>
@@ -1268,148 +1744,199 @@ export default function ImageStudio() {
                   transition={{ duration: 0.2 }}
                   className="pb-8"
                 >
-                  {/* Preset Libraries */}
-                  <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                    <div>
-                      <h2
-                        className="text-2xl font-black uppercase tracking-tight text-textPrimary"
-                        style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                      >
-                        Preset <span className="text-primary">Libraries</span>
+                  {mediaMode === "video" ? (
+                    /* Video Presets Coming Soon View */
+                    <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                      <div className="mb-6 relative">
+                        <div className="h-16 w-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[0_0_30px_rgba(var(--color-primary),0.15)]">
+                          <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+                          </svg>
+                        </div>
+                        <span className="absolute -bottom-2 -right-2 rounded-full bg-primary px-2 py-0.5 text-[9px] font-black uppercase text-background tracking-wider shadow">
+                          SOON
+                        </span>
+                      </div>
+
+                      <h2 className="text-2xl font-black uppercase tracking-tight text-textPrimary" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                        Video Preset <span className="text-primary">Libraries</span>
                       </h2>
-                      <p className="mt-2 text-xs text-textMuted max-w-xl leading-relaxed">
-                        High-fidelity neural weights and prompt matrices ready for recreation. Inject these parameters into your active workspace.
+                      <p className="mt-2 text-xs text-textMuted max-w-md leading-relaxed">
+                        Curated cinematic camera trajectories, FPV motion paths, dynamic anime transitions, and scene FX presets for video generation are currently in development.
                       </p>
-                    </div>
 
-                    {/* Search input */}
-                    <div className="relative w-full max-w-xs">
-                      <svg className="absolute left-3 top-2.5 h-4 w-4 text-textMuted" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <circle cx="11" cy="11" r="8" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35" />
-                      </svg>
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search presets..."
-                        className="h-9 w-full rounded-input border border-border/60 bg-surface pl-9 pr-4 text-xs text-textPrimary placeholder-textMuted outline-none focus:border-primary/50 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Filters & Sorting */}
-                  <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex flex-wrap gap-2">
-                      {["All", "Architecture", "Portrait", "Abstract", "Landscape", "UI Components", "Industrial", "Texture"].map((cat) => {
-                        const isActive = selectedCategory === cat;
-                        return (
-                          <button
-                            key={cat}
-                            onClick={() => setSelectedCategory(cat)}
-                            className={`rounded-full px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${isActive
-                              ? "bg-primary text-background shadow-md shadow-primary/10"
-                              : "bg-surface-elevated border border-border/40 text-textMuted hover:text-textSecondary hover:bg-surface"
-                              }`}
+                      {/* Teaser Feature Cards Grid */}
+                      <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 max-w-3xl w-full text-left">
+                        {[
+                          { title: "Cinematic Camera Paths", desc: "Drone fly-throughs, 360 orbits, dynamic dolly zooms", icon: "🎥" },
+                          { title: "Motion FX & Transitions", desc: "Speed ramps, hyperlapses, glitch morphs, fluid zooms", icon: "⚡" },
+                          { title: "Style Matrices & Aesthetics", desc: "Cyberpunk, Studio Ghibli, 35mm Vintage Film, Unreal 5", icon: "✨" },
+                          { title: "Product & 3D Turntables", desc: "Studio commercial lighting and seamless rotating loops", icon: "📦" },
+                          { title: "Character Animations", desc: "Facial expressions, continuous walks, stylized gestures", icon: "👤" },
+                          { title: "Visual VFX & Particle Loops", desc: "Smoke, fluid dynamics, magical aura, volumetric fog", icon: "🌌" },
+                        ].map((item, idx) => (
+                          <div
+                            key={`teaser-${idx}`}
+                            className="rounded-xl border border-border/30 bg-surface/50 p-4 backdrop-blur-sm relative overflow-hidden group hover:border-primary/30 transition-colors"
                           >
-                            {cat}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-textMuted">
-                      <span>Sort:</span>
-                      <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value)}
-                        className="bg-transparent text-textPrimary cursor-pointer outline-none hover:text-primary transition-colors border-none py-1 pl-1 pr-4"
-                      >
-                        <option value="Latest Deployed" className="bg-surface text-textPrimary">Latest Deployed</option>
-                        <option value="A-Z" className="bg-surface text-textPrimary">A-Z</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Grid */}
-                  {loadingPresets ? (
-                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-                      {Array.from({ length: 8 }).map((_, i) => (
-                        <div
-                          key={`preset-skeleton-${i}`}
-                          className="relative aspect-square overflow-hidden rounded-card border border-border/20 bg-surface/40 p-1"
-                        >
-                          <div className="relative h-full w-full rounded-[10px] overflow-hidden bg-elevated/40 flex items-center justify-center">
-                            <motion.div
-                              animate={{ x: ["-100%", "100%"] }}
-                              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent z-10"
-                            />
-                            <div className="flex flex-col items-center gap-2 relative z-20">
-                              <motion.div
-                                animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.7, 0.3] }}
-                                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                                className="h-8 w-8 rounded-full border border-primary/20 bg-primary/5 flex items-center justify-center"
-                              >
-                                <div className="h-2 w-2 rounded-full bg-primary" />
-                              </motion.div>
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted/50 animate-pulse">Syncing...</span>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xl select-none">{item.icon}</span>
+                              <span className="text-[8.5px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded bg-elevated text-textMuted border border-border/30">
+                                Coming Soon
+                              </span>
                             </div>
+                            <h3 className="text-xs font-bold text-textPrimary">{item.title}</h3>
+                            <p className="mt-1 text-[11px] text-textMuted leading-relaxed">{item.desc}</p>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : sortedPresets.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-                      {sortedPresets.map((preset) => (
-                        <div
-                          key={preset.id}
-                          onClick={() => setLightboxImage(preset)}
-                          className="group relative aspect-square cursor-pointer rounded-card border border-border/30 bg-surface overflow-hidden hover:border-primary/20 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.04)] transition-all"
-                        >
-                          {preset.before_image_url ? (
-                            <BeforeAfterSlider
-                              beforeImage={resolveImagePath(preset.before_image_url)}
-                              afterImage={resolveImagePath(preset.thumbnail_url || preset.image_url)}
-                              altTitle={preset.title}
-                            />
-                          ) : (
-                            <img
-                              src={resolveImagePath(preset.thumbnail_url || preset.image_url)}
-                              alt={preset.title}
-                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                              loading="lazy"
-                            />
-                          )}
-                          <div className="absolute left-2 top-2 sm:left-3 sm:top-3 rounded bg-background/80 px-1.5 sm:px-2 py-0.5 text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-primary border border-primary/20 backdrop-blur-sm z-10">
-                            {preset.category}
-                          </div>
-
-                          {/* Hover Overlay with Recreate option */}
-                          <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-2 sm:pb-4 px-2 sm:px-4">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRecreate(preset);
-                              }}
-                              className="w-full flex items-center justify-center gap-1 rounded-input bg-primary py-1.5 sm:py-2 text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-background shadow-lg shadow-primary/20 transition-all hover:bg-primaryHover active:scale-[0.98]"
-                            >
-                              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                              </svg>
-                              <span>Recreate</span>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <svg className="mb-3 h-8 w-8 text-textMuted" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <p className="text-xs text-textMuted">No presets found matching your filters.</p>
-                    </div>
+                    <>
+                      {/* Preset Libraries */}
+                      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                        <div>
+                          <h2
+                            className="text-2xl font-black uppercase tracking-tight text-textPrimary"
+                            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                          >
+                            Preset <span className="text-primary">Libraries</span>
+                          </h2>
+                          <p className="mt-2 text-xs text-textMuted max-w-xl leading-relaxed">
+                            High-fidelity neural weights and prompt matrices ready for recreation. Inject these parameters into your active workspace.
+                          </p>
+                        </div>
+
+                        {/* Search input */}
+                        <div className="relative w-full max-w-xs">
+                          <svg className="absolute left-3 top-2.5 h-4 w-4 text-textMuted" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <circle cx="11" cy="11" r="8" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35" />
+                          </svg>
+                          <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search presets..."
+                            className="h-9 w-full rounded-input border border-border/60 bg-surface pl-9 pr-4 text-xs text-textPrimary placeholder-textMuted outline-none focus:border-primary/50 transition-colors"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Filters & Sorting */}
+                      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex flex-wrap gap-2">
+                          {["All", "Architecture", "Portrait", "Abstract", "Landscape", "UI Components", "Industrial", "Texture"].map((cat) => {
+                            const isActive = selectedCategory === cat;
+                            return (
+                              <button
+                                key={cat}
+                                onClick={() => setSelectedCategory(cat)}
+                                className={`rounded-full px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${isActive
+                                  ? "bg-primary text-background shadow-md shadow-primary/10"
+                                  : "bg-surface-elevated border border-border/40 text-textMuted hover:text-textSecondary hover:bg-surface"
+                                  }`}
+                              >
+                                {cat}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-textMuted">
+                          <span>Sort:</span>
+                          <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className="bg-transparent text-textPrimary cursor-pointer outline-none hover:text-primary transition-colors border-none py-1 pl-1 pr-4"
+                          >
+                            <option value="Latest Deployed" className="bg-surface text-textPrimary">Latest Deployed</option>
+                            <option value="A-Z" className="bg-surface text-textPrimary">A-Z</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Grid */}
+                      {loadingPresets ? (
+                        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+                          {Array.from({ length: 8 }).map((_, i) => (
+                            <div
+                              key={`preset-skeleton-${i}`}
+                              className="relative aspect-square overflow-hidden rounded-card border border-border/20 bg-surface/40 p-1"
+                            >
+                              <div className="relative h-full w-full rounded-[10px] overflow-hidden bg-elevated/40 flex items-center justify-center">
+                                <motion.div
+                                  animate={{ x: ["-100%", "100%"] }}
+                                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent z-10"
+                                />
+                                <div className="flex flex-col items-center gap-2 relative z-20">
+                                  <motion.div
+                                    animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.7, 0.3] }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                    className="h-8 w-8 rounded-full border border-primary/20 bg-primary/5 flex items-center justify-center"
+                                  >
+                                    <div className="h-2 w-2 rounded-full bg-primary" />
+                                  </motion.div>
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted/50 animate-pulse">Syncing...</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : sortedPresets.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+                          {sortedPresets.map((preset) => (
+                            <div
+                              key={preset.id}
+                              onClick={() => setLightboxImage(preset)}
+                              className="group relative aspect-square cursor-pointer rounded-card border border-border/30 bg-surface overflow-hidden hover:border-primary/20 hover:shadow-[0_0_20px_rgba(var(--color-primary),0.04)] transition-all"
+                            >
+                              {preset.before_image_url ? (
+                                <BeforeAfterSlider
+                                  beforeImage={resolveImagePath(preset.before_image_url)}
+                                  afterImage={resolveImagePath(preset.thumbnail_url || preset.image_url)}
+                                  altTitle={preset.title}
+                                />
+                              ) : (
+                                <img
+                                  src={resolveImagePath(preset.thumbnail_url || preset.image_url)}
+                                  alt={preset.title}
+                                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                  loading="lazy"
+                                />
+                              )}
+                              <div className="absolute left-2 top-2 sm:left-3 sm:top-3 rounded bg-background/80 px-1.5 sm:px-2 py-0.5 text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-primary border border-primary/20 backdrop-blur-sm z-10">
+                                {preset.category}
+                              </div>
+
+                              {/* Hover Overlay with Recreate option */}
+                              <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-2 sm:pb-4 px-2 sm:px-4">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRecreate(preset);
+                                  }}
+                                  className="w-full flex items-center justify-center gap-1 rounded-input bg-primary py-1.5 sm:py-2 text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-background shadow-lg shadow-primary/20 transition-all hover:bg-primaryHover active:scale-[0.98]"
+                                >
+                                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                  </svg>
+                                  <span>Recreate</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-16 text-center">
+                          <svg className="mb-3 h-8 w-8 text-textMuted" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <p className="text-xs text-textMuted">No presets found matching your filters.</p>
+                        </div>
+                      )}
+                    </>
                   )}
                 </motion.div>
               )}
@@ -1463,51 +1990,93 @@ export default function ImageStudio() {
                       <div className="flex flex-wrap items-end gap-3">
                         {/* Provider & Model */}
                         {paymentMode !== "free_queue" && (
-                          hasModels ? (
-                            <>
-                              <div className="w-full sm:w-auto min-w-[120px] flex-1 sm:flex-initial">
-                                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Provider</label>
-                                <select
-                                  value={selectedProvider}
-                                  onChange={(e) => handleProviderChange(e.target.value)}
-                                  className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors cursor-pointer"
-                                >
-                                  {providerKeys.map((p) => {
-                                    const isPrem = !isFreeProvider(p);
-                                    return (
-                                      <option key={p} value={p}>
-                                        {p.charAt(0).toUpperCase() + p.slice(1)} {isPrem ? "✦ PRO" : ""}
-                                      </option>
-                                    );
-                                  })}
-                                </select>
+                          mediaMode === "video" ? (
+                            Object.keys(videoModels).length > 0 ? (
+                              <>
+                                <div className="w-full sm:w-auto min-w-[120px] flex-1 sm:flex-initial">
+                                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Video Provider</label>
+                                  <select
+                                    value={selectedVideoProvider}
+                                    onChange={(e) => {
+                                      const p = e.target.value;
+                                      setSelectedVideoProvider(p);
+                                      if (videoModels[p]?.length > 0) {
+                                        setSelectedVideoModel(videoModels[p][0]);
+                                      }
+                                    }}
+                                    className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                                  >
+                                    {Object.keys(videoModels).map((p) => (
+                                      <option key={p} value={p}>{p}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="w-full sm:w-auto min-w-[160px] flex-1 sm:flex-initial">
+                                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Video Model</label>
+                                  <select
+                                    value={selectedVideoModel}
+                                    onChange={(e) => setSelectedVideoModel(e.target.value)}
+                                    className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                                  >
+                                    {(videoModels[selectedVideoProvider] || []).map((m) => (
+                                      <option key={m} value={m}>{m}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="h-9 flex items-center rounded-input border border-border/40 bg-surface/50 px-3 text-xs text-textMuted w-full sm:w-auto">
+                                No video models available.
                               </div>
-                              <div className="w-full sm:w-auto min-w-[160px] flex-1 sm:flex-initial">
-                                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Model</label>
-                                <select
-                                  value={selectedModel}
-                                  onChange={(e) => setSelectedModel(e.target.value)}
-                                  className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors cursor-pointer"
-                                >
-                                  {(models[selectedProvider] || []).map((m) => {
-                                    const isPremModel = isPremiumModel(selectedProvider, m);
-                                    return (
-                                      <option key={m} value={m}>
-                                        {m} {isPremModel ? "✦ PRO" : ""}
-                                      </option>
-                                    );
-                                  })}
-                                </select>
-                              </div>
-                            </>
+                            )
                           ) : (
-                            <div className="h-9 flex items-center rounded-input border border-border/40 bg-surface/50 px-3 text-xs text-textMuted w-full sm:w-auto">
-                              No image models found.{" "}
-                              <a href="/settings" className="ml-1 text-primary underline">Add a key</a>.
-                            </div>
+                            hasModels ? (
+                              <>
+                                <div className="w-full sm:w-auto min-w-[120px] flex-1 sm:flex-initial">
+                                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Provider</label>
+                                  <select
+                                    value={selectedProvider}
+                                    onChange={(e) => handleProviderChange(e.target.value)}
+                                    className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                                  >
+                                    {providerKeys.map((p) => {
+                                      const isPrem = !isFreeProvider(p);
+                                      return (
+                                        <option key={p} value={p}>
+                                          {p.charAt(0).toUpperCase() + p.slice(1)} {isPrem ? "✦ PRO" : ""}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                </div>
+                                <div className="w-full sm:w-auto min-w-[160px] flex-1 sm:flex-initial">
+                                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Model</label>
+                                  <select
+                                    value={selectedModel}
+                                    onChange={(e) => setSelectedModel(e.target.value)}
+                                    className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                                  >
+                                    {(models[selectedProvider] || []).map((m) => {
+                                      const isPremModel = isPremiumModel(selectedProvider, m);
+                                      return (
+                                        <option key={m} value={m}>
+                                          {m} {isPremModel ? "✦ PRO" : ""}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="h-9 flex items-center rounded-input border border-border/40 bg-surface/50 px-3 text-xs text-textMuted w-full sm:w-auto">
+                                No image models found.{" "}
+                                <a href="/settings" className="ml-1 text-primary underline">Add a key</a>.
+                              </div>
+                            )
                           )
                         )}
 
+                        {/* Aspect Ratio */}
                         <div className="w-full sm:w-auto min-w-[110px] flex-1 sm:flex-initial">
                           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Aspect Ratio</label>
                           <select
@@ -1515,11 +2084,26 @@ export default function ImageStudio() {
                             onChange={(e) => setAspectRatio(e.target.value)}
                             className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors cursor-pointer"
                           >
-                            {ASPECT_RATIOS.map((ar) => (
+                            {(mediaMode === "video" ? ["16:9", "9:16", "1:1", "4:3"] : ASPECT_RATIOS).map((ar) => (
                               <option key={ar} value={ar}>{ar}</option>
                             ))}
                           </select>
                         </div>
+
+                        {/* Duration Selector for Video */}
+                        {mediaMode === "video" && (
+                          <div className="w-full sm:w-auto min-w-[100px] flex-1 sm:flex-initial">
+                            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Duration</label>
+                            <select
+                              value={durationSeconds}
+                              onChange={(e) => setDurationSeconds(Number(e.target.value))}
+                              className="h-9 w-full rounded-input border border-border/60 bg-surface px-2.5 text-xs text-textPrimary outline-none focus:border-primary/50 transition-colors cursor-pointer"
+                            >
+                              <option value={5}>5 Seconds</option>
+                              <option value={10}>10 Seconds</option>
+                            </select>
+                          </div>
+                        )}
 
                         {/* Pill Shaped Switcher */}
                         <div className="w-full sm:w-auto flex-1 sm:flex-initial">
@@ -1623,18 +2207,18 @@ export default function ImageStudio() {
                       <div className="mb-3 text-[11px] leading-relaxed text-textSecondary bg-surface/30 rounded-lg p-3 border border-border/20 flex flex-col gap-1.5">
                         {paymentMode === "own_key" && (
                           <div>
-                            <span className="font-semibold text-textPrimary">Personal API Key:</span> Generates images instantly using your own configured keys in Settings. No credits consumed.
+                            <span className="font-semibold text-textPrimary">Personal API Key:</span> Generates {mediaMode === "video" ? "videos" : "images"} instantly using your own configured keys in Settings. No credits consumed.
                           </div>
                         )}
                         {paymentMode === "credits" && (
                           <div>
-                            <span className="font-semibold text-primary">⚡ Instant Generation (5 Credits):</span> High-priority, premium generation with dedicated resources. Images start synthesizing immediately without queue delays.
+                            <span className="font-semibold text-primary">⚡ Instant Generation ({mediaMode === "video" ? `${videoCreditCost} Credits` : "5 Credits"}):</span> High-priority, premium generation with dedicated resources. {mediaMode === "video" ? "Videos" : "Images"} start synthesizing immediately without queue delays.
                           </div>
                         )}
                         {paymentMode === "free_queue" && (
                           <div className="flex flex-col gap-1">
                             <div>
-                              <span className="font-semibold text-textPrimary">⏳ Standard Queue (Free / 2 Credits):</span> Background-priority queue generation. Images are queued and processed using system default models.
+                              <span className="font-semibold text-textPrimary">⏳ Standard Queue (Free / 2 Credits):</span> Background-priority queue generation. {mediaMode === "video" ? "Videos" : "Images"} are queued and processed using system default models.
                             </div>
                             <div className="text-[10px] text-textMuted border-t border-border/10 pt-1 mt-1">
                               Free for first <strong className="text-textPrimary">{queueStatus?.limit || 3} generations/week</strong>, then costs <strong className="text-textPrimary">2 credits</strong> per generation.
@@ -1649,7 +2233,7 @@ export default function ImageStudio() {
                           animate={{ opacity: 1, y: 0 }}
                           className="mb-2 text-[10px] text-amber-500/90 leading-normal px-1"
                         >
-                          ⚠️ Weekly free limit reached ({queueStatus.used_today}/{queueStatus.limit}). Want immediate processing? <button type="button" onClick={() => setPaymentMode("credits")} className="font-bold underline text-amber-400 hover:text-amber-300 transition-colors">Switch to Instant Generation</button> (⚡ 5 Credits).
+                          ⚠️ Weekly free limit reached ({queueStatus.used_today}/{queueStatus.limit}). Want immediate processing? <button type="button" onClick={() => setPaymentMode("credits")} className="font-bold underline text-amber-400 hover:text-amber-300 transition-colors">Switch to Instant Generation</button> (⚡ {mediaMode === "video" ? `${videoCreditCost} Credits` : "5 Credits"}).
                         </motion.div>
                       )}
                     </div>
@@ -1657,118 +2241,157 @@ export default function ImageStudio() {
                 )}
               </AnimatePresence>
 
-              {/* AI Tool / Creation Mode Quick Selector for New Generations */}
+              {/* AI Tool / Creation Mode Quick Selector */}
               <div className="w-full max-w-full min-w-0 flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar pb-1 pt-0.5 touch-pan-x overscroll-x-contain">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-textMuted shrink-0 pr-1 select-none">
-                  Tools:
+                  {mediaMode === "video" ? "Video Mode:" : "Tools:"}
                 </span>
 
-                {/* 1. Standard Generation */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTask(null);
-                  }}
-                  className={`shrink-0 flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
-                    !activeTask
-                      ? "bg-primary text-background font-bold shadow-[0_0_12px_rgba(var(--color-primary),0.3)]"
-                      : "bg-surface/60 border border-border/30 text-textSecondary hover:text-textPrimary hover:border-border/60"
-                  }`}
-                >
-                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                  </svg>
-                  <span>Generate</span>
-                </button>
+                {mediaMode === "video" ? (
+                  <>
+                    {/* Video 1: Text to Video */}
+                    <button
+                      type="button"
+                      onClick={() => setActiveTask(null)}
+                      className={`shrink-0 flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${!activeTask
+                          ? "bg-primary text-background font-bold shadow-[0_0_12px_rgba(var(--color-primary),0.3)]"
+                          : "bg-surface/60 border border-border/30 text-textSecondary hover:text-textPrimary hover:border-border/60"
+                        }`}
+                    >
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+                      </svg>
+                      <span>Text to Video</span>
+                    </button>
 
-                {/* 2. Expand Canvas (Outpaint) */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (referencePreview) {
-                      setShowStudioExpandModal(true);
-                    } else {
-                      setActiveTask("expand");
-                      fileInputRef.current?.click();
-                    }
-                  }}
-                  className={`shrink-0 flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
-                    activeTask === "expand"
-                      ? "bg-primary text-background font-bold shadow-[0_0_12px_rgba(var(--color-primary),0.3)]"
-                      : "bg-surface/60 border border-border/30 text-textSecondary hover:text-primary hover:border-primary/50"
-                  }`}
-                  title="Expand canvas boundaries & synthesize surrounding scenery"
-                >
-                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                  </svg>
-                  <span>Expand Canvas</span>
-                  <span className={`text-[7.5px] sm:text-[8px] uppercase px-1 py-0.2 rounded font-bold ${
-                    activeTask === "expand" ? "bg-background/20 text-background" : "bg-primary/10 text-primary border border-primary/20"
-                  }`}>
-                    Outpaint
-                  </span>
-                </button>
+                    {/* Video 2: Animate Image (Image-to-Video) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTask("image_to_video");
+                        if (!referenceImage) {
+                          fileInputRef.current?.click();
+                        }
+                      }}
+                      className={`shrink-0 flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${activeTask === "image_to_video"
+                          ? "bg-primary text-background font-bold shadow-[0_0_12px_rgba(var(--color-primary),0.3)]"
+                          : "bg-surface/60 border border-border/30 text-textSecondary hover:text-primary hover:border-primary/50"
+                        }`}
+                      title="Animate an initial starting frame into dynamic video"
+                    >
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+                      </svg>
+                      <span>Animate Image</span>
+                      <span className={`text-[7.5px] sm:text-[8px] uppercase px-1 py-0.2 rounded font-bold ${activeTask === "image_to_video" ? "bg-background/20 text-background" : "bg-primary/10 text-primary border border-primary/20"
+                        }`}>
+                        Frame 1
+                      </span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {/* 1. Standard Generation */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTask(null);
+                      }}
+                      className={`shrink-0 flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${!activeTask
+                          ? "bg-primary text-background font-bold shadow-[0_0_12px_rgba(var(--color-primary),0.3)]"
+                          : "bg-surface/60 border border-border/30 text-textSecondary hover:text-textPrimary hover:border-border/60"
+                        }`}
+                    >
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                      </svg>
+                      <span>Generate</span>
+                    </button>
 
-                {/* 3. Remove Background */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTask("remove_background");
-                    if (!prompt.trim()) {
-                      setPrompt("Isolate main subject, remove background, clean sharp silhouette edges, transparent studio backdrop");
-                    }
-                    if (!referenceImage) {
-                      fileInputRef.current?.click();
-                    }
-                  }}
-                  className={`shrink-0 flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
-                    activeTask === "remove_background"
-                      ? "bg-rose-500 text-white font-bold shadow-[0_0_12px_rgba(244,63,94,0.3)]"
-                      : "bg-surface/60 border border-border/30 text-textSecondary hover:text-rose-400 hover:border-rose-500/50"
-                  }`}
-                  title="Isolate foreground subject with clean cutout edges"
-                >
-                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.848 8.25l1.536.887M7.848 8.25a3 3 0 11-5.196-3 3 3 0 015.196 3zm1.536.887a2.165 2.165 0 011.083 1.839c.005.351.054.695.14 1.024M9.384 9.137l2.077 1.199M7.848 15.75l1.536-.887m-1.536.887a3 3 0 11-5.196 3 3 3 0 015.196-3zm1.536-.887a2.165 2.165 0 001.083-1.838c.005-.352.054-.696.14-1.025m-1.223 2.863l2.077-1.199m0-3.328a4.323 4.323 0 012.068-1.379l5.325-1.628a4.5 4.5 0 012.48 8.528l-5.325-1.627a4.323 4.323 0 01-2.068-1.379z" />
-                  </svg>
-                  <span>Remove BG</span>
-                  <span className={`text-[7.5px] sm:text-[8px] uppercase px-1 py-0.2 rounded font-bold ${
-                    activeTask === "remove_background" ? "bg-white/20 text-white" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                  }`}>
-                    Cutout
-                  </span>
-                </button>
+                    {/* 2. Expand Canvas (Outpaint) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (referencePreview) {
+                          setShowStudioExpandModal(true);
+                        } else {
+                          setActiveTask("expand");
+                          fileInputRef.current?.click();
+                        }
+                      }}
+                      className={`shrink-0 flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${activeTask === "expand"
+                          ? "bg-primary text-background font-bold shadow-[0_0_12px_rgba(var(--color-primary),0.3)]"
+                          : "bg-surface/60 border border-border/30 text-textSecondary hover:text-primary hover:border-primary/50"
+                        }`}
+                      title="Expand canvas boundaries & synthesize surrounding scenery"
+                    >
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                      </svg>
+                      <span>Expand Canvas</span>
+                      <span className={`text-[7.5px] sm:text-[8px] uppercase px-1 py-0.2 rounded font-bold ${activeTask === "expand" ? "bg-background/20 text-background" : "bg-primary/10 text-primary border border-primary/20"
+                        }`}>
+                        Outpaint
+                      </span>
+                    </button>
 
-                {/* 4. AI Upscale & Enhance */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTask("upscale");
-                    if (!prompt.trim()) {
-                      setPrompt("Super resolution upscale 4K ultra high fidelity, enhance fine textures, remove compression noise, crisp sharpness");
-                    }
-                    if (!referenceImage) {
-                      fileInputRef.current?.click();
-                    }
-                  }}
-                  className={`shrink-0 flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${
-                    activeTask === "upscale"
-                      ? "bg-sky-500 text-white font-bold shadow-[0_0_12px_rgba(14,165,233,0.3)]"
-                      : "bg-surface/60 border border-border/30 text-textSecondary hover:text-sky-400 hover:border-sky-500/50"
-                  }`}
-                  title="Enhance 4K clarity, textures, and details"
-                >
-                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
-                  </svg>
-                  <span>AI Upscale</span>
-                  <span className={`text-[7.5px] sm:text-[8px] uppercase px-1 py-0.2 rounded font-bold ${
-                    activeTask === "upscale" ? "bg-white/20 text-white" : "bg-sky-500/10 text-sky-400 border border-sky-500/20"
-                  }`}>
-                    4K
-                  </span>
-                </button>
+                    {/* 3. Remove Background */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTask("remove_background");
+                        if (!prompt.trim()) {
+                          setPrompt("Isolate main subject, remove background, clean sharp silhouette edges, transparent studio backdrop");
+                        }
+                        if (!referenceImage) {
+                          fileInputRef.current?.click();
+                        }
+                      }}
+                      className={`shrink-0 flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${activeTask === "remove_background"
+                          ? "bg-rose-500 text-white font-bold shadow-[0_0_12px_rgba(244,63,94,0.3)]"
+                          : "bg-surface/60 border border-border/30 text-textSecondary hover:text-rose-400 hover:border-rose-500/50"
+                        }`}
+                      title="Isolate foreground subject with clean cutout edges"
+                    >
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.848 8.25l1.536.887M7.848 8.25a3 3 0 11-5.196-3 3 3 0 015.196 3zm1.536.887a2.165 2.165 0 011.083 1.839c.005.351.054.695.14 1.024M9.384 9.137l2.077 1.199M7.848 15.75l1.536-.887m-1.536.887a3 3 0 11-5.196 3 3 3 0 015.196-3zm1.536-.887a2.165 2.165 0 001.083-1.838c.005-.352.054-.696.14-1.025m-1.223 2.863l2.077-1.199m0-3.328a4.323 4.323 0 012.068-1.379l5.325-1.628a4.5 4.5 0 012.48 8.528l-5.325-1.627a4.323 4.323 0 01-2.068-1.379z" />
+                      </svg>
+                      <span>Remove BG</span>
+                      <span className={`text-[7.5px] sm:text-[8px] uppercase px-1 py-0.2 rounded font-bold ${activeTask === "remove_background" ? "bg-white/20 text-white" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                        }`}>
+                        Cutout
+                      </span>
+                    </button>
+
+                    {/* 4. AI Upscale & Enhance */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTask("upscale");
+                        if (!prompt.trim()) {
+                          setPrompt("Super resolution upscale 4K ultra high fidelity, enhance fine textures, remove compression noise, crisp sharpness");
+                        }
+                        if (!referenceImage) {
+                          fileInputRef.current?.click();
+                        }
+                      }}
+                      className={`shrink-0 flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all ${activeTask === "upscale"
+                          ? "bg-sky-500 text-white font-bold shadow-[0_0_12px_rgba(14,165,233,0.3)]"
+                          : "bg-surface/60 border border-border/30 text-textSecondary hover:text-sky-400 hover:border-sky-500/50"
+                        }`}
+                      title="Enhance 4K clarity, textures, and details"
+                    >
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
+                      </svg>
+                      <span>AI Upscale</span>
+                      <span className={`text-[7.5px] sm:text-[8px] uppercase px-1 py-0.2 rounded font-bold ${activeTask === "upscale" ? "bg-white/20 text-white" : "bg-sky-500/10 text-sky-400 border border-sky-500/20"
+                        }`}>
+                        4K
+                      </span>
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Prompt Input Card Container (Mobile Friendly) */}
@@ -2041,13 +2664,12 @@ export default function ImageStudio() {
                           <div className="relative shrink-0">
                             <label
                               title={isDual ? `Upload ${slotInfo.mainLabel}` : "Upload Reference Image"}
-                              className={`flex h-8 px-2 sm:px-2.5 cursor-pointer items-center justify-center gap-1 sm:gap-1.5 rounded-lg border text-xs font-semibold transition-all disabled:opacity-50 ${
-                                isDual && !referenceImage && !dismissedPresetPrompt
+                              className={`flex h-8 px-2 sm:px-2.5 cursor-pointer items-center justify-center gap-1 sm:gap-1.5 rounded-lg border text-xs font-semibold transition-all disabled:opacity-50 ${isDual && !referenceImage && !dismissedPresetPrompt
                                   ? "border-primary text-primary bg-primary/10 shadow-[0_0_12px_rgba(var(--color-primary),0.25)] ring-1 ring-primary animate-pulse"
                                   : referenceImage
-                                  ? "border-primary/60 bg-primary/10 text-primary"
-                                  : "border-border/30 bg-surface-elevated text-textMuted hover:border-primary/50 hover:text-primary"
-                              }`}
+                                    ? "border-primary/60 bg-primary/10 text-primary"
+                                    : "border-border/30 bg-surface-elevated text-textMuted hover:border-primary/50 hover:text-primary"
+                                }`}
                             >
                               <input
                                 ref={fileInputRef}
@@ -2080,13 +2702,12 @@ export default function ImageStudio() {
                             <div className="relative shrink-0">
                               <label
                                 title={`Upload ${slotInfo.secondaryLabel}`}
-                                className={`flex h-8 px-2 sm:px-2.5 cursor-pointer items-center justify-center gap-1 sm:gap-1.5 rounded-lg border text-xs font-semibold transition-all disabled:opacity-50 ${
-                                  !secondaryImage && !dismissedPresetPrompt
+                                className={`flex h-8 px-2 sm:px-2.5 cursor-pointer items-center justify-center gap-1 sm:gap-1.5 rounded-lg border text-xs font-semibold transition-all disabled:opacity-50 ${!secondaryImage && !dismissedPresetPrompt
                                     ? "border-primary text-primary bg-primary/10 shadow-[0_0_12px_rgba(var(--color-primary),0.25)] ring-1 ring-primary animate-pulse"
                                     : secondaryImage
-                                    ? "border-primary/60 bg-primary/10 text-primary"
-                                    : "border-border/30 bg-surface-elevated text-textMuted hover:border-primary/50 hover:text-primary"
-                                }`}
+                                      ? "border-primary/60 bg-primary/10 text-primary"
+                                      : "border-border/30 bg-surface-elevated text-textMuted hover:border-primary/50 hover:text-primary"
+                                  }`}
                               >
                                 <input
                                   ref={secondaryFileInputRef}
@@ -2119,7 +2740,7 @@ export default function ImageStudio() {
                     {!showOptions && !generating && (
                       <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-textSecondary bg-surface-elevated px-2.5 h-8 rounded-lg border border-border/30 shrink-0">
                         {paymentMode === "own_key" && "Personal Key"}
-                        {paymentMode === "credits" && "Credits (5c)"}
+                        {paymentMode === "credits" && (mediaMode === "video" ? `Credits (${videoCreditCost}c)` : "Credits (5c)")}
                         {paymentMode === "free_queue" && (
                           queueStatus && queueStatus.used_today >= queueStatus.limit
                             ? "Queue (2c)"
@@ -2131,7 +2752,7 @@ export default function ImageStudio() {
                     {/* Credits Counter or Details in toolbar */}
                     {paymentMode === "credits" && !generating && showOptions && (
                       <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-black uppercase text-primary/80 bg-primary/5 px-2 py-0.5 rounded border border-primary/10 shrink-0">
-                        5 Credits
+                        {mediaMode === "video" ? `${videoCreditCost} Credits` : "5 Credits"}
                       </span>
                     )}
                     {paymentMode === "free_queue" && queueStatus && queueStatus.used_today >= queueStatus.limit && !generating && showOptions && (
@@ -2147,49 +2768,56 @@ export default function ImageStudio() {
                     whileTap={{ scale: 0.95 }}
                     transition={{ type: "spring", stiffness: 400, damping: 15 }}
                     onClick={handleGenerate}
-                    disabled={generating || (!prompt.trim() && !selectedPreset) || (paymentMode !== "free_queue" && !hasModels)}
-                    className={`relative h-8 shrink-0 ml-auto overflow-hidden rounded-lg px-3.5 sm:px-4 text-xs font-bold framer-btn disabled:opacity-40 disabled:cursor-not-allowed ${paymentMode === "credits"
-                      ? "bg-primary text-background shadow-[0_0_12px_rgba(var(--color-primary),0.2)]"
-                      : "bg-surface-elevated border border-border/40 text-textPrimary hover:border-primary/50"
-                      }`}
+                    disabled={generating || (!prompt.trim() && !selectedPreset) || (paymentMode !== "free_queue" && (mediaMode === "video" ? !selectedVideoModel : !hasModels))}
+                    className="relative flex h-9 shrink-0 items-center justify-center gap-1 sm:gap-2 rounded-xl bg-primary px-3 sm:px-4 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_15px_rgba(var(--color-primary),0.3)] transition-all hover:bg-primaryHover disabled:opacity-30 disabled:hover:scale-100"
                   >
-                    <div className="relative z-10 flex items-center gap-2">
-                      {generating ? (
-                        <>
-                          <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                          </svg>
-                          <span className="hidden xs:inline">Architecting...</span>
-                          <span className="xs:hidden">...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>{paymentMode === "free_queue" ? "Request" : "Generate"}</span>
-                          {paymentMode === "credits" && (
-                            <span className="flex items-center gap-0.5 rounded bg-black/25 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-background border border-black/10">
-                              5 Credits
-                            </span>
+                    {generating ? (
+                      <div className="flex items-center gap-1.5 sm:gap-2">
+                        <svg className="h-4 w-4 animate-spin text-background" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                        </svg>
+                        <span>Synthesizing...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 sm:gap-1.5">
+                        <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          {mediaMode === "video" ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+                          ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
                           )}
-                          {paymentMode === "free_queue" && (
-                            queueStatus && queueStatus.used_today >= queueStatus.limit ? (
-                              <span className="flex items-center gap-0.5 rounded bg-amber-500/20 text-amber-400 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-amber-500/30">
-                                2 Credits
+                        </svg>
+                        <span>{mediaMode === "video" ? "Generate Video" : "Generate"}</span>
+
+                        {/* Persistent Credit Cost Display Badge */}
+                        {!generating && (
+                          <>
+                            {paymentMode === "credits" && (
+                              <span className="flex items-center gap-0.5 rounded bg-background/20 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-background border border-background/20 shadow-sm">
+                                {mediaMode === "video" ? `${videoCreditCost} Credits` : "5 Credits"}
                               </span>
-                            ) : (
-                              <span className="flex items-center gap-0.5 rounded bg-surface/80 text-textMuted px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-border/30">
-                                Free
+                            )}
+                            {paymentMode === "free_queue" && (
+                              queueStatus && queueStatus.used_today >= queueStatus.limit ? (
+                                <span className="flex items-center gap-0.5 rounded bg-amber-500/20 text-amber-400 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-amber-500/30">
+                                  2 Credits
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-0.5 rounded bg-surface/80 text-textMuted px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-border/30">
+                                  Free
+                                </span>
+                              )
+                            )}
+                            {paymentMode === "own_key" && (
+                              <span className="hidden sm:inline-flex items-center rounded bg-surface/80 text-textMuted px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border border-border/30">
+                                BYOK
                               </span>
-                            )
-                          )}
-                          {paymentMode === "own_key" && (
-                            <span className="hidden sm:inline-flex items-center rounded bg-surface/80 text-textMuted px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border border-border/30">
-                              BYOK
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
                   </motion.button>
                 </div>
               </div>

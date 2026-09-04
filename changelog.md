@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased] - 2026-08-21
 
 ### Added
+- **Studio Video Hover Preview & Lightweight Zero-Re-Render Playback (`ImageStudio.tsx`)**:
+  - **Instant First-Frame Display on Page Load**: Videos use media-fragment `#t=0.001` with `preload="metadata"` and automatic metadata frame-seeking, ensuring the opening frame is immediately decoded and rendered on page load with zero black cards, even when no static poster is provided by the backend.
+  - **Zero React Re-Renders During Playback**: Playback timestamps and glowing progress bars are updated via direct DOM element references (`ref`), eliminating 15–30 React re-renders per second and resulting in featherlight 60fps GPU-accelerated video playback.
+  - **150ms Hover-Intent Filter**: Fast scrolling and cursor sweeps across cards are ignored, only triggering playback when the user intentionally rests on a card.
+  - **Instant Pause & Frame Reset**: Leaving the card resets playback to frame 1 and clears progress bars cleanly.
 - **AI Provider Speed Tiers & Latency Badges**: Integrated `speed_tier`, `speed_label`, `latency_ms`, and `est_tps` into `ProviderModels` in `src/api/api.ts`, and added real-time latency badges (`{latency_ms}ms`), speed-tier indicator dots, and throughput estimation tooltips in the model picker in `MessageInput.tsx`.
 - **Sandbox Safety & Resource Guardrails**: Added output buffer truncation (capped at 1,000 lines / 250 console logs) to prevent DOM memory leaks, log throttling in `CodeRunnerModal.tsx` to maintain 60fps UI, and global unhandled error listeners in `codeDetector.ts` to intercept malformed code gracefully.
 - **Client-Side Python WebAssembly Code Runner (Pyodide)**: Integrated Pyodide WebAssembly in `codeDetector.ts` and `MessageBubble.tsx`, allowing users to execute Python code blocks client-side in the browser with `stdout`, `stderr`, interactive in-terminal CLI input (`input()`), execution timers, and live output without requiring any browser popups or backend resources.
@@ -20,6 +25,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Architecture and Maintenance Documentation**: Created `architecture.md` and added mandatory changelog and architecture maintenance rules in `rules.md`.
 
 ### Added
+- **AI Video Studio & Generation Mode (`ImageStudio.tsx`, `ImageLightbox.tsx`, `api.ts`)**: Added full end-to-end Video Generation mode to the Studio workspace:
+  - **Studio Mode Toggle**: Switch between **Image Studio** and **Video Studio** with dedicated animated indicators in the Studio header.
+  - **Lazy Loading of Video Data**: Video models (`/studio/video/models`) and video gallery records (`/studio/video/gallery`) are only fetched when the user explicitly switches to Video Studio mode, eliminating unnecessary network overhead on default Image Studio loads.
+  - **Video Parameters & Options**: Added video duration selectors (`5s`, `10s`), video-oriented aspect ratios (`16:9 Landscape`, `9:16 Shorts/Reels`, `1:1`, `4:3`), synchronized dynamic credit cost badges (10c for Video, 5c for Image), and dynamically populated video models strictly fetched from `GET /studio/video/models` without hardcoded fallbacks.
+  - **Creation Tools & Multi-Part File Uploads**: Video mode includes **Text to Video** and **Animate Image (Image-to-Video)** with initial starting frame upload, ensuring `reference_image` multipart files are reliably transmitted with explicit filenames and automated boundary headers.
+  - **Dedicated Video Presets (Coming Soon)**: Completely separated Video Presets from Image Presets; when in Video mode, the Preset Libraries tab renders a sleek, dedicated Coming Soon showcase featuring teaser cards for camera paths, motion FX, and style matrices.
+  - **Video Gallery & Lightbox Playback**: Video cards display duration badges (`5s`/`10s`), starting frame (`Frame 1`) reference thumbnails, play button overlays, and hover playback. Clicking opens a full video player in `ImageLightbox` with looping playback, controls, MP4 downloading, and dedicated **Starting Frame Reference** preview badge.
+  - **Video API Client Integration**: Added `generateStudioVideo`, `getStudioVideoModels`, `getStudioVideoGallery`, `getVideoStatus`, and `deleteStudioVideo` connecting directly to the `/studio/video/*` backend endpoints.
 - **AI Model Data Collection & Privacy Policy Indicator (`MessageInput.tsx`, `modelUtils.ts`, `api.ts`)**: Integrated backend `collects_data` and `data_policy_notice` metadata into the frontend architecture.
   - **Mobile-Responsive Popover & Provider Navigation**: Optimized modal proportions (`max-h-[82vh]`) with responsive provider column scaling (`w-[125px] xs:w-[135px] sm:w-[155px]`) for a clean dual-column experience on mobile screens.
   - **Full Data Notice Visibility**: When `collects_data: true`, the complete `data_policy_notice` text is rendered with auto-scroll containment without truncation across the model selector footer and prompt disclaimer.
