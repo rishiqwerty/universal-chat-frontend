@@ -3,10 +3,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import BeforeAfterSlider from "./BeforeAfterSlider";
 import SocialShareModal from "./SocialShareModal";
 import ImageEditMenu from "./ImageEditMenu";
-import { resolveImagePath, getProxyDownloadUrl, type GeneratedImage, type StudioPreset } from "../api/api";
+import { resolveImagePath, getProxyDownloadUrl, type GeneratedImage, type GeneratedVideo, type StudioPreset } from "../api/api";
 
 type Props = {
-  image: GeneratedImage | StudioPreset | null;
+  image: GeneratedImage | GeneratedVideo | StudioPreset | null;
   onClose: () => void;
   onDelete?: (id: string) => void;
   onRecreate?: (preset: StudioPreset) => void;
@@ -19,11 +19,15 @@ const isPreset = (img: any): img is StudioPreset => {
 export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: Props) {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isEditMenuOpen, setIsEditMenuOpen] = useState(false);
-  if (!image || !image.image_url) return null;
+  if (!image) return null;
+
+  const mediaUrl = (image as any).video_url || (image as any).image_url;
+  if (!mediaUrl) return null;
+  const isVideo = Boolean((image as any).video_url);
 
   const handleDownload = async () => {
     try {
-      const url = getProxyDownloadUrl(image.image_url || "");
+      const url = getProxyDownloadUrl(mediaUrl || "");
       const token = localStorage.getItem("access_token");
       const response = await fetch(url, {
         headers: {
@@ -36,7 +40,9 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
       link.href = blobUrl;
       const downloadName = isPreset(image) 
         ? `${image.title.toLowerCase().replace(/_/g, "-")}.png`
-        : `studio-${image.id}.png`;
+        : isVideo
+          ? `studio-video-${image.id}.mp4`
+          : `studio-${image.id}.png`;
       link.download = downloadName;
       document.body.appendChild(link);
       link.click();
@@ -44,7 +50,7 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
       URL.revokeObjectURL(blobUrl);
     } catch {
       // fallback to proxy download to force attachment download
-      window.open(getProxyDownloadUrl(image.image_url || ""), "_blank");
+      window.open(getProxyDownloadUrl(mediaUrl || ""), "_blank");
     }
   };
 
@@ -66,9 +72,19 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
             className="relative mx-4 w-full max-w-2xl overflow-hidden rounded-card border border-border/40 bg-surface shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Image / Before After Slider */}
+            {/* Media / Video / Image / Before After Slider */}
             <div className="flex items-center justify-center bg-background/50 p-2">
-              {isPreset(image) && image.before_image_url ? (
+              {isVideo ? (
+                <video
+                  src={resolveImagePath((image as any).video_url)}
+                  poster={resolveImagePath((image as any).thumbnail_url || (image as any).reference_image_url || "")}
+                  controls
+                  autoPlay
+                  loop
+                  playsInline
+                  className="max-h-[60vh] max-w-full rounded object-contain bg-black"
+                />
+              ) : isPreset(image) && image.before_image_url ? (
                 <div className="w-full flex items-center justify-center p-1">
                   <BeforeAfterSlider
                     beforeImage={resolveImagePath(image.before_image_url)}
@@ -80,7 +96,7 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
                 </div>
               ) : (
                 <img
-                  src={resolveImagePath(image.thumbnail_url || image.image_url)}
+                  src={resolveImagePath((image as any).thumbnail_url || (image as any).image_url)}
                   alt={isPreset(image) ? image.title : image.prompt}
                   className="max-h-[60vh] rounded object-contain"
                 />
@@ -130,7 +146,9 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
                     {/* Source Reference Thumbnails */}
                     {(image.reference_image_url || (image as any).secondary_reference_image_url || (image as any).secondary_image_url || (image as any).outfit_image_url) && (
                       <div className="mt-3 flex flex-col gap-1.5 pt-2 border-t border-border/20">
-                        <span className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Source References:</span>
+                        <span className="text-[10px] font-bold text-textMuted uppercase tracking-wider">
+                          {isVideo ? "Starting Frame Reference:" : "Source References:"}
+                        </span>
                         <div className="flex items-center gap-2">
                           {image.reference_image_url && (
                             <a
@@ -138,20 +156,31 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
                               target="_blank"
                               rel="noreferrer"
                               className="group relative flex items-center gap-1.5 rounded-lg border border-border/40 bg-elevated/40 p-1.5 hover:border-primary/40 transition-colors"
-                              title="View Person / Primary Reference"
+                              title={isVideo ? "View Initial Starting Frame (Frame 1)" : "View Person / Primary Reference"}
                             >
                               <img
                                 src={resolveImagePath(image.reference_image_thumbnail_url || image.reference_image_url)}
-                                alt="Person Reference"
+                                alt={isVideo ? "Frame 1 Reference" : "Person Reference"}
                                 className="h-8 w-8 rounded object-cover"
                               />
-                              <span className="text-[10px] font-semibold text-textSecondary group-hover:text-primary pr-1">
-                                👤 Person
+                              <span className="text-[10px] font-semibold text-textSecondary group-hover:text-primary pr-1 flex items-center gap-1">
+                                {isVideo ? (
+                                  <>
+                                    <svg className="h-3 w-3 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                                      <circle cx="8.5" cy="8.5" r="1.5" />
+                                      <polyline points="21 15 16 10 5 21" />
+                                    </svg>
+                                    <span>Frame 1 Reference</span>
+                                  </>
+                                ) : (
+                                  <>👤 Person</>
+                                )}
                               </span>
                             </a>
                           )}
 
-                          {((image as any).secondary_reference_image_url || (image as any).secondary_image_url || (image as any).outfit_image_url) && (
+                          {!isVideo && ((image as any).secondary_reference_image_url || (image as any).secondary_image_url || (image as any).outfit_image_url) && (
                             <a
                               href={resolveImagePath((image as any).secondary_reference_image_url || (image as any).secondary_image_url || (image as any).outfit_image_url)}
                               target="_blank"
@@ -194,8 +223,8 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
                   <span>Share</span>
                 </button>
 
-                {/* Edit Action Menu */}
-                {!isPreset(image) && (
+                {/* Edit & Transform Menu Trigger (only for static images) */}
+                {!isVideo && (
                   <button
                     type="button"
                     onClick={() => setIsEditMenuOpen(true)}
@@ -217,7 +246,7 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
                   onClick={handleDownload}
                   className="rounded-input bg-primary px-4 py-2 text-xs font-semibold text-background transition-colors hover:bg-primaryHover"
                 >
-                  Download
+                  Download {isVideo ? "MP4" : "PNG"}
                 </button>
                 {/* Recreate Preset */}
                 {isPreset(image) && onRecreate && (
@@ -260,17 +289,19 @@ export default function ImageLightbox({ image, onClose, onDelete, onRecreate }: 
             <SocialShareModal
               isOpen={isShareOpen}
               onClose={() => setIsShareOpen(false)}
-              imageUrl={image.image_url || ""}
+              imageUrl={(image as any).image_url || (image as any).thumbnail_url || (image as any).video_url || ""}
               prompt={isPreset(image) ? image.title : image.prompt}
               title={isPreset(image) ? image.title : undefined}
             />
 
             {/* Image Edit & Transform Menu */}
-            <ImageEditMenu
-              isOpen={isEditMenuOpen}
-              onClose={() => setIsEditMenuOpen(false)}
-              image={image}
-            />
+            {!isVideo && (
+              <ImageEditMenu
+                isOpen={isEditMenuOpen}
+                onClose={() => setIsEditMenuOpen(false)}
+                image={image as (GeneratedImage | StudioPreset)}
+              />
+            )}
           </motion.div>
         </motion.div>
       )}

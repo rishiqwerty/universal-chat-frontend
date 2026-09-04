@@ -739,11 +739,11 @@ export async function generateStudioImage(
   formData.append("aspect_ratio", aspectRatio);
   formData.append("payment_mode", paymentMode);
   if (referenceImage) {
-    formData.append("reference_image", referenceImage);
+    formData.append("reference_image", referenceImage, referenceImage.name || "reference.png");
   }
   if (secondaryImage) {
-    formData.append("secondary_image", secondaryImage);
-    formData.append("outfit_image", secondaryImage);
+    formData.append("secondary_image", secondaryImage, secondaryImage.name || "secondary.png");
+    formData.append("outfit_image", secondaryImage, secondaryImage.name || "secondary.png");
   }
   if (presetId) {
     formData.append("preset_id", presetId);
@@ -753,11 +753,7 @@ export async function generateStudioImage(
     formData.append("edit_type", task);
   }
 
-  const { data } = await client.post("/studio/generate", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
+  const { data } = await client.post("/studio/generate", formData);
   return data;
 }
 
@@ -789,6 +785,80 @@ export async function getStudioGallery(limit = 50, offset = 0): Promise<Generate
 
 export async function deleteStudioImage(imageId: string): Promise<void> {
   await client.delete(`/studio/${imageId}`);
+}
+
+// --- Video Studio ---
+
+export type GeneratedVideo = {
+  id: string;
+  prompt: string;
+  video_url: string | null;
+  thumbnail_url?: string | null;
+  reference_image_url: string | null;
+  reference_image_thumbnail_url?: string | null;
+  aspect_ratio: string;
+  duration_seconds: number;
+  provider: string;
+  model: string;
+  used_credits: string;
+  payment_mode: string;
+  status: string; // "pending" | "generating" | "completed" | "failed" | "queued"
+  error_message: string | null;
+  created_at: string;
+};
+
+export async function getStudioVideoModels(): Promise<StudioModels> {
+  const { data } = await client.get("/studio/video/models");
+  return data;
+}
+
+export async function getVideoCost(model: string, provider: string, durationSeconds: number): Promise<number> {
+  const { data } = await client.get(`/studio/video/cost`, {
+    params: {
+      model,
+      provider,
+      duration_seconds: durationSeconds
+    }
+  });
+  return data.credit_cost;
+}
+
+export async function generateStudioVideo(
+  prompt: string,
+  provider: string,
+  model: string,
+  aspectRatio: string = "16:9",
+  durationSeconds: number = 5,
+  paymentMode: string = "own_key",
+  referenceImage: File | null = null
+): Promise<GeneratedVideo> {
+  const formData = new FormData();
+  formData.append("prompt", prompt);
+  formData.append("provider", provider);
+  formData.append("model", model);
+  formData.append("aspect_ratio", aspectRatio);
+  formData.append("duration_seconds", String(durationSeconds));
+  formData.append("payment_mode", paymentMode);
+  if (referenceImage) {
+    formData.append("reference_image", referenceImage, referenceImage.name || "reference.png");
+  }
+
+  const { data } = await client.post("/studio/video/generate", formData);
+  return data;
+}
+
+export async function getStudioVideoGallery(limit = 50, offset = 0): Promise<GeneratedVideo[]> {
+  const { data } = await client.get(`/studio/video/gallery?limit=${limit}&offset=${offset}`);
+  return data;
+}
+
+export async function getVideoStatus(videoId: string): Promise<GeneratedVideo> {
+  const { data } = await client.get(`/studio/video/status/${videoId}`);
+  return data;
+}
+
+export async function deleteStudioVideo(videoId: string): Promise<void> {
+  await client.delete(`/studio/video/${videoId}`);
 }
 
 export type StudioPreset = {
