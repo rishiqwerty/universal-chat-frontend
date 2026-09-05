@@ -614,6 +614,9 @@ export default function ImageStudio() {
   const [mediaMode, setMediaMode] = useState<"image" | "video">("image");
   const [models, setModels] = useState<StudioModels>({});
   const [videoModels, setVideoModels] = useState<StudioModels>({});
+  const [loadingModels, setLoadingModels] = useState(true);
+  const [loadingVideoModels, setLoadingVideoModels] = useState(false);
+  const [hasFetchedVideoModels, setHasFetchedVideoModels] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedVideoProvider, setSelectedVideoProvider] = useState("");
@@ -875,6 +878,7 @@ export default function ImageStudio() {
 
   // Fetch available image models and queue status
   useEffect(() => {
+    setLoadingModels(true);
     getStudioModels()
       .then((data) => {
         if (data && typeof data === "object" && Object.keys(data).length > 0) {
@@ -915,6 +919,31 @@ export default function ImageStudio() {
         setModels(defaults);
         setSelectedProvider("Flux");
         setSelectedModel("flux-schnell");
+      })
+      .finally(() => {
+        setLoadingModels(false);
+      });
+
+    // Pre-fetch video models so switching to video mode is instant
+    setLoadingVideoModels(true);
+    getStudioVideoModels()
+      .then((data) => {
+        if (data && typeof data === "object" && Object.keys(data).length > 0) {
+          setVideoModels(data);
+          const vProviders = Object.keys(data);
+          if (vProviders.length > 0) {
+            setSelectedVideoProvider(vProviders[0]);
+            const vModels = data[vProviders[0]];
+            if (vModels && vModels.length > 0) {
+              setSelectedVideoModel(vModels[0]);
+            }
+          }
+        }
+      })
+      .catch(() => { })
+      .finally(() => {
+        setLoadingVideoModels(false);
+        setHasFetchedVideoModels(true);
       });
 
     getQueueStatus().then(setQueueStatus).catch(() => { });
@@ -1038,7 +1067,8 @@ export default function ImageStudio() {
     if (mediaMode !== "video" || !isAuthenticated) return;
 
     // 1. Fetch video models if not yet loaded
-    if (Object.keys(videoModels).length === 0) {
+    if (!hasFetchedVideoModels && Object.keys(videoModels).length === 0) {
+      setLoadingVideoModels(true);
       getStudioVideoModels()
         .then((data) => {
           if (data && typeof data === "object" && Object.keys(data).length > 0) {
@@ -1061,6 +1091,10 @@ export default function ImageStudio() {
           setVideoModels({});
           setSelectedVideoProvider("");
           setSelectedVideoModel("");
+        })
+        .finally(() => {
+          setLoadingVideoModels(false);
+          setHasFetchedVideoModels(true);
         });
     }
 
@@ -1372,6 +1406,8 @@ export default function ImageStudio() {
     return 0;
   });
   const hasModels = providerKeys.length > 0;
+  const isVideoModelsLoading = loadingVideoModels || (!hasFetchedVideoModels && Object.keys(videoModels).length === 0);
+  const isCurrentModeModelsLoading = mediaMode === "video" ? isVideoModelsLoading : loadingModels;
   const displayedGallery = gallery.slice(0, visibleCount);
   const hasMore = gallery.length > visibleCount;
 
@@ -1452,6 +1488,9 @@ export default function ImageStudio() {
                       setMediaMode("video");
                       setActiveTask(null);
                       if (aspectRatio === "1:1") setAspectRatio("16:9");
+                      if (!hasFetchedVideoModels && Object.keys(videoModels).length === 0) {
+                        setLoadingVideoModels(true);
+                      }
                     }}
                     className={`flex items-center gap-1 sm:gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${mediaMode === "video"
                         ? "bg-primary text-background shadow-sm"
@@ -1997,7 +2036,33 @@ export default function ImageStudio() {
                         {/* Provider & Model */}
                         {paymentMode !== "free_queue" && (
                           mediaMode === "video" ? (
-                            Object.keys(videoModels).length > 0 ? (
+                            isVideoModelsLoading ? (
+                              <>
+                                <div className="w-full sm:w-auto min-w-[130px] flex-1 sm:flex-initial">
+                                  <div className="mb-1 flex items-center justify-between">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-textMuted">Video Provider</span>
+                                    <span className="relative flex h-1.5 w-1.5">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary"></span>
+                                    </span>
+                                  </div>
+                                  <div className="h-9 flex items-center gap-2 rounded-input border border-border/60 bg-surface/70 px-2.5 text-xs text-textMuted select-none backdrop-blur-sm">
+                                    <svg className="h-3.5 w-3.5 animate-spin text-primary shrink-0" viewBox="0 0 24 24" fill="none">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                    </svg>
+                                    <span className="text-textMuted text-xs font-medium animate-pulse truncate">Loading providers...</span>
+                                  </div>
+                                </div>
+                                <div className="w-full sm:w-auto min-w-[170px] flex-1 sm:flex-initial">
+                                  <div className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Video Model</div>
+                                  <div className="h-9 flex items-center gap-2 rounded-input border border-border/60 bg-surface/70 px-2.5 text-xs text-textMuted select-none backdrop-blur-sm">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-pulse shrink-0" />
+                                    <span className="text-textMuted text-xs font-medium animate-pulse truncate">Fetching models...</span>
+                                  </div>
+                                </div>
+                              </>
+                            ) : Object.keys(videoModels).length > 0 ? (
                               <>
                                 <div className="w-full sm:w-auto min-w-[120px] flex-1 sm:flex-initial">
                                   <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Video Provider</label>
@@ -2031,12 +2096,41 @@ export default function ImageStudio() {
                                 </div>
                               </>
                             ) : (
-                              <div className="h-9 flex items-center rounded-input border border-border/40 bg-surface/50 px-3 text-xs text-textMuted w-full sm:w-auto">
-                                No video models available.
+                              <div className="h-9 flex items-center gap-2 rounded-input border border-border/40 bg-surface/50 px-3 text-xs text-textMuted w-full sm:w-auto">
+                                <svg className="h-3.5 w-3.5 text-amber-500/80 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <span>No video models available.</span>
                               </div>
                             )
                           ) : (
-                            hasModels ? (
+                            loadingModels ? (
+                              <>
+                                <div className="w-full sm:w-auto min-w-[130px] flex-1 sm:flex-initial">
+                                  <div className="mb-1 flex items-center justify-between">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-textMuted">Provider</span>
+                                    <span className="relative flex h-1.5 w-1.5">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary"></span>
+                                    </span>
+                                  </div>
+                                  <div className="h-9 flex items-center gap-2 rounded-input border border-border/60 bg-surface/70 px-2.5 text-xs text-textMuted select-none backdrop-blur-sm">
+                                    <svg className="h-3.5 w-3.5 animate-spin text-primary shrink-0" viewBox="0 0 24 24" fill="none">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                    </svg>
+                                    <span className="text-textMuted text-xs font-medium animate-pulse truncate">Loading providers...</span>
+                                  </div>
+                                </div>
+                                <div className="w-full sm:w-auto min-w-[170px] flex-1 sm:flex-initial">
+                                  <div className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Model</div>
+                                  <div className="h-9 flex items-center gap-2 rounded-input border border-border/60 bg-surface/70 px-2.5 text-xs text-textMuted select-none backdrop-blur-sm">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-pulse shrink-0" />
+                                    <span className="text-textMuted text-xs font-medium animate-pulse truncate">Fetching models...</span>
+                                  </div>
+                                </div>
+                              </>
+                            ) : hasModels ? (
                               <>
                                 <div className="w-full sm:w-auto min-w-[120px] flex-1 sm:flex-initial">
                                   <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-textMuted">Provider</label>
@@ -2781,7 +2875,14 @@ export default function ImageStudio() {
                     whileTap={{ scale: 0.95 }}
                     transition={{ type: "spring", stiffness: 400, damping: 15 }}
                     onClick={handleGenerate}
-                    disabled={generating || (!prompt.trim() && !selectedPreset) || (paymentMode !== "free_queue" && (mediaMode === "video" ? !selectedVideoModel : !hasModels))}
+                    disabled={
+                      generating ||
+                      (!prompt.trim() && !selectedPreset) ||
+                      (paymentMode !== "free_queue" &&
+                        (mediaMode === "video"
+                          ? !selectedVideoModel || isVideoModelsLoading
+                          : !hasModels || loadingModels))
+                    }
                     className="relative flex h-9 shrink-0 items-center justify-center gap-1 sm:gap-2 rounded-xl bg-primary px-3 sm:px-4 text-xs font-black uppercase tracking-wider text-background shadow-[0_0_15px_rgba(var(--color-primary),0.3)] transition-all hover:bg-primaryHover disabled:opacity-30 disabled:hover:scale-100"
                   >
                     {generating ? (
@@ -2791,6 +2892,14 @@ export default function ImageStudio() {
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                         </svg>
                         <span>Synthesizing...</span>
+                      </div>
+                    ) : isCurrentModeModelsLoading && paymentMode !== "free_queue" && (prompt.trim() || selectedPreset) ? (
+                      <div className="flex items-center gap-1.5 sm:gap-2 opacity-90">
+                        <svg className="h-3.5 w-3.5 animate-spin text-background" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                        </svg>
+                        <span>Loading models…</span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1 sm:gap-1.5">

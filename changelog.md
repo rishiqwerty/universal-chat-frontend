@@ -8,12 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased] - 2026-08-21
 
 ### Added
-- **Studio Video Hover Preview & Lightweight Zero-Re-Render Playback (`ImageStudio.tsx`)**:
-  - **Beta Tag & Indicator**: Added sleek `Beta` badges to the Video mode switcher and creation toolbar in Image Studio, indicating that video synthesis is currently in beta.
-  - **Instant First-Frame Display on Page Load**: Videos use media-fragment `#t=0.001` with `preload="metadata"` and automatic metadata frame-seeking, ensuring the opening frame is immediately decoded and rendered on page load with zero black cards, even when no static poster is provided by the backend.
-  - **Zero React Re-Renders During Playback**: Playback timestamps and glowing progress bars are updated via direct DOM element references (`ref`), eliminating 15–30 React re-renders per second and resulting in featherlight 60fps GPU-accelerated video playback.
-  - **150ms Hover-Intent Filter**: Fast scrolling and cursor sweeps across cards are ignored, only triggering playback when the user intentionally rests on a card.
-  - **Instant Pause & Frame Reset**: Leaving the card resets playback to frame 1 and clears progress bars cleanly.
+- **Studio Dynamic Model Loading States & Skeletons (`ImageStudio.tsx`)**:
+  - **Eliminated False "No Models" Flashes**: Replaced premature "No image models found" and "No video models available" fallback messages with animated loading skeletons, pulsing status indicators, and spinning loader badges while API endpoints (`/studio/models` and `/studio/video/models`) are actively in flight.
+  - **Eager Video Models Prefetching**: Automatically prefetches video models in the background on initial mount so switching from Image to Video Studio mode is instantaneous with pre-populated providers and models.
+  - **Synthesize Button Model-Ready State**: Added dedicated `"Loading models…"` spinner state on the generation button when a user starts composing before models finish resolving, preventing accidental submission and eliminating mystery disabled states.
+- **Brand PNG Logo Assets & Web Icon Integration (`public/`, `index.html`)**:
+  - **High-Resolution PNG Logos**: Generated pixel-perfect antialiased PNG assets from the brand's neural block geometric mark:
+    - Transparent Mark: `logo.png` (1024×1024) and `logo-512.png` (512×512).
+    - App Icon Card: `logo-card.png` (1024×1024), `logo-card-512.png` (512×512), and `logo-card-192.png` (192×192) featuring the signature neon `#D9FF00` glyph on dark `#18181b` rounded card surface.
+    - Horizontal Brand Banners: `logo-banner.png` and `logo-full-transparent.png` (1200×320) with official "Neural Architect" brand typography.
+  - **HTML Favicon & Touch Icon Linkage**: Updated `index.html` to reference `logo-card.svg` and `logo-card.png` for modern browser tabs and Apple mobile home screen bookmarks.
 - **AI Provider Speed Tiers & Latency Badges**: Integrated `speed_tier`, `speed_label`, `latency_ms`, and `est_tps` into `ProviderModels` in `src/api/api.ts`, and added real-time latency badges (`{latency_ms}ms`), speed-tier indicator dots, and throughput estimation tooltips in the model picker in `MessageInput.tsx`.
 - **Sandbox Safety & Resource Guardrails**: Added output buffer truncation (capped at 1,000 lines / 250 console logs) to prevent DOM memory leaks, log throttling in `CodeRunnerModal.tsx` to maintain 60fps UI, and global unhandled error listeners in `codeDetector.ts` to intercept malformed code gracefully.
 - **Client-Side Python WebAssembly Code Runner (Pyodide)**: Integrated Pyodide WebAssembly in `codeDetector.ts` and `MessageBubble.tsx`, allowing users to execute Python code blocks client-side in the browser with `stdout`, `stderr`, interactive in-terminal CLI input (`input()`), execution timers, and live output without requiring any browser popups or backend resources.
